@@ -16,16 +16,18 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
     const videoElement = videoRef.current;
     if (videoElement && video) {
       console.log('Loading video:', video.name, video.type, video.size);
+      console.log('Video object reference:', video);
       
       // Create object URL for the video file
       const videoUrl = URL.createObjectURL(video);
+      console.log('Created video URL:', videoUrl);
       videoElement.src = videoUrl;
       
       const handleLoadedMetadata = () => {
         console.log('Video metadata loaded, duration:', videoElement.duration);
         setDuration(videoElement.duration);
-        setIsVideoLoaded(true);
-        setVideoError('');
+        // Sync the playing state with the actual video element state
+        setIsPlaying(!videoElement.paused);
       };
 
       const handleLoadedData = () => {
@@ -36,6 +38,8 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
       const handleCanPlay = () => {
         console.log('Video can start playing');
         setIsVideoLoaded(true);
+        // Sync the playing state with the actual video element state
+        setIsPlaying(!videoElement.paused);
       };
 
       const handleTimeUpdate = () => {
@@ -84,6 +88,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
       videoElement.addEventListener('error', handleError);
 
       return () => {
+        console.log('Cleaning up video element');
         // Cleanup
         videoElement.removeEventListener('loadstart', handleLoadStart);
         videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -99,7 +104,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
         URL.revokeObjectURL(videoUrl);
       };
     }
-  }, [video, onTimeUpdate]);
+  }, [video]); // Removed onTimeUpdate from dependencies
 
   const togglePlayPause = async () => {
     const videoElement = videoRef.current;
@@ -110,7 +115,8 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
         console.log('Video element paused:', videoElement.paused);
         console.log('Video element currentTime:', videoElement.currentTime);
         
-        if (isPlaying) {
+        // Use the actual video element state instead of React state
+        if (!videoElement.paused) {
           console.log('Attempting to pause video');
           videoElement.pause();
         } else {

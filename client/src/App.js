@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import './App.css';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
@@ -19,10 +19,10 @@ function App() {
     setVideoDuration(0);
   };
 
-  const handleTimeUpdate = (currentTime, duration) => {
+  const handleTimeUpdate = useCallback((currentTime, duration) => {
     setCurrentTime(currentTime);
     setVideoDuration(duration);
-  };
+  }, []);
 
   const startTranscription = () => {
     setIsTranscribing(true);
