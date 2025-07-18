@@ -1,0 +1,377 @@
+.transcription-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 500px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.panel-header h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.transcription-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.start-btn, .stop-btn, .clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.start-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.start-btn:hover {
+  background: #229954;
+  transform: translateY(-1px);
+}
+
+.start-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.stop-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.stop-btn:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+}
+
+.clear-btn {
+  background: #95a5a6;
+  color: white;
+}
+
+.clear-btn:hover {
+  background: #7f8c8d;
+  transform: translateY(-1px);
+}
+
+.clear-btn:disabled {
+  background: #ecf0f1;
+  color: #bdc3c7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.error-message, .warning-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.error-message {
+  background: rgba(231, 76, 60, 0.1);
+  color: #c0392b;
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.warning-message {
+  background: rgba(243, 156, 18, 0.1);
+  color: #d68910;
+  border: 1px solid rgba(243, 156, 18, 0.2);
+}
+
+.transcription-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transcription-textarea {
+  flex: 1;
+  min-height: 200px;
+}
+
+.transcription-textarea textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.transcription-textarea textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.transcription-textarea textarea.listening {
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.05);
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: #e74c3c;
+  }
+  50% {
+    border-color: #c0392b;
+  }
+}
+
+.transcription-textarea textarea::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.transcription-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.copy-btn, .download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn {
+  background: #3498db;
+  color: white;
+}
+
+.copy-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.download-btn {
+  background: #9b59b6;
+  color: white;
+}
+
+.download-btn:hover {
+  background: #8e44ad;
+  transform: translateY(-1px);
+}
+
+.transcription-history {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.transcription-history h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-item {
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 8px;
+  padding: 0.75rem;
+  border-left: 3px solid #667eea;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.history-time {
+  font-weight: 500;
+}
+
+.video-time {
+  background: #667eea;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.history-text {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #333;
+  word-wrap: break-word;
+}
+
+.video-progress {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: #666;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.1s ease;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transcription-panel {
+    padding: 1rem;
+  }
+  
+  .panel-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .transcription-controls {
+    justify-content: center;
+  }
+  
+  .start-btn, .stop-btn, .clear-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .transcription-textarea textarea {
+    min-height: 150px;
+    font-size: 0.9rem;
+  }
+  
+  .transcription-actions {
+    flex-direction: column;
+  }
+  
+  .copy-btn, .download-btn {
+    justify-content: center;
+  }
+  
+  .history-list {
+    max-height: 150px;
+  }
+}
+
+/* Scrollbar for history */
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 3px;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 3px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
+}
+
+/* Animation for new history items */
+.history-item {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Success state for copy/download buttons */
+.copy-btn.success, .download-btn.success {
+  background: #27ae60;
+}
+
+.copy-btn.success:hover, .download-btn.success:hover {
+  background: #229954;
+} 
