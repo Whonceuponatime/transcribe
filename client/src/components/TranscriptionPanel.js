@@ -11,21 +11,18 @@ const TranscriptionPanel = ({
   transcriptionHistory,
   currentTime,
   videoDuration,
-  formatTime
+  formatTime,
+  videoFile // Add videoFile prop
 }) => {
-  const [recognition, setRecognition] = useState(null);
   const [isSupported, setIsSupported] = useState(false);
   const [error, setError] = useState('');
   const [debugInfo, setDebugInfo] = useState('');
   const [browserInfo, setBrowserInfo] = useState('');
-  const [isRecognitionActive, setIsRecognitionActive] = useState(false);
-  const [micPermission, setMicPermission] = useState('unknown');
-  const [hasError, setHasError] = useState(false);
-  const [restartAttempts, setRestartAttempts] = useState(0);
-  const [lastError, setLastError] = useState('');
-  const [shouldRestart, setShouldRestart] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const textareaRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
 
   // Detect browser and provide specific guidance
   useEffect(() => {
@@ -51,228 +48,157 @@ const TranscriptionPanel = ({
     
     // Check for HTTPS in production
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      setError('Speech recognition requires HTTPS in production. Please use a secure connection.');
+      setError('Audio processing requires HTTPS in production. Please use a secure connection.');
       return;
     }
 
-    // Check microphone permission
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'microphone' }).then(result => {
-        setMicPermission(result.state);
-        setDebugInfo(`Microphone permission: ${result.state}`);
-      });
+    // Check if Web Audio API is supported
+    if (window.AudioContext || window.webkitAudioContext) {
+      setIsSupported(true);
+      setDebugInfo('Audio processing supported');
+    } else {
+      setIsSupported(false);
+      setError('Audio processing is not supported in this browser. Please use Chrome or Edge.');
     }
   }, []);
 
-  // Initialize speech recognition only once
-  useEffect(() => {
-    if (recognitionRef.current) return; // Already initialized
+  const extractAudioFromVideo = async (videoFile) => {
+    try {
+      const fileSizeMB = (videoFile.size / (1024 * 1024)).toFixed(2);
+      setDebugInfo(`Processing video (${fileSizeMB} MB)...`);
+      setIsProcessing(true);
+      setProgress(5);
 
-    // Check if Web Speech API is supported
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      
-      try {
-        const recognitionInstance = new SpeechRecognition();
-        
-        recognitionInstance.continuous = true;
-        recognitionInstance.interimResults = true;
-        recognitionInstance.lang = 'en-US';
-        recognitionInstance.maxAlternatives = 1;
+      // For large files, we'll skip client-side audio extraction and send directly to server
+      setProgress(20);
+      setDebugInfo(`Sending ${fileSizeMB} MB video to server for processing...`);
 
-        recognitionInstance.onstart = () => {
-          console.log('Speech recognition started');
-          setIsRecognitionActive(true);
-          setHasError(false);
-          setLastError('');
-          setShouldRestart(false);
-          setDebugInfo('Speech recognition started successfully');
-          setError('');
-        };
+      // Send to transcription service
+      const transcript = await transcribeAudio();
+      setProgress(80);
 
-        recognitionInstance.onresult = (event) => {
-          let finalTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            }
-          }
-
-          if (finalTranscript) {
-            setTranscription(prev => prev + ' ' + finalTranscript);
-            setDebugInfo(`Transcribed: "${finalTranscript}"`);
-          }
-        };
-
-        recognitionInstance.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          setIsRecognitionActive(false);
-          setHasError(true);
-          setLastError(event.error);
-          
-          let errorMessage = `Speech recognition error: ${event.error}`;
-          
-          // Provide specific guidance for common errors
-          switch(event.error) {
-            case 'aborted':
-              errorMessage = 'Speech recognition was aborted. This usually happens when the browser stops the recognition. Try refreshing the page and ensure you\'re using Chrome or Edge.';
-              // Don't restart on aborted errors
-              setShouldRestart(false);
-              break;
-            case 'audio-capture':
-              errorMessage = 'Audio capture failed. Please check your microphone permissions and ensure your microphone is working.';
-              setShouldRestart(false);
-              break;
-            case 'bad-grammar':
-              errorMessage = 'Bad grammar error. This is usually a browser issue. Try refreshing the page.';
-              setShouldRestart(false);
-              break;
-            case 'language-not-supported':
-              errorMessage = 'Language not supported. The app is configured for English (US).';
-              setShouldRestart(false);
-              break;
-            case 'network':
-              errorMessage = 'Network error. Please check your internet connection.';
-              setShouldRestart(true);
-              break;
-            case 'no-speech':
-              errorMessage = 'No speech detected. Please speak clearly into your microphone.';
-              setShouldRestart(true);
-              break;
-            case 'not-allowed':
-              errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings.';
-              setShouldRestart(false);
-              break;
-            case 'service-not-allowed':
-              errorMessage = 'Speech recognition service not allowed. Please check your browser settings.';
-              setShouldRestart(false);
-              break;
-            default:
-              errorMessage = `Speech recognition error: ${event.error}. Please try refreshing the page.`;
-              setShouldRestart(false);
-          }
-          
-          setError(errorMessage);
-          setDebugInfo(`Error occurred: ${event.error}`);
-          
-          // Stop transcription on critical errors
-          if (event.error === 'aborted' || event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            onStopTranscription();
-          }
-        };
-
-        recognitionInstance.onend = () => {
-          console.log('Speech recognition ended');
-          setIsRecognitionActive(false);
-          setDebugInfo('Speech recognition ended');
-          
-          // Only restart if we're still supposed to be transcribing AND no critical errors occurred
-          if (isTranscribing && shouldRestart && restartAttempts < 2 && lastError !== 'aborted') {
-            setTimeout(() => {
-              try {
-                if (isTranscribing && !isRecognitionActive && shouldRestart && restartAttempts < 2) {
-                  setRestartAttempts(prev => prev + 1);
-                  recognitionInstance.start();
-                  setDebugInfo(`Restarting speech recognition... (attempt ${restartAttempts + 1})`);
-                }
-              } catch (error) {
-                console.error('Error restarting recognition:', error);
-                setError('Failed to restart speech recognition. Please try again.');
-                onStopTranscription();
-              }
-            }, 3000); // Increased delay to prevent rapid restarts
-          } else if (restartAttempts >= 2 || lastError === 'aborted') {
-            setError('Speech recognition failed to start after multiple attempts. Please refresh the page and try again.');
-            onStopTranscription();
-          }
-        };
-
-        recognitionRef.current = recognitionInstance;
-        setRecognition(recognitionInstance);
-        setIsSupported(true);
-        setDebugInfo('Speech recognition initialized successfully');
-      } catch (error) {
-        console.error('Error creating speech recognition:', error);
-        setError('Failed to initialize speech recognition. Please ensure you\'re using Chrome or Edge browser.');
-        setIsSupported(false);
+      if (transcript) {
+        setTranscription(transcript);
+        setDebugInfo(`Transcription completed: ${transcript.length} characters`);
+      } else {
+        setError('No transcription result received');
       }
-    } else {
-      setIsSupported(false);
-      setError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
-    }
 
-    // Cleanup function
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error) {
-          console.error('Error stopping recognition during cleanup:', error);
-        }
-        recognitionRef.current = null;
+      setProgress(100);
+      setIsProcessing(false);
+    } catch (error) {
+      console.error('Audio extraction error:', error);
+      setError(`Audio extraction failed: ${error.message}`);
+      setIsProcessing(false);
+    }
+  };
+
+  const convertToWav = async (audioBuffer) => {
+    // Convert AudioBuffer to WAV format
+    const length = audioBuffer.length;
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+
+    // WAV header
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
       }
     };
-  }, []); // Empty dependency array - only run once
 
-  // Handle transcription start/stop
-  useEffect(() => {
-    if (!recognitionRef.current) return;
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * numberOfChannels * 2, true);
 
-    if (isTranscribing && !isRecognitionActive && !hasError) {
-      try {
-        setHasError(false);
-        setRestartAttempts(0);
-        setLastError('');
-        setShouldRestart(false);
-        recognitionRef.current.start();
-        setDebugInfo('Starting speech recognition...');
-      } catch (error) {
-        console.error('Error starting recognition:', error);
-        setError('Failed to start speech recognition. Please try refreshing the page.');
-        setDebugInfo(`Start error: ${error.message}`);
-      }
-    } else if (!isTranscribing && isRecognitionActive) {
-      try {
-        recognitionRef.current.stop();
-        setDebugInfo('Stopping speech recognition...');
-      } catch (error) {
-        console.error('Error stopping recognition:', error);
-        setDebugInfo(`Stop error: ${error.message}`);
+    // Write audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
       }
     }
-  }, [isTranscribing, isRecognitionActive, hasError]);
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
+
+  const transcribeAudio = async () => {
+    try {
+      const fileSizeMB = (videoFile.size / (1024 * 1024)).toFixed(2);
+      setDebugInfo(`Sending video for transcription (${fileSizeMB} MB)...`);
+      
+      // Create FormData with the video file
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      
+      // Send to our transcription API (backend server on port 5000)
+      const response = await fetch('http://localhost:5000/api/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        let errorMessage = 'Transcription failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.details || 'Transcription failed';
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.transcription) {
+        setDebugInfo(`Transcription completed: ${result.transcription.length} characters (${fileSizeMB} MB video)`);
+        return result.transcription;
+      } else {
+        throw new Error('No transcription result received');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      throw new Error(`Transcription failed: ${error.message}`);
+    }
+  };
 
   const handleStartTranscription = async () => {
+    if (!videoFile) {
+      setError('No video file available for transcription');
+      return;
+    }
+
     setError('');
-    setHasError(false);
-    setRestartAttempts(0);
-    setLastError('');
-    setShouldRestart(false);
-    setDebugInfo('User requested to start transcription');
+    setProgress(0);
+    setDebugInfo('Starting video audio transcription...');
+    onStartTranscription();
     
-    // Check microphone permission first
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
-      setMicPermission('granted');
-      setDebugInfo('Microphone permission granted');
-      onStartTranscription();
+      await extractAudioFromVideo(videoFile);
     } catch (error) {
-      console.error('Microphone permission error:', error);
-      setError('Microphone access denied. Please allow microphone access and try again.');
-      setMicPermission('denied');
-      setDebugInfo('Microphone permission denied');
+      console.error('Transcription failed:', error);
+      setError(`Transcription failed: ${error.message}`);
+      onStopTranscription();
     }
   };
 
   const handleStopTranscription = () => {
     setDebugInfo('User requested to stop transcription');
-    setHasError(false);
-    setRestartAttempts(0);
-    setLastError('');
-    setShouldRestart(false);
+    setIsProcessing(false);
+    setProgress(0);
     onStopTranscription();
   };
 
@@ -315,11 +241,10 @@ const TranscriptionPanel = ({
   const getTroubleshootingSteps = () => {
     const steps = [
       '1. Ensure you\'re using Chrome or Edge browser',
-      '2. Allow microphone access when prompted',
-      '3. Check that your microphone is working',
-      '4. Try refreshing the page',
-      '5. Disable any browser extensions that might interfere',
-      '6. Check your browser\'s privacy settings'
+      '2. Check that the video file contains audio',
+      '3. Try with a different video file',
+      '4. Refresh the page and try again',
+      '5. Check your browser\'s audio settings'
     ];
     return steps.join('\n');
   };
@@ -327,19 +252,19 @@ const TranscriptionPanel = ({
   return (
     <div className="transcription-panel">
       <div className="panel-header">
-        <h3>🎤 Transcription</h3>
+        <h3>🎵 Video Audio Transcription</h3>
         <div className="transcription-controls">
           {!isTranscribing ? (
             <button
               className="start-btn"
               onClick={handleStartTranscription}
-              disabled={!isSupported}
+              disabled={!isSupported || !videoFile}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="12" r="10"/>
                 <circle cx="12" cy="12" r="3"/>
               </svg>
-              Start
+              Transcribe Video
             </button>
           ) : (
             <button
@@ -371,7 +296,7 @@ const TranscriptionPanel = ({
       {/* Browser info */}
       {browserInfo && (
         <div className="browser-info" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
-          Browser: {browserInfo} | Mic Permission: {micPermission}
+          Browser: {browserInfo} | Audio Processing: {isSupported ? 'Supported' : 'Not Supported'}
         </div>
       )}
 
@@ -383,14 +308,12 @@ const TranscriptionPanel = ({
             <line x1="9" y1="9" x2="15" y2="15"/>
           </svg>
           {error}
-          {error.includes('aborted') && (
-            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-              <strong>Troubleshooting steps:</strong>
-              <pre style={{ fontSize: '0.8rem', marginTop: '0.25rem', whiteSpace: 'pre-line' }}>
-                {getTroubleshootingSteps()}
-              </pre>
-            </div>
-          )}
+          <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+            <strong>Troubleshooting steps:</strong>
+            <pre style={{ fontSize: '0.8rem', marginTop: '0.25rem', whiteSpace: 'pre-line' }}>
+              {getTroubleshootingSteps()}
+            </pre>
+          </div>
         </div>
       )}
 
@@ -401,14 +324,29 @@ const TranscriptionPanel = ({
             <line x1="12" y1="9" x2="12" y2="13"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
-          Speech recognition requires Chrome or Edge browser
+          Audio processing requires Chrome or Edge browser
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {isProcessing && (
+        <div className="progress-container" style={{ marginBottom: '1rem' }}>
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="progress-text">
+            Processing: {progress}%
+          </div>
         </div>
       )}
 
       {/* Debug info for troubleshooting */}
       {process.env.NODE_ENV === 'development' && debugInfo && (
         <div className="debug-info" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
-          Debug: {debugInfo} | Active: {isRecognitionActive ? 'Yes' : 'No'} | Supported: {isSupported ? 'Yes' : 'No'} | Errors: {hasError ? 'Yes' : 'No'} | Restarts: {restartAttempts} | LastError: {lastError} | ShouldRestart: {shouldRestart ? 'Yes' : 'No'}
+          Debug: {debugInfo} | Processing: {isProcessing ? 'Yes' : 'No'} | Supported: {isSupported ? 'Yes' : 'No'} | Video: {videoFile ? 'Yes' : 'No'}
         </div>
       )}
 
@@ -418,7 +356,7 @@ const TranscriptionPanel = ({
             ref={textareaRef}
             value={transcription}
             onChange={(e) => setTranscription(e.target.value)}
-            placeholder={isTranscribing ? "Listening..." : "Transcription will appear here..."}
+            placeholder={isTranscribing ? "Processing video audio..." : "Video transcription will appear here..."}
             readOnly={isTranscribing}
             className={isTranscribing ? 'listening' : ''}
           />
@@ -470,7 +408,7 @@ const TranscriptionPanel = ({
           </div>
           <div className="progress-bar">
             <div 
-              className="progress-fill"
+              className="progress-fill" 
               style={{ width: `${(currentTime / videoDuration) * 100}%` }}
             ></div>
           </div>

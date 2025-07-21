@@ -84,14 +84,11 @@ function App() {
               currentTime={currentTime}
               videoDuration={videoDuration}
               formatTime={formatTime}
+              videoFile={uploadedVideo}
             />
           </div>
         </div>
       </main>
-
-      <footer className="App-footer">
-        <p>Built with React and Web Speech API</p>
-      </footer>
     </div>
   );
 }

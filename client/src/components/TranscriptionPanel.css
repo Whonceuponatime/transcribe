@@ -1,14 +1,40 @@
+/* Progress bar styles */
+.progress-container {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #45a049);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+}
+
+/* Update existing styles for video transcription */
 .transcription-panel {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 500px;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -17,14 +43,14 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  border-bottom: 2px solid #f0f0f0;
 }
 
 .panel-header h3 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: #333;
   margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .transcription-controls {
@@ -43,85 +69,104 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  white-space: nowrap;
 }
 
 .start-btn {
-  background: #27ae60;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
   color: white;
 }
 
-.start-btn:hover {
-  background: #229954;
+.start-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
   transform: translateY(-1px);
 }
 
 .start-btn:disabled {
-  background: #bdc3c7;
+  background: #ccc;
   cursor: not-allowed;
   transform: none;
 }
 
 .stop-btn {
-  background: #e74c3c;
+  background: linear-gradient(135deg, #f44336, #d32f2f);
   color: white;
 }
 
 .stop-btn:hover {
-  background: #c0392b;
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
   transform: translateY(-1px);
 }
 
 .clear-btn {
-  background: #95a5a6;
-  color: white;
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
 }
 
-.clear-btn:hover {
-  background: #7f8c8d;
+.clear-btn:hover:not(:disabled) {
+  background: #e0e0e0;
   transform: translateY(-1px);
 }
 
 .clear-btn:disabled {
-  background: #ecf0f1;
-  color: #bdc3c7;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-.error-message, .warning-message {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-  font-weight: 500;
+.browser-info {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #f9f9f9;
+  border-radius: 4px;
 }
 
 .error-message {
-  background: rgba(231, 76, 60, 0.1);
-  color: #c0392b;
-  border: 1px solid rgba(231, 76, 60, 0.2);
+  background: #ffebee;
+  color: #c62828;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #f44336;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .warning-message {
-  background: rgba(243, 156, 18, 0.1);
-  color: #d68910;
-  border: 1px solid rgba(243, 156, 18, 0.2);
+  background: #fff3e0;
+  color: #ef6c00;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #ff9800;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.debug-info {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #f0f8ff;
+  border-radius: 4px;
+  font-family: monospace;
 }
 
 .transcription-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  min-height: 0;
 }
 
 .transcription-textarea {
   flex: 1;
-  min-height: 200px;
+  margin-bottom: 1rem;
 }
 
 .transcription-textarea textarea {
@@ -129,46 +174,31 @@
   height: 100%;
   min-height: 200px;
   padding: 1rem;
-  border: 2px solid rgba(102, 126, 234, 0.2);
-  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.95rem;
+  line-height: 1.5;
   resize: vertical;
-  background: rgba(255, 255, 255, 0.9);
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease;
+  background: #fafafa;
 }
 
 .transcription-textarea textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #4CAF50;
+  background: white;
 }
 
 .transcription-textarea textarea.listening {
-  border-color: #e74c3c;
-  background: rgba(231, 76, 60, 0.05);
-  animation: pulse-border 2s infinite;
-}
-
-@keyframes pulse-border {
-  0%, 100% {
-    border-color: #e74c3c;
-  }
-  50% {
-    border-color: #c0392b;
-  }
-}
-
-.transcription-textarea textarea::placeholder {
-  color: #999;
-  font-style: italic;
+  border-color: #4CAF50;
+  background: #f8fff8;
 }
 
 .transcription-actions {
   display: flex;
   gap: 0.5rem;
-  justify-content: flex-end;
+  margin-bottom: 1rem;
 }
 
 .copy-btn, .download-btn {
@@ -176,66 +206,48 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  color: #333;
   font-size: 0.9rem;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.copy-btn {
-  background: #3498db;
-  color: white;
-}
-
-.copy-btn:hover {
-  background: #2980b9;
-  transform: translateY(-1px);
-}
-
-.download-btn {
-  background: #9b59b6;
-  color: white;
-}
-
-.download-btn:hover {
-  background: #8e44ad;
+.copy-btn:hover, .download-btn:hover {
+  background: #f5f5f5;
   transform: translateY(-1px);
 }
 
 .transcription-history {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 2px solid rgba(102, 126, 234, 0.1);
+  border-top: 1px solid #e0e0e0;
 }
 
 .transcription-history h4 {
-  font-size: 1.1rem;
-  font-weight: 600;
+  margin: 0 0 1rem 0;
   color: #333;
-  margin-bottom: 1rem;
+  font-size: 1rem;
 }
 
 .history-list {
   max-height: 200px;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
 }
 
 .history-item {
-  background: rgba(102, 126, 234, 0.05);
-  border-radius: 8px;
+  background: #f9f9f9;
   padding: 0.75rem;
-  border-left: 3px solid #667eea;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  border-left: 3px solid #4CAF50;
 }
 
 .history-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 0.5rem;
   font-size: 0.8rem;
   color: #666;
@@ -246,11 +258,7 @@
 }
 
 .video-time {
-  background: #667eea;
-  color: white;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
+  color: #4CAF50;
   font-weight: 600;
 }
 
@@ -258,42 +266,23 @@
   font-size: 0.9rem;
   line-height: 1.4;
   color: #333;
-  word-wrap: break-word;
 }
 
 .video-progress {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 2px solid rgba(102, 126, 234, 0.1);
+  border-top: 1px solid #e0e0e0;
 }
 
 .progress-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 0.5rem;
   font-size: 0.8rem;
   color: #666;
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 6px;
-  background: rgba(102, 126, 234, 0.2);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  border-radius: 3px;
-  transition: width 0.1s ease;
-}
-
-/* Responsive Design */
+/* Responsive design */
 @media (max-width: 768px) {
   .transcription-panel {
     padding: 1rem;
@@ -309,26 +298,8 @@
     justify-content: center;
   }
   
-  .start-btn, .stop-btn, .clear-btn {
-    flex: 1;
-    justify-content: center;
-  }
-  
   .transcription-textarea textarea {
     min-height: 150px;
-    font-size: 0.9rem;
-  }
-  
-  .transcription-actions {
-    flex-direction: column;
-  }
-  
-  .copy-btn, .download-btn {
-    justify-content: center;
-  }
-  
-  .history-list {
-    max-height: 150px;
   }
 }
 

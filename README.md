@@ -1,24 +1,23 @@
-# 🎬 Video Transcription App
+# Video Transcription App
 
-A modern web application that allows you to upload videos and transcribe the audio to text using the Web Speech API. Built with React, Node.js, and Express.
+A full-stack web application for uploading videos and transcribing audio to text using OpenAI Whisper API.
 
-## ✨ Features
+## Features
 
-- **Video Upload**: Drag and drop or click to upload video files
-- **Real-time Transcription**: Use your microphone to transcribe audio from videos
-- **Video Player**: Custom video player with controls and progress tracking
-- **Transcription History**: Save and view previous transcriptions
-- **Export Options**: Copy to clipboard or download as text file
-- **Responsive Design**: Works on desktop and mobile devices
-- **Modern UI**: Beautiful gradient design with glassmorphism effects
+- Upload large video files (no size limit)
+- Real-time audio extraction using FFmpeg
+- Transcription using OpenAI Whisper API
+- Modern React frontend with drag-and-drop upload
+- Progress tracking for large files
+- Export transcription results
 
-## 🚀 Quick Start
+## Setup
 
 ### Prerequisites
 
 - Node.js (v14 or higher)
-- npm or yarn
-- Chrome or Edge browser (for Web Speech API support)
+- FFmpeg installed on your system
+- OpenAI API key
 
 ### Installation
 
@@ -30,185 +29,118 @@ A modern web application that allows you to upload videos and transcribe the aud
 
 2. **Install dependencies**
    ```bash
-   # Install backend dependencies
    npm install
-   
-   # Install frontend dependencies
    cd client
    npm install
    cd ..
    ```
 
-3. **Start the development server**
-   ```bash
-   # Start backend server (from root directory)
-   npm run dev
+3. **Set up environment variables**
    
-   # In a new terminal, start frontend (from root directory)
-   cd client
-   npm start
+   Create a `.env` file in the root directory:
+   ```
+   OPENAI_API_KEY=your_openai_api_key_here
+   PORT=5000
+   NODE_ENV=development
+   ```
+   
+   Or set the environment variable directly:
+   ```bash
+   set OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-4. **Open your browser**
-   - Backend: http://localhost:5000
-   - Frontend: http://localhost:3000
+4. **Install FFmpeg**
+   
+   Download and install FFmpeg from: https://ffmpeg.org/download.html
+   
+   Make sure FFmpeg is available in your system PATH.
 
-## 📖 How to Use
+### Running the Application
 
-1. **Upload a Video**
-   - Drag and drop a video file onto the upload area
-   - Or click to browse and select a video file
-   - Supported formats: MP4, AVI, MOV, MKV, WMV, FLV, WebM
-   - Maximum file size: 100MB
+#### Option 1: Using batch files (Windows)
+```bash
+# Start the backend server
+.\start-server.bat
 
-2. **Start Transcription**
-   - Click the "Start" button in the transcription panel
-   - Allow microphone access when prompted
-   - The app will begin listening to your microphone
-
-3. **Play the Video**
-   - Use the video player controls to play your video
-   - The transcription will capture audio from your speakers/microphone
-   - You can pause, seek, and control volume as needed
-
-4. **Manage Transcriptions**
-   - View real-time transcription in the text area
-   - Click "Stop" to end transcription
-   - Use "Clear" to reset the current transcription
-   - Copy to clipboard or download as text file
-
-5. **View History**
-   - Previous transcriptions are saved with timestamps
-   - Each entry shows the video time when transcription was captured
-
-## 🛠️ Technical Details
-
-### Backend (Node.js + Express)
-- **File Upload**: Multer for handling video file uploads
-- **WebSocket**: Socket.IO for real-time communication
-- **CORS**: Enabled for cross-origin requests
-- **File Storage**: Local file system storage
-
-### Frontend (React)
-- **Web Speech API**: Real-time speech recognition
-- **Video Player**: Custom HTML5 video player
-- **Drag & Drop**: File upload with visual feedback
-- **Responsive Design**: Mobile-first approach
-
-### Browser Compatibility
-- **Chrome**: Full support (recommended)
-- **Edge**: Full support
-- **Firefox**: Limited support (no Web Speech API)
-- **Safari**: Limited support (no Web Speech API)
-
-## 🔧 Configuration
-
-### Environment Variables
-Create a `.env` file in the root directory:
-
-```env
-PORT=5000
-NODE_ENV=development
+# In a new terminal, start the frontend
+.\start-frontend.bat
 ```
 
-### File Upload Limits
-Modify `server.js` to change upload limits:
-```javascript
-limits: {
-  fileSize: 100 * 1024 * 1024 // 100MB limit
-}
+#### Option 2: Manual startup
+```bash
+# Terminal 1: Start backend
+set OPENAI_API_KEY=your_api_key_here
+node server.js
+
+# Terminal 2: Start frontend
+cd client
+npm start
 ```
 
-## 📁 Project Structure
+### Access the Application
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000
+
+## Security Notes
+
+⚠️ **IMPORTANT**: Never commit your API keys to version control!
+
+- The `.gitignore` file excludes sensitive files
+- API keys should be stored in environment variables
+- Update `start-server.bat` with your actual API key before running
+
+## API Endpoints
+
+- `GET /api/test` - Test server status
+- `POST /api/upload` - Upload video file
+- `POST /api/transcribe` - Transcribe video audio
+- `GET /api/files` - List uploaded files
+
+## File Structure
 
 ```
 transcribe/
-├── client/                 # React frontend
-│   ├── public/
-│   │   └── index.html
+├── server.js              # Backend server
+├── client/                # React frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── VideoUpload.js
-│   │   │   ├── VideoPlayer.js
-│   │   │   └── TranscriptionPanel.js
-│   │   ├── App.js
-│   │   ├── App.css
-│   │   └── index.js
+│   │   └── App.js
 │   └── package.json
-├── uploads/               # Video file storage
-├── server.js             # Express backend
-├── package.json
-└── README.md
+├── uploads/               # Uploaded video files
+├── audio/                 # Temporary audio files
+├── .gitignore            # Git ignore rules
+├── start-server.bat      # Windows server startup
+└── start-frontend.bat    # Windows frontend startup
 ```
 
-## 🚀 Deployment
-
-### Heroku
-1. Create a Heroku app
-2. Set buildpacks for Node.js
-3. Deploy using Heroku CLI or GitHub integration
-
-### Vercel
-1. Connect your GitHub repository
-2. Set build command: `npm run build`
-3. Set output directory: `client/build`
-
-### Docker
-```dockerfile
-FROM node:16-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN cd client && npm install && npm run build
-EXPOSE 5000
-CMD ["npm", "start"]
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-1. **Speech recognition not working**
-   - Ensure you're using Chrome or Edge
-   - Check microphone permissions
-   - Try refreshing the page
+1. **Port 5000 already in use**
+   - The batch file will automatically kill existing processes
+   - Or manually: `taskkill /F /IM node.exe`
 
-2. **Video not playing**
-   - Check file format compatibility
-   - Ensure file size is under 100MB
-   - Try a different video file
+2. **FFmpeg not found**
+   - Install FFmpeg and add to system PATH
+   - Test with: `ffmpeg -version`
 
-3. **Upload fails**
-   - Check file size limit
-   - Ensure file is a valid video format
-   - Check server logs for errors
+3. **API key errors**
+   - Verify your OpenAI API key is correct
+   - Check environment variable is set: `echo %OPENAI_API_KEY%`
 
-### Browser Support
-- **Chrome**: ✅ Full support
-- **Edge**: ✅ Full support  
-- **Firefox**: ❌ No Web Speech API
-- **Safari**: ❌ No Web Speech API
+4. **Large file uploads fail**
+   - Server is configured for unlimited file sizes
+   - Check network timeout settings
 
-## 📞 Support
+## Development
 
-If you encounter any issues or have questions, please:
-1. Check the troubleshooting section
-2. Search existing issues
-3. Create a new issue with detailed information
+- Backend: Node.js with Express
+- Frontend: React with modern hooks
+- File processing: FFmpeg for audio extraction
+- Transcription: OpenAI Whisper API
 
----
+## License
 
-**Note**: This app uses the Web Speech API which requires HTTPS in production and is only supported in Chrome and Edge browsers. 
+This project is for educational purposes. Please respect OpenAI's usage policies. 
