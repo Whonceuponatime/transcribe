@@ -3,8 +3,10 @@ import './App.css';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
+import TextToSpeech from './components/TextToSpeech';
 
 function App() {
+  const [activeTab, setActiveTab] = useState('transcription');
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -55,39 +57,58 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🎬 Video Transcription App</h1>
-        <p>Upload a video and transcribe the audio to text</p>
+        <h1>🎬 Video Transcription & Text-to-Speech App</h1>
+        <p>Upload videos to transcribe or convert text to speech for learning</p>
       </header>
 
-      <main className="App-main">
-        <div className="app-container">
-          <div className="left-panel">
-            <VideoUpload onVideoUpload={handleVideoUpload} />
-            {uploadedVideo && (
-              <VideoPlayer 
-                video={uploadedVideo}
-                onTimeUpdate={handleTimeUpdate}
-                isTranscribing={isTranscribing}
-              />
-            )}
-          </div>
+      <div className="tab-container">
+        <button 
+          className={`tab-button ${activeTab === 'transcription' ? 'active' : ''}`}
+          onClick={() => setActiveTab('transcription')}
+        >
+          🎬 Video Transcription
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'tts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tts')}
+        >
+          📖 Text to Speech
+        </button>
+      </div>
 
-          <div className="right-panel">
-            <TranscriptionPanel
-              transcription={transcription}
-              setTranscription={setTranscription}
-              isTranscribing={isTranscribing}
-              onStartTranscription={startTranscription}
-              onStopTranscription={stopTranscription}
-              onClearTranscription={clearTranscription}
-              transcriptionHistory={transcriptionHistory}
-              currentTime={currentTime}
-              videoDuration={videoDuration}
-              formatTime={formatTime}
-              videoFile={uploadedVideo}
-            />
+      <main className="App-main">
+        {activeTab === 'transcription' ? (
+          <div className="app-container">
+            <div className="left-panel">
+              <VideoUpload onVideoUpload={handleVideoUpload} />
+              {uploadedVideo && (
+                <VideoPlayer 
+                  video={uploadedVideo}
+                  onTimeUpdate={handleTimeUpdate}
+                  isTranscribing={isTranscribing}
+                />
+              )}
+            </div>
+
+            <div className="right-panel">
+              <TranscriptionPanel
+                transcription={transcription}
+                setTranscription={setTranscription}
+                isTranscribing={isTranscribing}
+                onStartTranscription={startTranscription}
+                onStopTranscription={stopTranscription}
+                onClearTranscription={clearTranscription}
+                transcriptionHistory={transcriptionHistory}
+                currentTime={currentTime}
+                videoDuration={videoDuration}
+                formatTime={formatTime}
+                videoFile={uploadedVideo}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <TextToSpeech />
+        )}
       </main>
     </div>
   );

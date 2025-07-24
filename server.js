@@ -254,6 +254,60 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+// Text-to-Speech endpoint
+app.post('/api/text-to-speech', async (req, res) => {
+  try {
+    const { text, voice = 'alloy' } = req.body;
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    if (text.length > 4000) {
+      return res.status(400).json({ error: 'Text is too long. Maximum 4000 characters allowed.' });
+    }
+
+    console.log('Text-to-Speech request received');
+    console.log('Text length:', text.length, 'characters');
+    console.log('Voice:', voice);
+
+    // Validate voice
+    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+    if (!validVoices.includes(voice)) {
+      return res.status(400).json({ error: 'Invalid voice selected' });
+    }
+
+    // Create speech using OpenAI TTS
+    const mp3 = await openai.audio.speech.create({
+      model: "tts-1",
+      voice: voice,
+      input: text,
+    });
+
+    // Convert the response to a buffer
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+
+    // Set response headers
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Disposition', 'attachment; filename="speech.mp3"');
+
+    // Send the audio buffer
+    res.send(buffer);
+
+    console.log('Text-to-Speech completed successfully');
+    console.log('Audio size:', (buffer.length / 1024).toFixed(2), 'KB');
+
+  } catch (error) {
+    console.error('Text-to-Speech error:', error);
+    res.status(500).json({ 
+      error: 'Text-to-Speech failed', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Serve React app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
