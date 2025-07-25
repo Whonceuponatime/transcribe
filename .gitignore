@@ -91,3 +91,4 @@ Thumbs.db
 
 # Bat files
 *.bat
+.vercel
