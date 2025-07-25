@@ -1,15 +1,27 @@
-# Video Transcription App
+# Video Transcription & Text-to-Speech App
 
-A full-stack web application for uploading videos and transcribing audio to text using OpenAI Whisper API.
+A full-stack web application for uploading videos and transcribing audio to text, plus converting text to speech for learning on the go using OpenAI APIs.
 
 ## Features
 
+### Video Transcription
 - Upload large video files (no size limit)
 - Real-time audio extraction using FFmpeg
 - Transcription using OpenAI Whisper API
 - Modern React frontend with drag-and-drop upload
 - Progress tracking for large files
 - Export transcription results
+
+### Text-to-Speech
+- Convert text to speech using **OpenAI TTS** or **ElevenLabs** APIs
+- **OpenAI**: 6 high-quality voices (Alloy, Echo, Fable, Onyx, Nova, Shimmer)
+- **ElevenLabs**: 100+ voices with various accents and styles
+- Upload text files (.txt, .md, .doc, .docx) or paste text directly
+- Automatic handling of long texts (chunks and combines audio)
+- Markdown formatting automatically cleaned for natural speech
+- Audio playback with play/pause/stop controls
+- Save and manage converted texts
+- Perfect for learning while driving or multitasking
 
 ## Setup
 
@@ -40,13 +52,15 @@ A full-stack web application for uploading videos and transcribing audio to text
    Create a `.env` file in the root directory:
    ```
    OPENAI_API_KEY=your_openai_api_key_here
+   ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
    PORT=5000
    NODE_ENV=development
    ```
    
-   Or set the environment variable directly:
+   Or set the environment variables directly:
    ```bash
    set OPENAI_API_KEY=your_openai_api_key_here
+   set ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
    ```
 
 4. **Install FFmpeg**
@@ -92,10 +106,15 @@ npm start
 
 ## API Endpoints
 
+### Video Transcription
 - `GET /api/test` - Test server status
 - `POST /api/upload` - Upload video file
 - `POST /api/transcribe` - Transcribe video audio
 - `GET /api/files` - List uploaded files
+
+### Text-to-Speech
+- `GET /api/voices` - Get available voices from both providers
+- `POST /api/text-to-speech` - Convert text to speech (supports provider and voice selection)
 
 ## File Structure
 
@@ -105,6 +124,8 @@ transcribe/
 ├── client/                # React frontend
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── TextToSpeech.js    # Text-to-speech component
+│   │   │   └── TextToSpeech.css   # TTS styles
 │   │   └── App.js
 │   └── package.json
 ├── uploads/               # Uploaded video files

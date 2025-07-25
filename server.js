@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -21,6 +24,22 @@ const io = socketIo(server, {
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+
+
+// Log API key status (without exposing the actual keys)
+console.log('OpenAI API Key loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
+console.log('ElevenLabs API Key loaded:', process.env.ELEVENLABS_API_KEY ? 'Yes' : 'No');
+
+if (!process.env.OPENAI_API_KEY) {
+  console.error('WARNING: OPENAI_API_KEY not found in environment variables');
+  console.error('OpenAI TTS will not be available');
+}
+
+if (!process.env.ELEVENLABS_API_KEY) {
+  console.error('WARNING: ELEVENLABS_API_KEY not found in environment variables');
+  console.error('ElevenLabs TTS will not be available');
+}
 
 // Middleware
 app.use(cors({
@@ -119,6 +138,57 @@ const transcribeAudio = async (audioPath) => {
     console.error('Transcription error:', error);
     throw error;
   }
+};
+
+// Create speech chunk for long texts
+const createSpeechChunk = async (text, voice, provider = 'openai') => {
+  try {
+    if (provider === 'openai') {
+      const mp3 = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voice,
+        input: text,
+      });
+      
+      return Buffer.from(await mp3.arrayBuffer());
+    } else if (provider === 'elevenlabs') {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_monolingual_v1",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const audioBuffer = await response.arrayBuffer();
+      return Buffer.from(audioBuffer);
+    } else {
+      throw new Error(`Unsupported provider: ${provider}`);
+    }
+  } catch (error) {
+    console.error('Speech chunk creation error:', error);
+    throw error;
+  }
+};
+
+// Combine multiple audio buffers into one
+const combineAudioBuffers = (buffers) => {
+  // For now, we'll concatenate the buffers
+  // In a production app, you might want to use a proper audio library
+  // to handle MP3 concatenation properly
+  return Buffer.concat(buffers);
 };
 
 // Test endpoint
@@ -254,17 +324,130 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+// Get available voices from both providers
+app.get('/api/voices', async (req, res) => {
+  try {
+    const voices = {
+      openai: [],
+      elevenlabs: []
+    };
+
+    // Get OpenAI voices
+    if (process.env.OPENAI_API_KEY) {
+      const openaiVoices = [
+        { id: 'alloy', name: 'Alloy (Neutral)' },
+        { id: 'echo', name: 'Echo (Warm)' },
+        { id: 'fable', name: 'Fable (Storytelling)' },
+        { id: 'onyx', name: 'Onyx (Deep)' },
+        { id: 'nova', name: 'Nova (Bright & Energetic)' },
+        { id: 'shimmer', name: 'Shimmer (Soft & Gentle)' }
+      ];
+      voices.openai = openaiVoices.map(voice => ({
+        value: voice.id,
+        label: voice.name
+      }));
+    }
+
+    // Get ElevenLabs voices
+    if (process.env.ELEVENLABS_API_KEY) {
+      try {
+        const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+          headers: {
+            'xi-api-key': process.env.ELEVENLABS_API_KEY
+          }
+        });
+        
+        if (response.ok) {
+          const elevenlabsVoices = await response.json();
+          voices.elevenlabs = elevenlabsVoices.voices.map(voice => ({
+            value: voice.voice_id,
+            label: voice.name
+          }));
+        } else {
+          console.error('Error fetching ElevenLabs voices:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching ElevenLabs voices:', error);
+        // If ElevenLabs fails, still return OpenAI voices
+      }
+    }
+
+    res.json(voices);
+  } catch (error) {
+    console.error('Error fetching voices:', error);
+    res.status(500).json({ error: 'Failed to fetch voices' });
+  }
+});
+
 // Text-to-Speech endpoint
 app.post('/api/text-to-speech', async (req, res) => {
   try {
-    const { text, voice = 'alloy' } = req.body;
+    const { text, voice = 'alloy', provider = 'openai' } = req.body;
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({ error: 'Text is required' });
     }
 
-    if (text.length > 4000) {
-      return res.status(400).json({ error: 'Text is too long. Maximum 4000 characters allowed.' });
+    // Validate provider
+    if (!['openai', 'elevenlabs'].includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider. Must be "openai" or "elevenlabs"' });
+    }
+
+    // Check if provider API key is available
+    if (provider === 'openai' && !process.env.OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'OpenAI API key not configured' });
+    }
+    if (provider === 'elevenlabs' && !process.env.ELEVENLABS_API_KEY) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured' });
+    }
+
+    console.log('Text-to-Speech request received');
+    console.log('Provider:', provider);
+    console.log('Voice:', voice);
+    console.log('Text length:', text.length, 'characters');
+
+    // Handle long texts by chunking them (only for OpenAI, ElevenLabs handles long texts better)
+    const maxChunkSize = provider === 'openai' ? 4096 : 5000;
+    let audioBuffers = [];
+    
+    if (text.length > maxChunkSize && provider === 'openai') {
+      console.log(`Text is ${text.length} characters, chunking into smaller pieces...`);
+      
+      // Split text into sentences to avoid cutting mid-sentence
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+      let currentChunk = '';
+      
+      for (const sentence of sentences) {
+        if ((currentChunk + sentence).length <= maxChunkSize) {
+          currentChunk += sentence;
+        } else {
+          if (currentChunk) {
+            audioBuffers.push(await createSpeechChunk(currentChunk.trim(), voice, provider));
+          }
+          currentChunk = sentence;
+        }
+      }
+      
+      if (currentChunk) {
+        audioBuffers.push(await createSpeechChunk(currentChunk.trim(), voice, provider));
+      }
+      
+      console.log(`Created ${audioBuffers.length} audio chunks`);
+      
+      // Combine audio buffers
+      const combinedBuffer = combineAudioBuffers(audioBuffers);
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', combinedBuffer.length);
+      res.setHeader('Content-Disposition', 'attachment; filename="speech.mp3"');
+      
+      // Send the combined audio buffer
+      res.send(combinedBuffer);
+      
+      console.log('Text-to-Speech completed successfully (chunked)');
+      console.log('Audio size:', (combinedBuffer.length / 1024).toFixed(2), 'KB');
+      return;
     }
 
     console.log('Text-to-Speech request received');
@@ -277,15 +460,43 @@ app.post('/api/text-to-speech', async (req, res) => {
       return res.status(400).json({ error: 'Invalid voice selected' });
     }
 
-    // Create speech using OpenAI TTS
-    const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: voice,
-      input: text,
-    });
-
-    // Convert the response to a buffer
-    const buffer = Buffer.from(await mp3.arrayBuffer());
+    // Create speech using selected provider
+    console.log(`Sending text to ${provider.toUpperCase()} TTS API...`);
+    console.log('Text preview (first 200 chars):', text.substring(0, 200));
+    
+    let buffer;
+    
+    if (provider === 'openai') {
+      const mp3 = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voice,
+        input: text,
+      });
+      buffer = Buffer.from(await mp3.arrayBuffer());
+    } else if (provider === 'elevenlabs') {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_monolingual_v1",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const audioBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(audioBuffer);
+    }
 
     // Set response headers
     res.setHeader('Content-Type', 'audio/mpeg');
@@ -295,7 +506,7 @@ app.post('/api/text-to-speech', async (req, res) => {
     // Send the audio buffer
     res.send(buffer);
 
-    console.log('Text-to-Speech completed successfully');
+    console.log(`${provider.toUpperCase()} Text-to-Speech completed successfully`);
     console.log('Audio size:', (buffer.length / 1024).toFixed(2), 'KB');
 
   } catch (error) {

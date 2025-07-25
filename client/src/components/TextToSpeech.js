@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './TextToSpeech.css';
 
 const TextToSpeech = () => {
@@ -7,30 +7,136 @@ const TextToSpeech = () => {
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [savedTexts, setSavedTexts] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState('alloy');
+  const [selectedVoice, setSelectedVoice] = useState('nova');
   const [currentTextName, setCurrentTextName] = useState('');
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showCleanedText, setShowCleanedText] = useState(false);
+  const [originalText, setOriginalText] = useState('');
+  const [downloadedFiles, setDownloadedFiles] = useState([]);
+  const [selectedProvider, setSelectedProvider] = useState('openai');
+  const [availableVoices, setAvailableVoices] = useState({
+    openai: [],
+    elevenlabs: []
+  });
+  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const voices = [
-    { value: 'alloy', label: 'Alloy' },
-    { value: 'echo', label: 'Echo' },
-    { value: 'fable', label: 'Fable' },
-    { value: 'onyx', label: 'Onyx' },
-    { value: 'nova', label: 'Nova' },
-    { value: 'shimmer', label: 'Shimmer' }
+  // Load saved texts and downloaded files from localStorage on component mount
+  useEffect(() => {
+    const savedTextsFromStorage = localStorage.getItem('savedTexts');
+    const downloadedFilesFromStorage = localStorage.getItem('downloadedFiles');
+    
+    if (savedTextsFromStorage) {
+      setSavedTexts(JSON.parse(savedTextsFromStorage));
+    }
+    
+    if (downloadedFilesFromStorage) {
+      setDownloadedFiles(JSON.parse(downloadedFilesFromStorage));
+    }
+  }, []);
+
+  // Fetch available voices on component mount
+  useEffect(() => {
+    fetchAvailableVoices();
+  }, []);
+
+  const fetchAvailableVoices = async () => {
+    try {
+      setIsLoadingVoices(true);
+      const response = await fetch('/api/voices');
+      if (response.ok) {
+        const voices = await response.json();
+        setAvailableVoices(voices);
+        
+        // Set default voice based on provider
+        if (voices.openai.length > 0) {
+          setSelectedVoice(voices.openai[0].value);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching voices:', error);
+    } finally {
+      setIsLoadingVoices(false);
+    }
+  };
+
+  // Save to localStorage whenever savedTexts or downloadedFiles change
+  useEffect(() => {
+    localStorage.setItem('savedTexts', JSON.stringify(savedTexts));
+  }, [savedTexts]);
+
+  useEffect(() => {
+    localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+  }, [downloadedFiles]);
+
+  const defaultVoices = [
+    { value: 'alloy', label: 'Alloy (Neutral)' },
+    { value: 'echo', label: 'Echo (Warm)' },
+    { value: 'fable', label: 'Fable (Storytelling)' },
+    { value: 'onyx', label: 'Onyx (Deep)' },
+    { value: 'nova', label: 'Nova (Bright & Energetic)' },
+    { value: 'shimmer', label: 'Shimmer (Soft & Gentle)' }
   ];
+
+  // Get current voices based on selected provider
+  const getCurrentVoices = () => {
+    if (selectedProvider === 'openai') {
+      return availableVoices.openai.length > 0 ? availableVoices.openai : defaultVoices;
+    } else {
+      return availableVoices.elevenlabs;
+    }
+  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setText(e.target.result);
+        let content = e.target.result;
+        
+        // Store original text
+        setOriginalText(e.target.result);
+        
+        // Clean markdown formatting for better speech
+        content = cleanMarkdownForSpeech(content);
+        
+        setText(content);
         setCurrentTextName(file.name.replace(/\.[^/.]+$/, ''));
       };
       reader.readAsText(file);
     }
+  };
+
+  const cleanMarkdownForSpeech = (text) => {
+    return text
+      // Remove markdown links: [text](url) -> text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      
+      // Remove inline code: `code` -> code
+      .replace(/`([^`]+)`/g, '$1')
+      
+      // Remove code blocks: ```code``` -> code
+      .replace(/```[\s\S]*?```/g, '')
+      
+      // Remove headers: # Header -> Header
+      .replace(/^#{1,6}\s+/gm, '')
+      
+      // Remove bold/italic: **text** or *text* -> text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      
+      // Clean up table formatting
+      .replace(/\|/g, ' ')
+      .replace(/-{3,}/g, '')
+      
+      // Remove HTML tags if any
+      .replace(/<[^>]*>/g, '')
+      
+      // Clean up extra whitespace
+      .replace(/\n\s*\n/g, '\n\n')
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
   const handleTextToSpeech = async () => {
@@ -48,7 +154,8 @@ const TextToSpeech = () => {
         },
         body: JSON.stringify({
           text: text,
-          voice: selectedVoice
+          voice: selectedVoice,
+          provider: selectedProvider
         }),
       });
 
@@ -60,23 +167,55 @@ const TextToSpeech = () => {
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       
-      // Save to history
+      // Save to history with download info
+      const fileName = `${currentTextName || 'speech'}_${selectedVoice}_${Date.now()}.mp3`;
       const newText = {
         id: Date.now(),
         name: currentTextName || `Text ${savedTexts.length + 1}`,
         text: text,
         voice: selectedVoice,
+        provider: selectedProvider,
         timestamp: new Date().toLocaleString(),
-        audioUrl: url
+        audioUrl: url,
+        fileName: fileName,
+        blob: blob
       };
       setSavedTexts(prev => [newText, ...prev]);
       
+      // Add to downloaded files
+      const downloadedFile = {
+        id: Date.now(),
+        name: currentTextName || `Speech ${downloadedFiles.length + 1}`,
+        fileName: fileName,
+        voice: selectedVoice,
+        provider: selectedProvider,
+        timestamp: new Date().toLocaleString(),
+        size: (blob.size / 1024).toFixed(2) + ' KB'
+      };
+      setDownloadedFiles(prev => [downloadedFile, ...prev]);
+      
     } catch (error) {
       console.error('Error converting text to speech:', error);
-      alert('Failed to convert text to speech. Please try again.');
+      
+      // Try to get detailed error message
+      let errorMessage = 'Failed to convert text to speech. Please try again.';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsConverting(false);
     }
+  };
+
+  const downloadAudio = (savedText) => {
+    const link = document.createElement('a');
+    link.href = savedText.audioUrl;
+    link.download = savedText.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const playAudio = () => {
@@ -104,6 +243,7 @@ const TextToSpeech = () => {
   const loadSavedText = (savedText) => {
     setText(savedText.text);
     setSelectedVoice(savedText.voice);
+    setSelectedProvider(savedText.provider || 'openai');
     setCurrentTextName(savedText.name);
     setAudioUrl(savedText.audioUrl);
   };
@@ -112,11 +252,48 @@ const TextToSpeech = () => {
     setSavedTexts(prev => prev.filter(item => item.id !== id));
   };
 
+  const deleteDownloadedFile = (id) => {
+    setDownloadedFiles(prev => prev.filter(item => item.id !== id));
+  };
+
   const clearText = () => {
     setText('');
     setAudioUrl(null);
     setCurrentTextName('');
     setIsPlaying(false);
+  };
+
+  const previewVoice = async () => {
+    const sampleText = "Hello! This is a preview of how this voice sounds. Perfect for learning and studying.";
+    
+    setIsPreviewing(true);
+    try {
+      const response = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: sampleText,
+          voice: selectedVoice,
+          provider: selectedProvider
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to preview voice');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+      
+    } catch (error) {
+      console.error('Error previewing voice:', error);
+      alert('Failed to preview voice. Please try again.');
+    } finally {
+      setIsPreviewing(false);
+    }
   };
 
   return (
@@ -147,18 +324,63 @@ const TextToSpeech = () => {
           </div>
 
           <div className="voice-selection">
-            <h3>Select Voice</h3>
-            <select 
-              value={selectedVoice} 
-              onChange={(e) => setSelectedVoice(e.target.value)}
-              className="voice-select"
-            >
-              {voices.map(voice => (
-                <option key={voice.value} value={voice.value}>
-                  {voice.label}
-                </option>
-              ))}
-            </select>
+            <h3>Select Provider & Voice</h3>
+            
+            <div className="provider-selection">
+              <label className="provider-label">
+                <input
+                  type="radio"
+                  name="provider"
+                  value="openai"
+                  checked={selectedProvider === 'openai'}
+                  onChange={(e) => setSelectedProvider(e.target.value)}
+                />
+                <span className="provider-text">OpenAI TTS</span>
+              </label>
+              <label className="provider-label">
+                <input
+                  type="radio"
+                  name="provider"
+                  value="elevenlabs"
+                  checked={selectedProvider === 'elevenlabs'}
+                  onChange={(e) => setSelectedProvider(e.target.value)}
+                />
+                <span className="provider-text">ElevenLabs</span>
+              </label>
+            </div>
+
+            <div className="voice-controls">
+              <select 
+                value={selectedVoice} 
+                onChange={(e) => setSelectedVoice(e.target.value)}
+                className="voice-select"
+                disabled={isLoadingVoices}
+              >
+                {isLoadingVoices ? (
+                  <option>Loading voices...</option>
+                ) : (
+                  getCurrentVoices().map(voice => (
+                    <option key={voice.value} value={voice.value}>
+                      {voice.label}
+                    </option>
+                  ))
+                )}
+              </select>
+              <button 
+                onClick={previewVoice}
+                disabled={isPreviewing || isLoadingVoices}
+                className="preview-btn"
+              >
+                {isPreviewing ? '🔄 Previewing...' : '🎵 Preview Voice'}
+              </button>
+            </div>
+            
+            <p className="voice-hint">
+              {selectedProvider === 'openai' 
+                ? 'Try "Nova" for a bright, energetic voice or "Shimmer" for a soft, gentle voice'
+                : 'ElevenLabs offers 100+ voices with various accents and styles'
+              }
+            </p>
           </div>
 
           <div className="text-input-section">
@@ -170,15 +392,36 @@ const TextToSpeech = () => {
               onChange={(e) => setCurrentTextName(e.target.value)}
               className="text-name-input"
             />
+            
+            {originalText && (
+              <div className="text-toggle">
+                <button 
+                  onClick={() => setShowCleanedText(!showCleanedText)}
+                  className="toggle-btn"
+                >
+                  {showCleanedText ? '📄 Show Original' : '🎵 Show Cleaned for Speech'}
+                </button>
+                <span className="toggle-hint">
+                  {showCleanedText ? 'Showing cleaned text (what will be spoken)' : 'Showing original markdown'}
+                </span>
+              </div>
+            )}
+            
             <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Paste or type your text here... (max 4000 characters)"
+              value={showCleanedText ? text : (originalText || text)}
+              onChange={(e) => {
+                if (showCleanedText) {
+                  setText(e.target.value);
+                } else {
+                  setOriginalText(e.target.value);
+                  setText(cleanMarkdownForSpeech(e.target.value));
+                }
+              }}
+              placeholder="Paste or type your text here... (no character limit)"
               className="text-input"
-              maxLength={4000}
             />
             <div className="text-counter">
-              {text.length}/4000 characters
+              {text.length} characters (will be spoken)
             </div>
           </div>
 
@@ -217,9 +460,15 @@ const TextToSpeech = () => {
                 <button onClick={stopAudio} className="stop-btn">
                   ⏹️ Stop
                 </button>
+                <button 
+                  onClick={() => downloadAudio(savedTexts[0])}
+                  className="download-btn"
+                >
+                  💾 Download
+                </button>
               </div>
               <div className="audio-info">
-                <p>Voice: {voices.find(v => v.value === selectedVoice)?.label}</p>
+                <p>Voice: {getCurrentVoices().find(v => v.value === selectedVoice)?.label}</p>
                 <p>Text length: {text.length} characters</p>
               </div>
             </div>
@@ -235,7 +484,8 @@ const TextToSpeech = () => {
                   <div key={savedText.id} className="saved-text-item">
                     <div className="saved-text-info">
                       <h4>{savedText.name}</h4>
-                      <p>Voice: {voices.find(v => v.value === savedText.voice)?.label}</p>
+                      <p>Voice: {getCurrentVoices().find(v => v.value === savedText.voice)?.label || savedText.voice}</p>
+                      <p>Provider: {savedText.provider || 'OpenAI'}</p>
                       <p>Length: {savedText.text.length} characters</p>
                       <p>Created: {savedText.timestamp}</p>
                     </div>
@@ -247,10 +497,46 @@ const TextToSpeech = () => {
                         📂 Load
                       </button>
                       <button 
+                        onClick={() => downloadAudio(savedText)}
+                        className="download-btn"
+                      >
+                        💾 Download
+                      </button>
+                      <button 
                         onClick={() => deleteSavedText(savedText.id)}
                         className="delete-btn"
                       >
                         🗑️ Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="downloaded-files">
+            <h3>Downloaded Files</h3>
+            {downloadedFiles.length === 0 ? (
+              <p className="no-downloaded-files">No downloaded files yet. Download some audio files to see them here!</p>
+            ) : (
+              <div className="downloaded-files-list">
+                {downloadedFiles.map((file) => (
+                  <div key={file.id} className="downloaded-file-item">
+                    <div className="downloaded-file-info">
+                      <h4>{file.name}</h4>
+                      <p>Voice: {getCurrentVoices().find(v => v.value === file.voice)?.label || file.voice}</p>
+                      <p>Provider: {file.provider || 'OpenAI'}</p>
+                      <p>File: {file.fileName}</p>
+                      <p>Size: {file.size}</p>
+                      <p>Downloaded: {file.timestamp}</p>
+                    </div>
+                    <div className="downloaded-file-actions">
+                      <button 
+                        onClick={() => deleteDownloadedFile(file.id)}
+                        className="delete-btn"
+                      >
+                        🗑️ Remove
                       </button>
                     </div>
                   </div>
