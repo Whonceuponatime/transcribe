@@ -26,11 +26,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+// Initialize Supabase (optional for deployment)
+let supabase = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+  );
+}
 
 
 
@@ -102,6 +105,12 @@ const upload = multer({
 
 // Authentication middleware
 const authenticateUser = async (req, res, next) => {
+  // Skip authentication if Supabase is not configured
+  if (!supabase) {
+    console.log('Supabase not configured, skipping authentication');
+    return next();
+  }
+  
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -559,12 +568,14 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
   console.log(`Upload directory: ${uploadsDir}`);
   console.log(`Audio directory: ${audioDir}`);
   console.log('Ready to handle large video files (no size limit)');
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use. Please stop the other server or use a different port.`);
