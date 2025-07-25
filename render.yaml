@@ -9,4 +9,5 @@ services:
         value: production
       - key: PORT
         value: 5000
-    healthCheckPath: /api/test 
+    healthCheckPath: /api/test
+    autoDeploy: true 
