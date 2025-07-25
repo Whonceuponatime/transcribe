@@ -13,6 +13,7 @@
     "heroku-postbuild": "npm run install-client && npm run build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.52.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "elevenlabs-node": "^2.0.3",

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../supabase';
 import './TextToSpeech.css';
 
 const TextToSpeech = () => {
@@ -44,7 +45,20 @@ const TextToSpeech = () => {
   const fetchAvailableVoices = async () => {
     try {
       setIsLoadingVoices(true);
-      const response = await fetch('/api/voices');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+      
+      const response = await fetch('/api/voices', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       if (response.ok) {
         const voices = await response.json();
         setAvailableVoices(voices);
@@ -147,10 +161,18 @@ const TextToSpeech = () => {
 
     setIsConverting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           text: text,
@@ -268,10 +290,18 @@ const TextToSpeech = () => {
     
     setIsPreviewing(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           text: sampleText,

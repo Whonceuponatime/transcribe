@@ -1,11 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
+import Auth from './components/Auth';
+import { supabase } from './supabase';
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('transcription');
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
@@ -13,6 +17,35 @@ function App() {
   const [transcriptionHistory, setTranscriptionHistory] = useState([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+
+  useEffect(() => {
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleAuthChange = (user) => {
+    setUser(user);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error.message);
+    }
+  };
 
   const handleVideoUpload = (videoFile) => {
     setUploadedVideo(videoFile);
@@ -54,11 +87,34 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth onAuthChange={handleAuthChange} />;
+  }
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🎬 Video Transcription & Text-to-Speech App</h1>
-        <p>Upload videos to transcribe or convert text to speech for learning</p>
+        <div className="header-content">
+          <div className="header-left">
+            <h1>🎬 Video Transcription & Text-to-Speech App</h1>
+            <p>Upload videos to transcribe or convert text to speech for learning</p>
+          </div>
+          <div className="user-info">
+            <span>Welcome, {user.email}</span>
+            <button onClick={handleSignOut} className="sign-out-button">
+              Sign Out
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="tab-container">

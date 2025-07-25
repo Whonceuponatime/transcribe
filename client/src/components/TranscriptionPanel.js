@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { supabase } from '../supabase';
 import './TranscriptionPanel.css';
 
 const TranscriptionPanel = ({
@@ -140,6 +141,14 @@ const TranscriptionPanel = ({
       const fileSizeMB = (videoFile.size / (1024 * 1024)).toFixed(2);
       setDebugInfo(`Sending video for transcription (${fileSizeMB} MB)...`);
       
+      // Get authentication token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
       // Create FormData with the video file
       const formData = new FormData();
       formData.append('video', videoFile);
@@ -147,6 +156,9 @@ const TranscriptionPanel = ({
       // Send to our transcription API (backend server on port 5000)
       const response = await fetch('http://localhost:5000/api/transcribe', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
       

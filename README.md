@@ -23,6 +23,13 @@ A full-stack web application for uploading videos and transcribing audio to text
 - Save and manage converted texts
 - Perfect for learning while driving or multitasking
 
+### User Authentication
+- **Supabase Authentication** for secure user management
+- Email/password sign up and sign in
+- Protected API endpoints requiring authentication
+- User session management
+- Secure token-based authentication
+
 ## Setup
 
 ### Prerequisites
@@ -30,6 +37,7 @@ A full-stack web application for uploading videos and transcribing audio to text
 - Node.js (v14 or higher)
 - FFmpeg installed on your system
 - OpenAI API key
+- Supabase account and project
 
 ### Installation
 
@@ -53,17 +61,41 @@ A full-stack web application for uploading videos and transcribing audio to text
    ```
    OPENAI_API_KEY=your_openai_api_key_here
    ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+   SUPABASE_URL=your_supabase_url_here
+   SUPABASE_ANON_KEY=your_supabase_anon_key_here
    PORT=5000
    NODE_ENV=development
    ```
    
+   Create a `.env` file in the `client` directory:
+   ```
+   REACT_APP_SUPABASE_URL=your_supabase_url_here
+   REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+   ```
+   
    Or set the environment variables directly:
    ```bash
-   set OPENAI_API_KEY=your_openai_api_key_here
+   set OPENAI_API_KEY=your_api_key_here
    set ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+   set SUPABASE_URL=your_supabase_url_here
+   set SUPABASE_ANON_KEY=your_supabase_anon_key_here
    ```
 
-4. **Install FFmpeg**
+4. **Set up Supabase Authentication**
+   
+   Create a Supabase project at https://supabase.com
+   
+   In your Supabase dashboard:
+   - Go to Settings > API
+   - Copy your Project URL and anon/public key
+   - Add these to your environment variables
+   
+   Enable Email authentication:
+   - Go to Authentication > Settings
+   - Enable "Enable email confirmations" if desired
+   - Configure any additional auth settings
+
+5. **Install FFmpeg**
    
    Download and install FFmpeg from: https://ffmpeg.org/download.html
    
@@ -108,13 +140,13 @@ npm start
 
 ### Video Transcription
 - `GET /api/test` - Test server status
-- `POST /api/upload` - Upload video file
-- `POST /api/transcribe` - Transcribe video audio
+- `POST /api/upload` - Upload video file (requires authentication)
+- `POST /api/transcribe` - Transcribe video audio (requires authentication)
 - `GET /api/files` - List uploaded files
 
 ### Text-to-Speech
-- `GET /api/voices` - Get available voices from both providers
-- `POST /api/text-to-speech` - Convert text to speech (supports provider and voice selection)
+- `GET /api/voices` - Get available voices from both providers (requires authentication)
+- `POST /api/text-to-speech` - Convert text to speech (supports provider and voice selection, requires authentication)
 
 ## File Structure
 
@@ -125,7 +157,10 @@ transcribe/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── TextToSpeech.js    # Text-to-speech component
-│   │   │   └── TextToSpeech.css   # TTS styles
+│   │   │   ├── TextToSpeech.css   # TTS styles
+│   │   │   ├── Auth.js            # Authentication component
+│   │   │   └── Auth.css           # Auth styles
+│   │   ├── supabase.js            # Supabase client config
 │   │   └── App.js
 │   └── package.json
 ├── uploads/               # Uploaded video files

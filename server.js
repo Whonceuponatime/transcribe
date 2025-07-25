@@ -10,6 +10,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const ffmpeg = require('fluent-ffmpeg');
 const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,11 +26,19 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Initialize Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
 
 
 // Log API key status (without exposing the actual keys)
 console.log('OpenAI API Key loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 console.log('ElevenLabs API Key loaded:', process.env.ELEVENLABS_API_KEY ? 'Yes' : 'No');
+console.log('Supabase URL loaded:', process.env.SUPABASE_URL ? 'Yes' : 'No');
+console.log('Supabase Anon Key loaded:', process.env.SUPABASE_ANON_KEY ? 'Yes' : 'No');
 
 if (!process.env.OPENAI_API_KEY) {
   console.error('WARNING: OPENAI_API_KEY not found in environment variables');
@@ -90,6 +99,31 @@ const upload = multer({
   }
   // Removed file size limits to handle large videos
 });
+
+// Authentication middleware
+const authenticateUser = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No authorization token provided' });
+  }
+  
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+};
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -201,7 +235,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Upload endpoint
-app.post('/api/upload', upload.single('video'), (req, res) => {
+app.post('/api/upload', authenticateUser, upload.single('video'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file uploaded' });
@@ -231,7 +265,7 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
 });
 
 // Transcribe video endpoint
-app.post('/api/transcribe', upload.single('video'), async (req, res) => {
+app.post('/api/transcribe', authenticateUser, upload.single('video'), async (req, res) => {
   try {
     console.log('Transcription request received');
     
@@ -325,7 +359,7 @@ app.get('/api/files', (req, res) => {
 });
 
 // Get available voices from both providers
-app.get('/api/voices', async (req, res) => {
+app.get('/api/voices', authenticateUser, async (req, res) => {
   try {
     const voices = {
       openai: [],
@@ -380,7 +414,7 @@ app.get('/api/voices', async (req, res) => {
 });
 
 // Text-to-Speech endpoint
-app.post('/api/text-to-speech', async (req, res) => {
+app.post('/api/text-to-speech', authenticateUser, async (req, res) => {
   try {
     const { text, voice = 'alloy', provider = 'openai' } = req.body;
 
