@@ -1,12 +1,34 @@
-# 🚀 Deployment Guide for Nuxthub
+# 🚀 Deployment Guide
 
-This guide will help you deploy your Video Transcription & Text-to-Speech app to Nuxthub.
+This guide will help you deploy your Video Transcription & Text-to-Speech app to various platforms.
+
+## 🎯 **Recommended Platforms**
+
+### **1. Vercel** (Recommended - Fast & Reliable)
+- Free tier available
+- Automatic deployments from Git
+- Great for Node.js apps
+- Built-in CDN
+
+### **2. Railway** (Alternative)
+- Simple deployment
+- Good for full-stack apps
+- Pay-as-you-go pricing
+
+### **3. Render** (Alternative)
+- Free tier available
+- Easy deployment
+- Good documentation
+
+### **4. Nuxthub** (If working)
+- Nuxt-focused platform
+- May have Cloudflare issues
 
 ## 📋 Prerequisites
 
-1. **Nuxthub Account**: Sign up at https://nuxthub.com
-2. **Git Repository**: Your code should be in a Git repository (GitHub, GitLab, etc.)
-3. **Environment Variables**: Prepare your API keys
+1. **Git Repository**: Your code should be in a Git repository (GitHub, GitLab, etc.)
+2. **Environment Variables**: Prepare your API keys
+3. **Platform Account**: Choose your deployment platform
 
 ## 🔧 Environment Variables Setup
 
@@ -60,13 +82,40 @@ PORT=5000
    ```
 
 2. **Verify these files are in your repository**:
-   - `Dockerfile`
-   - `nuxthub.json`
    - `package.json`
    - `server.js`
    - `client/` folder
+   - Platform-specific config files (see below)
 
-### Step 2: Deploy to Nuxthub
+### Step 2: Choose Your Platform
+
+#### **Option A: Vercel (Recommended)**
+
+1. **Sign up at Vercel**: https://vercel.com
+2. **Import your Git repository**
+3. **Configure build settings**:
+   - Framework Preset: `Node.js`
+   - Build Command: `npm run build`
+   - Output Directory: `client/build`
+4. **Set environment variables** in Vercel dashboard
+5. **Deploy**
+
+#### **Option B: Railway**
+
+1. **Sign up at Railway**: https://railway.app
+2. **Connect your Git repository**
+3. **Set environment variables** in Railway dashboard
+4. **Deploy**
+
+#### **Option C: Render**
+
+1. **Sign up at Render**: https://render.com
+2. **Create new Web Service**
+3. **Connect your Git repository**
+4. **Set environment variables** in Render dashboard
+5. **Deploy**
+
+#### **Option D: Nuxthub (If working)**
 
 1. **Login to Nuxthub Dashboard**
    - Go to https://nuxthub.com
