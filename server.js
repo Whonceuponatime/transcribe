@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -7,6 +10,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const ffmpeg = require('fluent-ffmpeg');
 const { OpenAI } = require('openai');
+const { ElevenLabs } = require('elevenlabs-node');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,9 +22,38 @@ const io = socketIo(server, {
 });
 
 // Initialize OpenAI (you'll need to set OPENAI_API_KEY environment variable)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai;
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
+  try {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    console.log('OpenAI API configured successfully');
+  } catch (error) {
+    console.warn('OpenAI API key invalid. Text-to-speech and transcription features will be disabled.');
+    openai = null;
+  }
+} else {
+  console.warn('OpenAI API key not found in environment variables. Text-to-speech and transcription features will be disabled.');
+  openai = null;
+}
+
+// Initialize ElevenLabs
+let elevenlabs;
+if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim() !== '') {
+  try {
+    elevenlabs = new ElevenLabs({
+      apiKey: process.env.ELEVENLABS_API_KEY,
+    });
+    console.log('ElevenLabs API configured successfully');
+  } catch (error) {
+    console.warn('ElevenLabs API key invalid. ElevenLabs text-to-speech features will be disabled.');
+    elevenlabs = null;
+  }
+} else {
+  console.warn('ElevenLabs API key not found in environment variables. ElevenLabs text-to-speech features will be disabled.');
+  elevenlabs = null;
+}
 
 // Middleware
 app.use(cors({
@@ -105,6 +138,10 @@ const extractAudio = (videoPath, audioPath) => {
 
 // Transcribe audio using OpenAI Whisper
 const transcribeAudio = async (audioPath) => {
+  if (!openai) {
+    throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+  }
+  
   try {
     const audioFile = fs.createReadStream(audioPath);
     
@@ -125,7 +162,8 @@ const transcribeAudio = async (audioPath) => {
 app.get('/api/test', (req, res) => {
   res.json({ 
     message: 'Server is running',
-    openaiConfigured: !!process.env.OPENAI_API_KEY,
+    openaiConfigured: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== ''),
+    elevenlabsConfigured: !!(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim() !== ''),
     timestamp: new Date().toISOString()
   });
 });
@@ -232,6 +270,21 @@ app.post('/api/transcribe', upload.single('video'), async (req, res) => {
   }
 });
 
+// Get ElevenLabs voices
+app.get('/api/voices', async (req, res) => {
+  try {
+    if (!elevenlabs) {
+      return res.status(503).json({ error: 'ElevenLabs API key not configured' });
+    }
+
+    const voices = await elevenlabs.voices.getAll();
+    res.json(voices);
+  } catch (error) {
+    console.error('Error fetching voices:', error);
+    res.status(500).json({ error: 'Failed to fetch voices', details: error.message });
+  }
+});
+
 // Get uploaded files
 app.get('/api/files', (req, res) => {
   try {
@@ -257,7 +310,7 @@ app.get('/api/files', (req, res) => {
 // Text-to-Speech endpoint
 app.post('/api/text-to-speech', async (req, res) => {
   try {
-    const { text, voice = 'alloy' } = req.body;
+    const { text, voice = 'jOEnNSVLOHUgmrNwfqQE', provider = 'elevenlabs' } = req.body;
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({ error: 'Text is required' });
@@ -270,22 +323,55 @@ app.post('/api/text-to-speech', async (req, res) => {
     console.log('Text-to-Speech request received');
     console.log('Text length:', text.length, 'characters');
     console.log('Voice:', voice);
+    console.log('Provider:', provider);
 
-    // Validate voice
-    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-    if (!validVoices.includes(voice)) {
-      return res.status(400).json({ error: 'Invalid voice selected' });
+    let buffer;
+
+    if (provider === 'elevenlabs') {
+      if (!elevenlabs) {
+        return res.status(503).json({ error: 'ElevenLabs API key not configured. Please set ELEVENLABS_API_KEY environment variable.' });
+      }
+
+      // Use ElevenLabs TTS
+      const audioStream = await elevenlabs.textToSpeech({
+        text: text,
+        voiceId: voice,
+        modelId: 'eleven_monolingual_v1',
+        voiceSettings: {
+          stability: 0.5,
+          similarityBoost: 0.5
+        }
+      });
+
+      // Convert stream to buffer
+      const chunks = [];
+      for await (const chunk of audioStream) {
+        chunks.push(chunk);
+      }
+      buffer = Buffer.concat(chunks);
+
+    } else {
+      // Fallback to OpenAI TTS
+      if (!openai) {
+        return res.status(503).json({ error: 'OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.' });
+      }
+
+      // Validate OpenAI voice
+      const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+      if (!validVoices.includes(voice)) {
+        return res.status(400).json({ error: 'Invalid voice selected for OpenAI' });
+      }
+
+      // Create speech using OpenAI TTS
+      const mp3 = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voice,
+        input: text,
+      });
+
+      // Convert the response to a buffer
+      buffer = Buffer.from(await mp3.arrayBuffer());
     }
-
-    // Create speech using OpenAI TTS
-    const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: voice,
-      input: text,
-    });
-
-    // Convert the response to a buffer
-    const buffer = Buffer.from(await mp3.arrayBuffer());
 
     // Set response headers
     res.setHeader('Content-Type', 'audio/mpeg');
@@ -313,7 +399,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

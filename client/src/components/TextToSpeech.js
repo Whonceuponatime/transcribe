@@ -7,18 +7,23 @@ const TextToSpeech = () => {
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [savedTexts, setSavedTexts] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState('alloy');
+  const [selectedVoice, setSelectedVoice] = useState('jOEnNSVLOHUgmrNwfqQE');
+  const [selectedProvider, setSelectedProvider] = useState('elevenlabs');
   const [currentTextName, setCurrentTextName] = useState('');
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const voices = [
-    { value: 'alloy', label: 'Alloy' },
-    { value: 'echo', label: 'Echo' },
-    { value: 'fable', label: 'Fable' },
-    { value: 'onyx', label: 'Onyx' },
-    { value: 'nova', label: 'Nova' },
-    { value: 'shimmer', label: 'Shimmer' }
+  const elevenlabsVoices = [
+    { value: 'jOEnNSVLOHUgmrNwfqQE', label: 'Custom Voice (ElevenLabs)' }
+  ];
+
+  const openaiVoices = [
+    { value: 'alloy', label: 'Alloy (OpenAI)' },
+    { value: 'echo', label: 'Echo (OpenAI)' },
+    { value: 'fable', label: 'Fable (OpenAI)' },
+    { value: 'onyx', label: 'Onyx (OpenAI)' },
+    { value: 'nova', label: 'Nova (OpenAI)' },
+    { value: 'shimmer', label: 'Shimmer (OpenAI)' }
   ];
 
   const handleFileUpload = (event) => {
@@ -48,7 +53,8 @@ const TextToSpeech = () => {
         },
         body: JSON.stringify({
           text: text,
-          voice: selectedVoice
+          voice: selectedVoice,
+          provider: selectedProvider
         }),
       });
 
@@ -66,6 +72,7 @@ const TextToSpeech = () => {
         name: currentTextName || `Text ${savedTexts.length + 1}`,
         text: text,
         voice: selectedVoice,
+        provider: selectedProvider,
         timestamp: new Date().toLocaleString(),
         audioUrl: url
       };
@@ -104,6 +111,7 @@ const TextToSpeech = () => {
   const loadSavedText = (savedText) => {
     setText(savedText.text);
     setSelectedVoice(savedText.voice);
+    setSelectedProvider(savedText.provider || 'elevenlabs');
     setCurrentTextName(savedText.name);
     setAudioUrl(savedText.audioUrl);
   };
@@ -147,17 +155,51 @@ const TextToSpeech = () => {
           </div>
 
           <div className="voice-selection">
-            <h3>Select Voice</h3>
+            <h3>Select Provider & Voice</h3>
+            <div className="provider-selection">
+              <label>
+                <input
+                  type="radio"
+                  value="elevenlabs"
+                  checked={selectedProvider === 'elevenlabs'}
+                  onChange={(e) => {
+                    setSelectedProvider(e.target.value);
+                    setSelectedVoice('jOEnNSVLOHUgmrNwfqQE');
+                  }}
+                />
+                ElevenLabs (Higher Quality)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="openai"
+                  checked={selectedProvider === 'openai'}
+                  onChange={(e) => {
+                    setSelectedProvider(e.target.value);
+                    setSelectedVoice('alloy');
+                  }}
+                />
+                OpenAI (Faster)
+              </label>
+            </div>
             <select 
               value={selectedVoice} 
               onChange={(e) => setSelectedVoice(e.target.value)}
               className="voice-select"
             >
-              {voices.map(voice => (
-                <option key={voice.value} value={voice.value}>
-                  {voice.label}
-                </option>
-              ))}
+              {selectedProvider === 'elevenlabs' ? (
+                elevenlabsVoices.map(voice => (
+                  <option key={voice.value} value={voice.value}>
+                    {voice.label}
+                  </option>
+                ))
+              ) : (
+                openaiVoices.map(voice => (
+                  <option key={voice.value} value={voice.value}>
+                    {voice.label}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -219,7 +261,8 @@ const TextToSpeech = () => {
                 </button>
               </div>
               <div className="audio-info">
-                <p>Voice: {voices.find(v => v.value === selectedVoice)?.label}</p>
+                <p>Voice: {(selectedProvider === 'elevenlabs' ? elevenlabsVoices : openaiVoices).find(v => v.value === selectedVoice)?.label}</p>
+                <p>Provider: {selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'OpenAI'}</p>
                 <p>Text length: {text.length} characters</p>
               </div>
             </div>
@@ -235,7 +278,8 @@ const TextToSpeech = () => {
                   <div key={savedText.id} className="saved-text-item">
                     <div className="saved-text-info">
                       <h4>{savedText.name}</h4>
-                      <p>Voice: {voices.find(v => v.value === savedText.voice)?.label}</p>
+                      <p>Voice: {(savedText.provider === 'elevenlabs' ? elevenlabsVoices : openaiVoices).find(v => v.value === savedText.voice)?.label}</p>
+                      <p>Provider: {savedText.provider === 'elevenlabs' ? 'ElevenLabs' : 'OpenAI'}</p>
                       <p>Length: {savedText.text.length} characters</p>
                       <p>Created: {savedText.timestamp}</p>
                     </div>

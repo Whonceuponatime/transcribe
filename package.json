@@ -13,17 +13,24 @@
     "heroku-postbuild": "npm run install-client && npm run build"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "elevenlabs-node": "^2.0.3",
+    "express": "^4.18.2",
     "fluent-ffmpeg": "^2.1.2",
-    "socket.io": "^4.7.2",
-    "openai": "^4.20.1"
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.20.1",
+    "socket.io": "^4.7.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": ["video", "transcription", "audio", "speech-to-text"],
+  "keywords": [
+    "video",
+    "transcription",
+    "audio",
+    "speech-to-text"
+  ],
   "author": "Your Name",
   "license": "MIT"
-} 
+}
