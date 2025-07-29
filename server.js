@@ -10,7 +10,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const ffmpeg = require('fluent-ffmpeg');
 const { OpenAI } = require('openai');
-const { ElevenLabs } = require('elevenlabs-node');
+const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,20 +39,13 @@ if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
 }
 
 // Initialize ElevenLabs
-let elevenlabs;
+let elevenlabsApiKey;
 if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim() !== '') {
-  try {
-    elevenlabs = new ElevenLabs({
-      apiKey: process.env.ELEVENLABS_API_KEY,
-    });
-    console.log('ElevenLabs API configured successfully');
-  } catch (error) {
-    console.warn('ElevenLabs API key invalid. ElevenLabs text-to-speech features will be disabled.');
-    elevenlabs = null;
-  }
+  elevenlabsApiKey = process.env.ELEVENLABS_API_KEY.trim();
+  console.log('ElevenLabs API key configured successfully');
 } else {
   console.warn('ElevenLabs API key not found in environment variables. ElevenLabs text-to-speech features will be disabled.');
-  elevenlabs = null;
+  elevenlabsApiKey = null;
 }
 
 // Middleware
@@ -164,6 +157,7 @@ app.get('/api/test', (req, res) => {
     message: 'Server is running',
     openaiConfigured: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== ''),
     elevenlabsConfigured: !!(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim() !== ''),
+    elevenlabsApiKey: !!elevenlabsApiKey,
     timestamp: new Date().toISOString()
   });
 });
@@ -270,18 +264,49 @@ app.post('/api/transcribe', upload.single('video'), async (req, res) => {
   }
 });
 
-// Get ElevenLabs voices
-app.get('/api/voices', async (req, res) => {
+// Get ElevenLabs models
+app.get('/api/models', async (req, res) => {
   try {
-    if (!elevenlabs) {
+    if (!elevenlabsApiKey) {
       return res.status(503).json({ error: 'ElevenLabs API key not configured' });
     }
 
-    const voices = await elevenlabs.voices.getAll();
-    res.json(voices);
+    const response = await axios({
+      method: 'GET',
+      url: 'https://api.elevenlabs.io/v1/models',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': elevenlabsApiKey
+      }
+    });
+
+    res.json(response.data);
   } catch (error) {
-    console.error('Error fetching voices:', error);
-    res.status(500).json({ error: 'Failed to fetch voices', details: error.message });
+    console.error('Error fetching models:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch models', details: error.response?.data || error.message });
+  }
+});
+
+// Get ElevenLabs voices
+app.get('/api/voices', async (req, res) => {
+  try {
+    if (!elevenlabsApiKey) {
+      return res.status(503).json({ error: 'ElevenLabs API key not configured' });
+    }
+
+    const response = await axios({
+      method: 'GET',
+      url: 'https://api.elevenlabs.io/v1/voices',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': elevenlabsApiKey
+      }
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching voices:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch voices', details: error.response?.data || error.message });
   }
 });
 
@@ -328,27 +353,37 @@ app.post('/api/text-to-speech', async (req, res) => {
     let buffer;
 
     if (provider === 'elevenlabs') {
-      if (!elevenlabs) {
+      if (!elevenlabsApiKey) {
         return res.status(503).json({ error: 'ElevenLabs API key not configured. Please set ELEVENLABS_API_KEY environment variable.' });
       }
 
-      // Use ElevenLabs TTS
-      const audioStream = await elevenlabs.textToSpeech({
-        text: text,
-        voiceId: voice,
-        modelId: 'eleven_monolingual_v1',
-        voiceSettings: {
-          stability: 0.5,
-          similarityBoost: 0.5
-        }
-      });
+      try {
+        // Use ElevenLabs REST API directly
+        const response = await axios({
+          method: 'POST',
+          url: `https://api.elevenlabs.io/v1/text-to-speech/${voice}`,
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': elevenlabsApiKey
+          },
+          data: {
+            text: text,
+            model_id: 'eleven_multilingual_v2',
+            output_format: 'mp3_44100_128'
+          },
+          responseType: 'arraybuffer'
+        });
 
-      // Convert stream to buffer
-      const chunks = [];
-      for await (const chunk of audioStream) {
-        chunks.push(chunk);
+        buffer = Buffer.from(response.data);
+      } catch (elevenlabsError) {
+        console.error('ElevenLabs TTS error:', elevenlabsError.response?.data || elevenlabsError.message);
+        return res.status(500).json({ 
+          error: 'ElevenLabs TTS failed', 
+          details: elevenlabsError.response?.data || elevenlabsError.message,
+          suggestion: 'Please check your ElevenLabs API key and voice ID'
+        });
       }
-      buffer = Buffer.concat(chunks);
 
     } else {
       // Fallback to OpenAI TTS
