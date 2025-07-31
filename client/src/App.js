@@ -4,6 +4,7 @@ import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
+import FileAnalysis from './components/FileAnalysis';
 
 function App() {
   const [activeTab, setActiveTab] = useState('transcription');
@@ -57,7 +58,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🎬 Video Transcription & Text-to-Speech App</h1>
+        <h1>All in One - Sam</h1>
         <p>Upload videos to transcribe or convert text to speech for learning</p>
       </header>
 
@@ -73,6 +74,12 @@ function App() {
           onClick={() => setActiveTab('tts')}
         >
           📖 Text to Speech
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'analysis' ? 'active' : ''}`}
+          onClick={() => setActiveTab('analysis')}
+        >
+          📄 File Analysis
         </button>
       </div>
 
@@ -106,8 +113,10 @@ function App() {
               />
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'tts' ? (
           <TextToSpeech />
+        ) : (
+          <FileAnalysis />
         )}
       </main>
     </div>

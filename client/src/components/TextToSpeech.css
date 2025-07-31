@@ -302,8 +302,34 @@
   margin-top: 25px;
 }
 
-.saved-texts h3 {
+.saved-texts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+}
+
+.saved-texts-header h3 {
+  color: #333;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.clear-all-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.clear-all-btn:hover {
+  background: #c82333;
+  transform: translateY(-1px);
 }
 
 .no-saved-texts {
@@ -354,6 +380,7 @@
 }
 
 .load-btn,
+.download-btn,
 .delete-btn {
   padding: 8px 16px;
   border: none;
@@ -373,6 +400,16 @@
 .load-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.download-btn {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+}
+
+.download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
 }
 
 .delete-btn {

@@ -6,7 +6,11 @@ const TextToSpeech = () => {
   const [isConverting, setIsConverting] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [savedTexts, setSavedTexts] = useState([]);
+  const [savedTexts, setSavedTexts] = useState(() => {
+    // Load saved texts from localStorage on component mount
+    const saved = localStorage.getItem('savedTexts');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [selectedVoice, setSelectedVoice] = useState('jOEnNSVLOHUgmrNwfqQE');
   const [selectedProvider, setSelectedProvider] = useState('elevenlabs');
   const [currentTextName, setCurrentTextName] = useState('');
@@ -116,8 +120,28 @@ const TextToSpeech = () => {
     setAudioUrl(savedText.audioUrl);
   };
 
+  // Save to localStorage whenever savedTexts changes
+  React.useEffect(() => {
+    localStorage.setItem('savedTexts', JSON.stringify(savedTexts));
+  }, [savedTexts]);
+
   const deleteSavedText = (id) => {
     setSavedTexts(prev => prev.filter(item => item.id !== id));
+  };
+
+  const clearAllSavedTexts = () => {
+    if (window.confirm('Are you sure you want to delete all saved texts? This action cannot be undone.')) {
+      setSavedTexts([]);
+    }
+  };
+
+  const downloadAudio = (audioUrl, filename) => {
+    const link = document.createElement('a');
+    link.href = audioUrl;
+    link.download = filename || 'speech.mp3';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const clearText = () => {
@@ -269,7 +293,18 @@ const TextToSpeech = () => {
           )}
 
           <div className="saved-texts">
-            <h3>Saved Texts</h3>
+            <div className="saved-texts-header">
+              <h3>Saved Texts ({savedTexts.length})</h3>
+              {savedTexts.length > 0 && (
+                <button 
+                  onClick={clearAllSavedTexts}
+                  className="clear-all-btn"
+                  title="Delete all saved texts"
+                >
+                  🗑️ Clear All
+                </button>
+              )}
+            </div>
             {savedTexts.length === 0 ? (
               <p className="no-saved-texts">No saved texts yet. Convert some text to speech to see them here!</p>
             ) : (
@@ -287,12 +322,21 @@ const TextToSpeech = () => {
                       <button 
                         onClick={() => loadSavedText(savedText)}
                         className="load-btn"
+                        title="Load this text and audio"
                       >
                         📂 Load
                       </button>
                       <button 
+                        onClick={() => downloadAudio(savedText.audioUrl, `${savedText.name}.mp3`)}
+                        className="download-btn"
+                        title="Download audio file"
+                      >
+                        💾 Download
+                      </button>
+                      <button 
                         onClick={() => deleteSavedText(savedText.id)}
                         className="delete-btn"
+                        title="Delete this saved text"
                       >
                         🗑️ Delete
                       </button>
