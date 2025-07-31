@@ -708,7 +708,7 @@ Please provide your analysis and linking suggestions, taking into account the co
 
       try {
         const batchAnalysis = await openai.chat.completions.create({
-          model: "o1-mini", // Switch to o1-mini which has 200,000 TPM and better reasoning capabilities
+          model: "gpt-4o-mini", // Use gpt-4o-mini which is more widely available
           messages: [
             {
               role: "user",
@@ -717,8 +717,8 @@ Please provide your analysis and linking suggestions, taking into account the co
 ${batchPrompt}`
             }
           ],
-          max_completion_tokens: 2000 // o1-mini uses max_completion_tokens instead of max_tokens
-          // temperature: 0.3 - removed as o1-mini only supports default temperature (1)
+          max_tokens: 2000, // gpt-4o-mini uses max_tokens
+          temperature: 0.3
         });
 
         analysisResult += `\n\n--- BATCH ${Math.floor(i/batchSize) + 1} ---\n\n`;
@@ -838,28 +838,44 @@ ${batchContent}
 Process each file and return ONLY the processed content with embedded wiki-links, separated by "===FILE_SEPARATOR===":`;
 
       try {
-        const batchProcessing = await openai.chat.completions.create({
-          model: "o1-mini", // Switch to o1-mini which has 200,000 TPM and better reasoning capabilities
-          messages: [
-            {
-              role: "user",
-              content: `You are an expert at processing text files and embedding Obsidian wiki-links. You understand the context and can intelligently replace mentions with proper wiki-style links [[]].
+        try {
+          const batchProcessing = await openai.chat.completions.create({
+            model: "gpt-4o-mini", // Use gpt-4o-mini which is more widely available
+            messages: [
+              {
+                role: "user",
+                content: `You are an expert at processing text files and embedding Obsidian wiki-links. You understand the context and can intelligently replace mentions with proper wiki-style links [[]].
 
 ${batchProcessingPrompt}`
-            }
-          ],
-          max_completion_tokens: 3000 // o1-mini uses max_completion_tokens instead of max_tokens
-          // temperature: 0.2 - removed as o1-mini only supports default temperature (1)
-        });
+              }
+            ],
+            max_tokens: 3000, // gpt-4o-mini uses max_tokens
+            temperature: 0.2
+          });
 
-        const aiResponse = batchProcessing.choices[0].message.content;
-        console.log(`AI Response for batch ${Math.floor(i/batchSize) + 1}:`);
-        console.log('Response length:', aiResponse.length);
-        console.log('Response preview:', aiResponse.substring(0, 300));
-        console.log('Contains FILE_SEPARATOR:', aiResponse.includes('===FILE_SEPARATOR==='));
-        console.log('Number of separators:', (aiResponse.match(/===FILE_SEPARATOR===/g) || []).length);
-        
-        processedContent += aiResponse;
+          const aiResponse = batchProcessing.choices[0].message.content;
+          console.log(`AI Response for batch ${Math.floor(i/batchSize) + 1}:`);
+          console.log('Response length:', aiResponse.length);
+          console.log('Response preview:', aiResponse.substring(0, 300));
+          console.log('Contains FILE_SEPARATOR:', aiResponse.includes('===FILE_SEPARATOR==='));
+          console.log('Number of separators:', (aiResponse.match(/===FILE_SEPARATOR===/g) || []).length);
+          
+          processedContent += aiResponse;
+        } catch (apiError) {
+          console.error(`OpenAI API Error for batch ${Math.floor(i/batchSize) + 1}:`, apiError);
+          console.error('Error details:', {
+            message: apiError.message,
+            code: apiError.code,
+            status: apiError.status,
+            type: apiError.type
+          });
+          
+          // Add error information to processed content
+          processedContent += `\n\n--- ERROR IN BATCH ${Math.floor(i/batchSize) + 1} ---\n\n`;
+          processedContent += `OpenAI API Error: ${apiError.message}\n`;
+          processedContent += `Error Code: ${apiError.code || 'Unknown'}\n`;
+          processedContent += `Files in this batch: ${batchNames.join(', ')}\n`;
+        }
         
         // Check if AI actually processed the content
         if (aiResponse.trim().length < 100) {
