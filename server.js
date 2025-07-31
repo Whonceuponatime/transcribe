@@ -838,6 +838,7 @@ ${batchContent}
 Process each file and return ONLY the processed content with embedded wiki-links, separated by "===FILE_SEPARATOR===":`;
 
       try {
+        let aiResponse = '';
         try {
           const batchProcessing = await openai.chat.completions.create({
             model: "gpt-4o-mini", // Use gpt-4o-mini which is more widely available
@@ -853,7 +854,7 @@ ${batchProcessingPrompt}`
             temperature: 0.2
           });
 
-          const aiResponse = batchProcessing.choices[0].message.content;
+          aiResponse = batchProcessing.choices[0].message.content;
           console.log(`AI Response for batch ${Math.floor(i/batchSize) + 1}:`);
           console.log('Response length:', aiResponse.length);
           console.log('Response preview:', aiResponse.substring(0, 300));
@@ -861,6 +862,12 @@ ${batchProcessingPrompt}`
           console.log('Number of separators:', (aiResponse.match(/===FILE_SEPARATOR===/g) || []).length);
           
           processedContent += aiResponse;
+          
+          // Check if AI actually processed the content
+          if (aiResponse.trim().length < 100) {
+            console.log('WARNING: AI response seems too short, might be an error message');
+            console.log('Full AI response:', aiResponse);
+          }
         } catch (apiError) {
           console.error(`OpenAI API Error for batch ${Math.floor(i/batchSize) + 1}:`, apiError);
           console.error('Error details:', {
@@ -875,12 +882,6 @@ ${batchProcessingPrompt}`
           processedContent += `OpenAI API Error: ${apiError.message}\n`;
           processedContent += `Error Code: ${apiError.code || 'Unknown'}\n`;
           processedContent += `Files in this batch: ${batchNames.join(', ')}\n`;
-        }
-        
-        // Check if AI actually processed the content
-        if (aiResponse.trim().length < 100) {
-          console.log('WARNING: AI response seems too short, might be an error message');
-          console.log('Full AI response:', aiResponse);
         }
         
         // Track completed files in processing phase
