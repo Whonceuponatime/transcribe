@@ -148,7 +148,7 @@ const extractAudio = (videoPath, audioPath) => {
 };
 
 // Transcribe audio using OpenAI Whisper
-const transcribeAudio = async (audioPath) => {
+const transcribeAudio = async (audioPath, options = {}) => {
   if (!openai) {
     throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
   }
@@ -156,11 +156,22 @@ const transcribeAudio = async (audioPath) => {
   try {
     const audioFile = fs.createReadStream(audioPath);
     
-    const transcription = await openai.audio.transcriptions.create({
+    const transcriptionOptions = {
       file: audioFile,
       model: "whisper-1",
-      response_format: "text"
-    });
+      response_format: "text",
+      ...options
+    };
+
+    // Optional: Specify language if provided
+    if (options.language) {
+      transcriptionOptions.language = options.language;
+      console.log(`Transcribing with specified language: ${options.language}`);
+    } else {
+      console.log('Transcribing with automatic language detection');
+    }
+
+    const transcription = await openai.audio.transcriptions.create(transcriptionOptions);
 
     return transcription;
   } catch (error) {
@@ -242,7 +253,12 @@ app.post('/api/transcribe', upload.single('video'), async (req, res) => {
     
     // Transcribe audio
     console.log('Sending audio to OpenAI for transcription...');
-    const transcription = await transcribeAudio(audioPath);
+    
+    // Get language preference from request body (optional)
+    const language = req.body.language || null;
+    const transcriptionOptions = language ? { language } : {};
+    
+    const transcription = await transcribeAudio(audioPath, transcriptionOptions);
     
     // Clean up audio file
     if (fs.existsSync(audioPath)) {

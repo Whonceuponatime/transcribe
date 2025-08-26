@@ -20,6 +20,7 @@ const TranscriptionPanel = ({
   const [browserInfo, setBrowserInfo] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState('auto');
   const textareaRef = useRef(null);
   const audioContextRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -144,6 +145,11 @@ const TranscriptionPanel = ({
       const formData = new FormData();
       formData.append('video', videoFile);
       
+      // Add language preference if not auto
+      if (selectedLanguage !== 'auto') {
+        formData.append('language', selectedLanguage);
+      }
+      
       // Send to our transcription API (backend server on port 5000)
       const response = await fetch('http://localhost:5000/api/transcribe', {
         method: 'POST',
@@ -253,6 +259,39 @@ const TranscriptionPanel = ({
     <div className="transcription-panel">
       <div className="panel-header">
         <h3>🎵 Video Audio Transcription</h3>
+        
+        {/* Language selection */}
+        <div className="language-selector" style={{ marginBottom: '1rem' }}>
+          <label htmlFor="language-select" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            Language:
+          </label>
+          <select
+            id="language-select"
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              fontSize: '14px',
+              width: '100%',
+              marginBottom: '1rem'
+            }}
+          >
+            <option value="auto">Auto-detect (Recommended)</option>
+            <option value="ko">Korean (한국어)</option>
+            <option value="en">English</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="zh">Chinese (中文)</option>
+            <option value="es">Spanish (Español)</option>
+            <option value="fr">French (Français)</option>
+            <option value="de">German (Deutsch)</option>
+            <option value="it">Italian (Italiano)</option>
+            <option value="pt">Portuguese (Português)</option>
+            <option value="ru">Russian (Русский)</option>
+          </select>
+        </div>
+        
         <div className="transcription-controls">
           {!isTranscribing ? (
             <button
