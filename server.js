@@ -298,6 +298,71 @@ app.post('/api/transcribe', upload.single('video'), async (req, res) => {
   }
 });
 
+// Direct audio transcription endpoint (skips video processing)
+app.post('/api/transcribe-audio', upload.single('audio'), async (req, res) => {
+  try {
+    console.log('Direct audio transcription request received');
+    
+    if (!req.file) {
+      console.log('No audio file uploaded');
+      return res.status(400).json({ error: 'No audio file uploaded' });
+    }
+
+    const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+    console.log('Audio file received:', req.file.originalname, 'Size:', fileSizeMB + ' MB');
+    
+    const audioPath = req.file.path;
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+    
+    // Check if it's a supported audio format
+    const supportedFormats = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma'];
+    if (!supportedFormats.includes(fileExtension)) {
+      return res.status(400).json({ 
+        error: 'Unsupported audio format', 
+        supportedFormats: supportedFormats,
+        receivedFormat: fileExtension
+      });
+    }
+
+    console.log('Starting direct audio transcription...');
+    console.log('Audio path:', audioPath);
+    
+    // Transcribe audio directly (no video processing needed)
+    console.log('Sending audio to OpenAI for transcription...');
+    
+    // Get language preference from request body (optional)
+    const language = req.body.language || null;
+    const transcriptionOptions = language ? { language } : {};
+    
+    const transcription = await transcribeAudio(audioPath, transcriptionOptions);
+    
+    console.log('Direct audio transcription completed successfully');
+    console.log('Transcription length:', transcription.length, 'characters');
+    
+    res.json({
+      success: true,
+      transcription: transcription,
+      filename: req.file.originalname,
+      fileSize: fileSizeMB + ' MB',
+      transcriptionLength: transcription.length,
+      processingType: 'direct_audio'
+    });
+    
+  } catch (error) {
+    console.error('Direct audio transcription error:', error);
+    
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ 
+      error: 'Audio transcription failed', 
+      details: error.message 
+    });
+  }
+});
+
 // Get ElevenLabs models
 app.get('/api/models', async (req, res) => {
   try {

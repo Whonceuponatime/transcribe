@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import './App.css';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
+import AudioTranscriptionPanel from './components/AudioTranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
 import FileAnalysis from './components/FileAnalysis';
@@ -70,6 +71,12 @@ function App() {
           🎬 Video Transcription
         </button>
         <button 
+          className={`tab-button ${activeTab === 'audio' ? 'active' : ''}`}
+          onClick={() => setActiveTab('audio')}
+        >
+          🎵 Audio Transcription
+        </button>
+        <button 
           className={`tab-button ${activeTab === 'tts' ? 'active' : ''}`}
           onClick={() => setActiveTab('tts')}
         >
@@ -113,6 +120,8 @@ function App() {
               />
             </div>
           </div>
+        ) : activeTab === 'audio' ? (
+          <AudioTranscriptionPanel />
         ) : activeTab === 'tts' ? (
           <TextToSpeech />
         ) : (
