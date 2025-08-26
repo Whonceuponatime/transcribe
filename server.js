@@ -116,6 +116,38 @@ const textUpload = multer({
   // Removed file size limits to handle large files
 });
 
+// Configure multer for audio file uploads
+const audioUpload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    // Accept audio files
+    const audioMimeTypes = [
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/wave',
+      'audio/x-wav',
+      'audio/mp4',
+      'audio/m4a',
+      'audio/aac',
+      'audio/ogg',
+      'audio/flac',
+      'audio/x-flac',
+      'audio/wma'
+    ];
+    
+    const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    if (audioMimeTypes.includes(file.mimetype) || audioExtensions.includes(fileExtension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only audio files are allowed! Supported formats: MP3, WAV, M4A, AAC, OGG, FLAC, WMA'), false);
+    }
+  }
+  // Removed file size limits to handle large audio files
+});
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -299,7 +331,7 @@ app.post('/api/transcribe', upload.single('video'), async (req, res) => {
 });
 
 // Direct audio transcription endpoint (skips video processing)
-app.post('/api/transcribe-audio', upload.single('audio'), async (req, res) => {
+app.post('/api/transcribe-audio', audioUpload.single('audio'), async (req, res) => {
   try {
     console.log('Direct audio transcription request received');
     
