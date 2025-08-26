@@ -150,8 +150,8 @@ const TranscriptionPanel = ({
         formData.append('language', selectedLanguage);
       }
       
-      // Send to our transcription API (backend server on port 5000)
-      const response = await fetch('http://localhost:5000/api/transcribe', {
+      // Send to our transcription API (backend server on port 3000)
+      const response = await fetch('http://localhost:3000/api/transcribe', {
         method: 'POST',
         body: formData
       });

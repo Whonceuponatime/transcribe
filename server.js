@@ -179,37 +179,65 @@ const extractAudio = (videoPath, audioPath) => {
   });
 };
 
-// Transcribe audio using OpenAI Whisper
+// Transcribe audio using OpenAI Whisper with retry logic
 const transcribeAudio = async (audioPath, options = {}) => {
   if (!openai) {
     throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
   }
   
-  try {
-    const audioFile = fs.createReadStream(audioPath);
-    
-    const transcriptionOptions = {
-      file: audioFile,
-      model: "whisper-1",
-      response_format: "text",
-      ...options
-    };
+  const maxRetries = 3;
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Transcription attempt ${attempt}/${maxRetries}...`);
+      
+      const audioFile = fs.createReadStream(audioPath);
+      
+      const transcriptionOptions = {
+        file: audioFile,
+        model: "whisper-1",
+        response_format: "text",
+        ...options
+      };
 
-    // Optional: Specify language if provided
-    if (options.language) {
-      transcriptionOptions.language = options.language;
-      console.log(`Transcribing with specified language: ${options.language}`);
-    } else {
-      console.log('Transcribing with automatic language detection');
+      // Optional: Specify language if provided
+      if (options.language) {
+        transcriptionOptions.language = options.language;
+        console.log(`Transcribing with specified language: ${options.language}`);
+      } else {
+        console.log('Transcribing with automatic language detection');
+      }
+
+      const transcription = await openai.audio.transcriptions.create(transcriptionOptions);
+      console.log(`Transcription successful on attempt ${attempt}`);
+      return transcription;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`Transcription attempt ${attempt} failed:`, error.message);
+      
+      // Check if it's a network error that we should retry
+      if (error.code === 'ECONNRESET' || 
+          error.message.includes('Connection error') ||
+          error.message.includes('network') ||
+          error.message.includes('timeout')) {
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`Network error detected. Retrying in ${delay/1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // For non-network errors or after max retries, throw immediately
+      throw error;
     }
-
-    const transcription = await openai.audio.transcriptions.create(transcriptionOptions);
-
-    return transcription;
-  } catch (error) {
-    console.error('Transcription error:', error);
-    throw error;
   }
+  
+  // If we get here, all retries failed
+  throw lastError;
 };
 
 // Test endpoint
