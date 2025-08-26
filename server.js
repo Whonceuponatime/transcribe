@@ -240,6 +240,66 @@ const transcribeAudio = async (audioPath, options = {}) => {
   throw lastError;
 };
 
+// Transcribe large audio files by splitting into chunks
+const transcribeAudioChunked = async (audioPath, options = {}) => {
+  console.log('Starting chunked audio transcription...');
+  
+  // Use FFmpeg to get audio duration and split into 10-minute chunks
+  const chunkDuration = 600; // 10 minutes in seconds
+  const outputDir = path.dirname(audioPath);
+  const baseName = path.basename(audioPath, path.extname(audioPath));
+  
+  try {
+    // Get audio duration
+    const durationCmd = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${audioPath}"`;
+    const duration = parseFloat(require('child_process').execSync(durationCmd, { encoding: 'utf8' }).trim());
+    console.log(`Audio duration: ${duration} seconds (${(duration/60).toFixed(1)} minutes)`);
+    
+    const numChunks = Math.ceil(duration / chunkDuration);
+    console.log(`Splitting into ${numChunks} chunks of ${chunkDuration} seconds each...`);
+    
+    let fullTranscription = '';
+    
+    for (let i = 0; i < numChunks; i++) {
+      const startTime = i * chunkDuration;
+      const endTime = Math.min((i + 1) * chunkDuration, duration);
+      const chunkPath = path.join(outputDir, `${baseName}_chunk_${i + 1}.mp3`);
+      
+      console.log(`Processing chunk ${i + 1}/${numChunks} (${startTime}s - ${endTime}s)...`);
+      
+      // Extract chunk using FFmpeg
+      const ffmpegCmd = `ffmpeg -i "${audioPath}" -ss ${startTime} -t ${endTime - startTime} -c copy "${chunkPath}" -y`;
+      require('child_process').execSync(ffmpegCmd);
+      
+      try {
+        // Transcribe this chunk
+        const chunkTranscription = await transcribeAudio(chunkPath, options);
+        fullTranscription += chunkTranscription + ' ';
+        
+        console.log(`Chunk ${i + 1} transcribed successfully (${chunkTranscription.length} characters)`);
+        
+      } finally {
+        // Clean up chunk file
+        if (fs.existsSync(chunkPath)) {
+          fs.unlinkSync(chunkPath);
+        }
+      }
+      
+      // Add a small delay between chunks to avoid rate limiting
+      if (i < numChunks - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    console.log('Chunked transcription completed successfully');
+    return fullTranscription.trim();
+    
+  } catch (error) {
+    console.error('Chunked transcription error:', error);
+    throw error;
+  }
+};
+
 // Test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ 
@@ -387,14 +447,20 @@ app.post('/api/transcribe-audio', audioUpload.single('audio'), async (req, res) 
     console.log('Starting direct audio transcription...');
     console.log('Audio path:', audioPath);
     
-    // Transcribe audio directly (no video processing needed)
-    console.log('Sending audio to OpenAI for transcription...');
-    
     // Get language preference from request body (optional)
     const language = req.body.language || null;
     const transcriptionOptions = language ? { language } : {};
     
-    const transcription = await transcribeAudio(audioPath, transcriptionOptions);
+    let transcription;
+    
+    // Check if file is large (over 20MB) and needs chunking
+    if (req.file.size > 20 * 1024 * 1024) {
+      console.log('Large file detected, using chunked processing...');
+      transcription = await transcribeAudioChunked(audioPath, transcriptionOptions);
+    } else {
+      console.log('Small file, using direct processing...');
+      transcription = await transcribeAudio(audioPath, transcriptionOptions);
+    }
     
     console.log('Direct audio transcription completed successfully');
     console.log('Transcription length:', transcription.length, 'characters');
@@ -405,7 +471,7 @@ app.post('/api/transcribe-audio', audioUpload.single('audio'), async (req, res) 
       filename: req.file.originalname,
       fileSize: fileSizeMB + ' MB',
       transcriptionLength: transcription.length,
-      processingType: 'direct_audio'
+      processingType: req.file.size > 20 * 1024 * 1024 ? 'chunked_audio' : 'direct_audio'
     });
     
   } catch (error) {
