@@ -267,8 +267,8 @@ const transcribeAudioChunked = async (audioPath, options = {}) => {
       
       console.log(`Processing chunk ${i + 1}/${numChunks} (${startTime}s - ${endTime}s)...`);
       
-      // Extract chunk using FFmpeg
-      const ffmpegCmd = `ffmpeg -i "${audioPath}" -ss ${startTime} -t ${endTime - startTime} -c copy "${chunkPath}" -y`;
+      // Extract chunk using FFmpeg (transcode to MP3)
+      const ffmpegCmd = `ffmpeg -i "${audioPath}" -ss ${startTime} -t ${endTime - startTime} -acodec libmp3lame -ar 44100 -ac 1 "${chunkPath}" -y`;
       require('child_process').execSync(ffmpegCmd);
       
       try {
