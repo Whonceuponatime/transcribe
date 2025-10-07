@@ -6,6 +6,7 @@ import AudioTranscriptionPanel from './components/AudioTranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
 import FileAnalysis from './components/FileAnalysis';
+import MetadataPanel from './components/MetadataPanel';
 
 function App() {
   const [activeTab, setActiveTab] = useState('transcription');
@@ -88,6 +89,12 @@ function App() {
         >
           📄 File Analysis
         </button>
+        <button 
+          className={`tab-button ${activeTab === 'metadata' ? 'active' : ''}`}
+          onClick={() => setActiveTab('metadata')}
+        >
+          🛡️ Metadata Tools
+        </button>
       </div>
 
       <main className="App-main">
@@ -124,8 +131,10 @@ function App() {
           <AudioTranscriptionPanel />
         ) : activeTab === 'tts' ? (
           <TextToSpeech />
-        ) : (
+        ) : activeTab === 'analysis' ? (
           <FileAnalysis />
+        ) : (
+          <MetadataPanel />
         )}
       </main>
     </div>

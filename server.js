@@ -11,6 +11,8 @@ const socketIo = require('socket.io');
 const ffmpeg = require('fluent-ffmpeg');
 const { OpenAI } = require('openai');
 const axios = require('axios');
+const sharp = require('sharp');
+const ExifParser = require('exif-parser');
 // const archiver = require('archiver'); // Temporarily disabled
 
 const app = express();
@@ -68,11 +70,15 @@ app.use((req, res, next) => {
 // Create directories if they don't exist
 const uploadsDir = path.join(__dirname, 'uploads');
 const audioDir = path.join(__dirname, 'audio');
+const metadataDir = path.join(__dirname, 'metadata');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 if (!fs.existsSync(audioDir)) {
   fs.mkdirSync(audioDir);
+}
+if (!fs.existsSync(metadataDir)) {
+  fs.mkdirSync(metadataDir);
 }
 
 // Configure multer for file uploads
@@ -146,6 +152,33 @@ const audioUpload = multer({
     }
   }
   // Removed file size limits to handle large audio files
+});
+
+// Configure multer for media files (videos and images) for metadata processing
+const mediaStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, metadataDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const mediaUpload = multer({ 
+  storage: mediaStorage,
+  fileFilter: (req, file, cb) => {
+    // Accept video and image files
+    const isVideo = file.mimetype.startsWith('video/');
+    const isImage = file.mimetype.startsWith('image/');
+    
+    if (isVideo || isImage) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only video and image files are allowed!'), false);
+    }
+  }
+  // Removed file size limits to handle large files
 });
 
 // Socket.IO connection handling
@@ -296,6 +329,91 @@ const transcribeAudioChunked = async (audioPath, options = {}) => {
     
   } catch (error) {
     console.error('Chunked transcription error:', error);
+    throw error;
+  }
+};
+
+// Metadata processing functions
+const processImageMetadata = async (inputPath, outputPath, options) => {
+  try {
+    // Use Sharp to process the image and remove metadata
+    const image = sharp(inputPath);
+    
+    // Remove all metadata by default, or apply specific options
+    if (options.removeAll) {
+      // Remove all metadata
+      await image
+        .withMetadata({}) // Remove all metadata
+        .jpeg({ quality: 90 }) // Re-encode as JPEG to ensure metadata removal
+        .png({ quality: 90 }) // Re-encode as PNG to ensure metadata removal
+        .toFile(outputPath);
+    } else {
+      // Apply selective metadata removal
+      const metadata = await image.metadata();
+      const newMetadata = {};
+      
+      // Keep only specific metadata if not being removed
+      if (!options.removeLocation && metadata.exif) {
+        // This is a simplified approach - in a real implementation,
+        // you'd need more sophisticated EXIF manipulation
+        newMetadata.exif = metadata.exif;
+      }
+      
+      await image
+        .withMetadata(newMetadata)
+        .toFile(outputPath);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error processing image metadata:', error);
+    throw error;
+  }
+};
+
+const processVideoMetadata = async (inputPath, outputPath, options) => {
+  try {
+    // For videos, we'll use FFmpeg to remove metadata
+    return new Promise((resolve, reject) => {
+      let ffmpegCommand = ffmpeg(inputPath);
+      
+      // Remove metadata by re-encoding without metadata
+      ffmpegCommand = ffmpegCommand
+        .outputOptions([
+          '-map_metadata', '-1', // Remove all metadata
+          '-c:v', 'copy', // Copy video stream without re-encoding
+          '-c:a', 'copy'  // Copy audio stream without re-encoding
+        ]);
+      
+      // Add specific metadata removal options
+      if (options.removeLocation) {
+        ffmpegCommand = ffmpegCommand.outputOptions(['-metadata', 'location=']);
+      }
+      
+      if (options.removeCameraInfo) {
+        ffmpegCommand = ffmpegCommand.outputOptions([
+          '-metadata', 'make=',
+          '-metadata', 'model=',
+          '-metadata', 'software='
+        ]);
+      }
+      
+      ffmpegCommand
+        .on('progress', (progress) => {
+          console.log('Video processing progress:', progress.percent + '%');
+        })
+        .on('end', () => {
+          console.log('Video metadata processing completed');
+          resolve(true);
+        })
+        .on('error', (err) => {
+          console.error('Video metadata processing error:', err);
+          reject(err);
+        })
+        .save(outputPath);
+    });
+  } catch (error) {
+    console.error('Error processing video metadata:', error);
     throw error;
   }
 };
@@ -1443,6 +1561,155 @@ Please provide your analysis and linking suggestions:`;
       error: 'File analysis failed', 
       details: error.message 
     });
+  }
+});
+
+// Metadata processing endpoint
+app.post('/api/process-metadata', mediaUpload.array('files', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    console.log('Metadata processing request received:', req.files.length, 'files');
+
+    // Parse metadata options
+    const metadataOptions = JSON.parse(req.body.metadataOptions || '{}');
+    console.log('Metadata options:', metadataOptions);
+
+    const processedFiles = [];
+    const processedDir = path.join(__dirname, 'processed');
+    if (!fs.existsSync(processedDir)) {
+      fs.mkdirSync(processedDir);
+    }
+
+    // Process each file
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const fileExtension = path.extname(file.originalname).toLowerCase();
+      const isImage = file.mimetype.startsWith('image/');
+      const isVideo = file.mimetype.startsWith('video/');
+
+      console.log(`Processing file ${i + 1}/${req.files.length}: ${file.originalname}`);
+
+      try {
+        const outputFilename = `processed_${Date.now()}_${file.originalname}`;
+        const outputPath = path.join(processedDir, outputFilename);
+
+        if (isImage) {
+          await processImageMetadata(file.path, outputPath, metadataOptions);
+        } else if (isVideo) {
+          await processVideoMetadata(file.path, outputPath, metadataOptions);
+        } else {
+          throw new Error('Unsupported file type');
+        }
+
+        processedFiles.push(outputFilename);
+        console.log(`Successfully processed: ${file.originalname} -> ${outputFilename}`);
+
+      } catch (fileError) {
+        console.error(`Error processing file ${file.originalname}:`, fileError);
+        // Continue with other files even if one fails
+      }
+    }
+
+    // Clean up uploaded files
+    for (const file of req.files) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', file.originalname, cleanupError);
+      }
+    }
+
+    res.json({
+      success: true,
+      processedFiles: processedFiles,
+      totalFiles: req.files.length,
+      processedCount: processedFiles.length
+    });
+
+  } catch (error) {
+    console.error('Metadata processing error:', error);
+    
+    // Clean up files if they exist
+    if (req.files) {
+      for (const file of req.files) {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', file.originalname, cleanupError);
+        }
+      }
+    }
+    
+    res.status(500).json({ 
+      error: 'Metadata processing failed', 
+      details: error.message 
+    });
+  }
+});
+
+// Download processed metadata file
+app.get('/api/download-metadata-file/:filename(*)', (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(__dirname, 'processed', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Download failed', details: error.message });
+  }
+});
+
+// Download all processed metadata files as ZIP
+app.post('/api/download-all-metadata-files', (req, res) => {
+  try {
+    const { files } = req.body;
+    const processedDir = path.join(__dirname, 'processed');
+    
+    if (!fs.existsSync(processedDir)) {
+      return res.status(404).json({ error: 'No processed files found' });
+    }
+    
+    // For now, we'll create a simple directory listing
+    // In a real implementation, you'd use a ZIP library like archiver
+    const availableFiles = [];
+    files.forEach(filename => {
+      const filePath = path.join(processedDir, filename);
+      if (fs.existsSync(filePath)) {
+        availableFiles.push(filename);
+      }
+    });
+    
+    // Create a simple text file with download instructions
+    const downloadInstructions = `Metadata Processing Results
+Generated: ${new Date().toISOString()}
+
+Processed files:
+${availableFiles.map(file => `  ${file}`).join('\n')}
+
+To download individual files, use the download links in the application.
+
+Total files: ${availableFiles.length}
+`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', 'attachment; filename="metadata-processing-results.txt"');
+    res.send(downloadInstructions);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Download failed', details: error.message });
   }
 });
 
