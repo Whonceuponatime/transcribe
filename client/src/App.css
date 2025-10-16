@@ -1,3 +1,7 @@
+/* Mr. Robot Inspired Theme - Dark Cyberpunk Aesthetic */
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -5,44 +9,136 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Source Code Pro', 'Courier New', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0a0a0a;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(0, 255, 0, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(0, 255, 0, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(0, 255, 0, 0.02) 0%, transparent 50%);
   background-attachment: fixed;
   min-height: 100vh;
-  color: #333;
+  color: #00ff00;
   line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Terminal-style cursor animation */
+body::after {
+  content: '_';
+  color: #00ff00;
+  animation: blink 1s infinite;
+  font-weight: bold;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 
 .App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* Glitch effect overlay */
+.App::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(90deg, transparent 98%, rgba(0, 255, 0, 0.03) 100%),
+    linear-gradient(0deg, transparent 98%, rgba(0, 255, 0, 0.03) 100%);
+  background-size: 3px 3px;
+  pointer-events: none;
+  z-index: 1;
+  animation: scanlines 0.1s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(3px); }
 }
 
 .App-header {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid #00ff00;
+  border-radius: 0 0 10px 10px;
   padding: 2rem;
   text-align: center;
-  color: white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  color: #00ff00;
+  box-shadow: 
+    0 0 20px rgba(0, 255, 0, 0.3),
+    inset 0 0 20px rgba(0, 255, 0, 0.1);
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(5px);
+}
+
+.App-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00ff00, transparent);
+  animation: glitch-line 2s infinite;
+}
+
+@keyframes glitch-line {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 .App-header h1 {
+  font-family: 'Orbitron', monospace;
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
   font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: 
+    0 0 10px #00ff00,
+    0 0 20px #00ff00,
+    0 0 30px #00ff00;
+  animation: glitch-text 3s infinite;
+  position: relative;
+}
+
+@keyframes glitch-text {
+  0%, 100% { 
+    transform: translate(0);
+    filter: hue-rotate(0deg);
+  }
+  20% { 
+    transform: translate(-2px, 2px);
+    filter: hue-rotate(90deg);
+  }
+  40% { 
+    transform: translate(-2px, -2px);
+    filter: hue-rotate(180deg);
+  }
+  60% { 
+    transform: translate(2px, 2px);
+    filter: hue-rotate(270deg);
+  }
+  80% { 
+    transform: translate(2px, -2px);
+    filter: hue-rotate(360deg);
+  }
 }
 
 .App-header p {
   font-size: 1.1rem;
-  opacity: 0.9;
+  opacity: 0.8;
   font-weight: 300;
+  color: #00cc00;
+  text-shadow: 0 0 5px #00ff00;
 }
 
 .App-main {
@@ -51,6 +147,8 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
+  z-index: 2;
 }
 
 .tab-container {
@@ -63,51 +161,76 @@ body {
 }
 
 .tab-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #00ff00;
+  color: #00ff00;
   padding: 1rem 2rem;
-  border-radius: 12px;
+  border-radius: 5px;
   cursor: pointer;
+  font-family: 'Source Code Pro', monospace;
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: 500;
   transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
   min-width: 200px;
   position: relative;
   overflow: hidden;
-}
-
-.tab-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 
+    0 0 10px rgba(0, 255, 0, 0.2),
+    inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 
 .tab-button::before {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.3s ease, height 0.3s ease;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.2), transparent);
+  transition: left 0.5s ease;
 }
 
-.tab-button:active::before {
-  width: 300px;
-  height: 300px;
+.tab-button:hover::before {
+  left: 100%;
+}
+
+.tab-button:hover {
+  background: rgba(0, 255, 0, 0.1);
+  border-color: #00cc00;
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 20px rgba(0, 255, 0, 0.4),
+    0 5px 15px rgba(0, 0, 0, 0.3),
+    inset 0 0 20px rgba(0, 255, 0, 0.2);
+  text-shadow: 0 0 10px #00ff00;
 }
 
 .tab-button.active {
-  background: rgba(255, 255, 255, 0.9);
-  color: #333;
-  border-color: rgba(255, 255, 255, 1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background: rgba(0, 255, 0, 0.2);
+  color: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 
+    0 0 25px rgba(0, 255, 0, 0.6),
+    inset 0 0 25px rgba(0, 255, 0, 0.3);
+  text-shadow: 
+    0 0 10px #ffffff,
+    0 0 20px #00ff00;
+  animation: active-pulse 2s infinite;
+}
+
+@keyframes active-pulse {
+  0%, 100% { 
+    box-shadow: 
+      0 0 25px rgba(0, 255, 0, 0.6),
+      inset 0 0 25px rgba(0, 255, 0, 0.3);
+  }
+  50% { 
+    box-shadow: 
+      0 0 35px rgba(0, 255, 0, 0.8),
+      inset 0 0 35px rgba(0, 255, 0, 0.5);
+  }
 }
 
 .app-container {
@@ -130,13 +253,104 @@ body {
 }
 
 .App-footer {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid #00ff00;
+  border-radius: 10px 10px 0 0;
   padding: 1rem;
   text-align: center;
-  color: white;
+  color: #00ff00;
   font-size: 0.9rem;
   opacity: 0.8;
+  position: relative;
+  z-index: 2;
+  box-shadow: 
+    0 0 20px rgba(0, 255, 0, 0.3),
+    inset 0 0 20px rgba(0, 255, 0, 0.1);
+}
+
+/* Terminal-style scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+  border: 1px solid #00ff00;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00ff00;
+  border: 1px solid #000000;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00cc00;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+/* Glitch animation classes */
+.glitch {
+  position: relative;
+  animation: glitch 2s infinite;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glitch::before {
+  animation: glitch-1 0.5s infinite;
+  color: #ff0000;
+  z-index: -1;
+}
+
+.glitch::after {
+  animation: glitch-2 0.5s infinite;
+  color: #0000ff;
+  z-index: -2;
+}
+
+@keyframes glitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+}
+
+@keyframes glitch-1 {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(2px, -2px); }
+  40% { transform: translate(-2px, 2px); }
+  60% { transform: translate(-2px, -2px); }
+  80% { transform: translate(2px, 2px); }
+}
+
+@keyframes glitch-2 {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, -2px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(-2px, 2px); }
+}
+
+/* Matrix-style rain effect */
+.matrix-rain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.1;
 }
 
 /* Responsive Design */
@@ -249,7 +463,7 @@ body {
     max-width: none;
     padding: 0.8rem 1rem;
     font-size: 0.9rem;
-    border-radius: 8px;
+    border-radius: 3px;
   }
   
   .app-container {
@@ -272,66 +486,29 @@ body {
   }
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-/* Animation Classes */
-.fade-in {
-  animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.slide-in {
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
 /* Button Hover Effects */
 button {
   transition: all 0.2s ease;
+  font-family: 'Source Code Pro', monospace;
+  border: 1px solid #00ff00;
+  background: rgba(0, 0, 0, 0.8);
+  color: #00ff00;
+  text-shadow: 0 0 5px #00ff00;
 }
 
 button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 
+    0 0 15px rgba(0, 255, 0, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 255, 0, 0.1);
 }
 
 button:active {
   transform: translateY(0);
+  box-shadow: 
+    0 0 10px rgba(0, 255, 0, 0.6),
+    inset 0 0 10px rgba(0, 255, 0, 0.2);
 }
 
 /* Focus States */
@@ -339,25 +516,47 @@ button:focus,
 input:focus,
 textarea:focus,
 select:focus {
-  outline: 2px solid #667eea;
+  outline: 2px solid #00ff00;
   outline-offset: 2px;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+}
+
+/* Input styling */
+input, textarea, select {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  font-family: 'Source Code Pro', monospace;
+  padding: 0.5rem;
+  border-radius: 3px;
+}
+
+input:focus, textarea:focus, select:focus {
+  background: rgba(0, 0, 0, 0.9);
+  box-shadow: 
+    0 0 10px rgba(0, 255, 0, 0.3),
+    inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 
 /* Touch-friendly improvements */
 @media (hover: none) and (pointer: coarse) {
   .tab-button:hover {
     transform: none;
-    box-shadow: none;
+    box-shadow: 
+      0 0 10px rgba(0, 255, 0, 0.2),
+      inset 0 0 10px rgba(0, 255, 0, 0.1);
   }
   
   .tab-button:active {
     transform: scale(0.98);
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(0, 255, 0, 0.2);
   }
   
   button:hover {
     transform: none;
-    box-shadow: none;
+    box-shadow: 
+      0 0 10px rgba(0, 255, 0, 0.2),
+      inset 0 0 10px rgba(0, 255, 0, 0.1);
   }
   
   button:active {
@@ -369,11 +568,13 @@ select:focus {
 @media (prefers-contrast: high) {
   .tab-button {
     border-width: 3px;
+    background: #000000;
+    color: #ffffff;
   }
   
   .tab-button.active {
-    background: white;
-    color: black;
+    background: #00ff00;
+    color: #000000;
   }
 }
 
@@ -384,12 +585,21 @@ select:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  
+  .App-header h1 {
+    animation: none;
+  }
+  
+  .App::before {
+    animation: none;
+  }
 }
 
 /* Loading States */
 .loading {
   opacity: 0.6;
   pointer-events: none;
+  position: relative;
 }
 
 .loading::after {
@@ -400,13 +610,73 @@ select:focus {
   width: 20px;
   height: 20px;
   margin: -10px 0 0 -10px;
-  border: 2px solid #667eea;
+  border: 2px solid #00ff00;
   border-top: 2px solid transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  box-shadow: 0 0 10px #00ff00;
 }
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-} 
+}
+
+/* Terminal-style text effects */
+.terminal-text {
+  font-family: 'Source Code Pro', monospace;
+  color: #00ff00;
+  text-shadow: 0 0 5px #00ff00;
+}
+
+.terminal-text::after {
+  content: '_';
+  animation: blink 1s infinite;
+  color: #00ff00;
+}
+
+/* Cyberpunk grid background */
+.cyber-grid {
+  background-image: 
+    linear-gradient(rgba(0, 255, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 0, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Hacker-style progress bars */
+.progress-bar {
+  background: #000000;
+  border: 1px solid #00ff00;
+  height: 20px;
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00cc00);
+  width: var(--progress, 0%);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+/* Error states */
+.error {
+  color: #ff0000;
+  text-shadow: 0 0 10px #ff0000;
+  border-color: #ff0000;
+  box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+}
+
+/* Success states */
+.success {
+  color: #00ff00;
+  text-shadow: 0 0 10px #00ff00;
+  border-color: #00ff00;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+}
