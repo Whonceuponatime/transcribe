@@ -7,6 +7,7 @@ import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
 import FileAnalysis from './components/FileAnalysis';
 import MetadataPanel from './components/MetadataPanel';
+import ImageConverter from './components/ImageConverter';
 
 function App() {
   const [activeTab, setActiveTab] = useState('transcription');
@@ -60,8 +61,8 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>All in One - Sam</h1>
-        <p>Upload videos to transcribe or convert text to speech for learning</p>
+        <h1>🃏 Jack of clubs</h1>
+        <p>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
       </header>
 
       <div className="tab-container">
@@ -94,6 +95,12 @@ function App() {
           onClick={() => setActiveTab('metadata')}
         >
           🛡️ Metadata Tools
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'converter' ? 'active' : ''}`}
+          onClick={() => setActiveTab('converter')}
+        >
+          🖼️ Image Converter
         </button>
       </div>
 
@@ -133,8 +140,10 @@ function App() {
           <TextToSpeech />
         ) : activeTab === 'analysis' ? (
           <FileAnalysis />
-        ) : (
+        ) : activeTab === 'metadata' ? (
           <MetadataPanel />
+        ) : (
+          <ImageConverter />
         )}
       </main>
     </div>
