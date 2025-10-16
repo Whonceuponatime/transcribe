@@ -1,4 +1,4 @@
-/* Mr. Robot Theme - Image Converter */
+/* Mr. Robot Theme - Clean Minimalist Image Converter */
 
 .image-converter {
   padding: 20px;
@@ -13,41 +13,33 @@
 }
 
 .converter-header h2 {
-  color: #00ff00;
+  color: white;
   margin-bottom: 10px;
   font-size: 2.2rem;
-  font-family: 'Orbitron', monospace;
-  text-shadow: 
-    0 0 10px #00ff00,
-    0 0 20px #00ff00;
-  animation: glitch-text 3s infinite;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .converter-header p {
-  color: #00cc00;
+  color: white;
   font-size: 1.1rem;
-  text-shadow: 0 0 5px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .format-note {
-  background: rgba(255, 255, 0, 0.1);
-  border: 1px solid #ffff00;
-  border-radius: 3px;
+  background-color: #191919;
+  border: 1px solid white;
   padding: 10px 15px;
   margin-top: 15px;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
-  box-shadow: 
-    0 0 15px rgba(255, 255, 0, 0.3),
-    inset 0 0 15px rgba(255, 255, 0, 0.1);
 }
 
 .format-note p {
   margin: 0;
-  color: #ffff00;
+  color: white;
   font-size: 0.9rem;
-  text-shadow: 0 0 5px #ffff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .converter-container {
@@ -58,56 +50,35 @@
 }
 
 .left-section, .right-section {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid #00ff00;
-  border-radius: 5px;
+  background-color: #191919;
+  border: 1px solid white;
   padding: 25px;
-  box-shadow: 
-    0 0 20px rgba(0, 255, 0, 0.3),
-    inset 0 0 20px rgba(0, 255, 0, 0.1);
-  position: relative;
-}
-
-.left-section::before,
-.right-section::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #00ff00, transparent);
-  animation: glitch-line 2s infinite;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .upload-section h3, .settings-section h3 {
-  color: #00ff00;
+  color: white;
   margin-bottom: 20px;
   font-size: 1.4rem;
-  font-family: 'Orbitron', monospace;
-  border-bottom: 2px solid #00ff00;
+  font-family: 'Source Code Pro', monospace;
+  border-bottom: 1px solid white;
   padding-bottom: 10px;
-  text-shadow: 0 0 10px #00ff00;
 }
 
 .upload-area {
   position: relative;
-  border: 2px dashed #00ff00;
-  border-radius: 5px;
+  border: 2px dashed white;
   padding: 40px 20px;
   text-align: center;
   transition: all 0.3s ease;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.5);
-  color: #00ff00;
+  background-color: transparent;
+  color: white;
 }
 
 .upload-area:hover {
-  border-color: #00cc00;
-  background: rgba(0, 255, 0, 0.1);
-  box-shadow: 
-    0 0 20px rgba(0, 255, 0, 0.4),
-    inset 0 0 20px rgba(0, 255, 0, 0.1);
+  border-color: green;
+  color: green;
 }
 
 .file-input {
@@ -127,20 +98,31 @@
 .upload-icon {
   font-size: 3rem;
   margin-bottom: 15px;
-  color: #00ff00;
-  text-shadow: 0 0 10px #00ff00;
+  color: white;
+}
+
+.upload-area:hover .upload-icon {
+  color: green;
 }
 
 .upload-placeholder p {
   margin: 5px 0;
-  color: #00cc00;
-  text-shadow: 0 0 5px #00ff00;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-placeholder p {
+  color: green;
 }
 
 .upload-hint {
   font-size: 0.9rem;
-  color: #009900;
-  text-shadow: 0 0 3px #00ff00;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-hint {
+  color: green;
 }
 
 .files-list {
@@ -148,19 +130,18 @@
 }
 
 .files-list h4 {
-  color: #00ff00;
+  color: white;
   margin-bottom: 15px;
   font-size: 1.1rem;
-  text-shadow: 0 0 5px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .files-container {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #00ff00;
-  border-radius: 3px;
+  border: 1px solid white;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.5);
+  background-color: transparent;
 }
 
 .file-item {
@@ -168,14 +149,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px;
-  border-bottom: 1px solid rgba(0, 255, 0, 0.3);
+  border-bottom: 1px solid white;
   transition: background-color 0.2s ease;
-  color: #00ff00;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .file-item:hover {
-  background: rgba(0, 255, 0, 0.1);
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+  background-color: #191919;
 }
 
 .file-item:last-child {
@@ -190,124 +171,114 @@
 
 .file-name {
   font-weight: 500;
-  color: #00ff00;
+  color: white;
   margin-bottom: 2px;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .file-format {
   font-size: 0.75rem;
-  color: #00ff00;
-  background: rgba(0, 255, 0, 0.2);
-  border: 1px solid #00ff00;
+  color: white;
+  background-color: transparent;
+  border: 1px solid white;
   padding: 2px 6px;
-  border-radius: 3px;
   display: inline-block;
   margin-bottom: 2px;
   width: fit-content;
-  text-shadow: 0 0 3px #00ff00;
-  box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+  font-family: 'Source Code Pro', monospace;
 }
 
 .file-size {
   font-size: 0.85rem;
-  color: #00cc00;
-  text-shadow: 0 0 3px #00ff00;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .remove-file-btn {
-  background: #ff0000;
+  background-color: transparent;
   color: white;
-  border: 1px solid #ff0000;
-  border-radius: 3px;
+  border: 1px solid white;
   width: 24px;
   height: 24px;
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.2s ease;
-  box-shadow: 0 0 5px #ff0000;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .remove-file-btn:hover {
-  background: #cc0000;
-  box-shadow: 0 0 10px #ff0000;
+  color: green;
+  border-color: green;
 }
 
 .setting-group {
   margin-bottom: 20px;
   padding: 15px;
-  border: 1px solid #00ff00;
-  border-radius: 3px;
+  border: 1px solid white;
   transition: all 0.2s ease;
-  background: rgba(0, 0, 0, 0.3);
+  background-color: transparent;
 }
 
 .setting-group:hover {
-  border-color: #00cc00;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+  border-color: green;
 }
 
 .setting-label {
   display: block;
   font-weight: 500;
-  color: #00ff00;
+  color: white;
   margin-bottom: 8px;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .setting-description {
   font-size: 0.9rem;
-  color: #00cc00;
+  color: white;
   margin: 5px 0 0 0;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .format-select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #00ff00;
-  border-radius: 3px;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
   font-size: 0.9rem;
-  background: rgba(0, 0, 0, 0.8);
-  color: #00ff00;
   font-family: 'Source Code Pro', monospace;
   cursor: pointer;
 }
 
 .format-select:focus {
   outline: none;
-  border-color: #00cc00;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-  background: rgba(0, 0, 0, 0.9);
+  border-color: green;
 }
 
 .format-select option {
-  background: #000000;
-  color: #00ff00;
+  background-color: #191919;
+  color: white;
 }
 
 .quality-slider {
   width: 100%;
   margin: 10px 0;
   cursor: pointer;
-  accent-color: #00ff00;
+  accent-color: green;
 }
 
 .quality-hint {
   font-size: 0.8rem;
-  color: #009900;
+  color: white;
   text-align: center;
   margin-top: 5px;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .resize-settings {
   margin-top: 15px;
   padding: 15px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 3px;
-  border: 1px solid #00ff00;
-  box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
+  background-color: transparent;
+  border: 1px solid white;
 }
 
 .dimension-inputs {
@@ -324,68 +295,55 @@
 
 .dimension-input label {
   font-size: 0.9rem;
-  color: #00cc00;
+  color: white;
   margin-bottom: 5px;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .dimension-input input {
   padding: 8px 12px;
-  border: 1px solid #00ff00;
-  border-radius: 3px;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
   font-size: 0.9rem;
-  background: rgba(0, 0, 0, 0.8);
-  color: #00ff00;
   font-family: 'Source Code Pro', monospace;
 }
 
 .dimension-input input:focus {
   outline: none;
-  border-color: #00cc00;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-  background: rgba(0, 0, 0, 0.9);
+  border-color: green;
 }
 
 .conversion-section {
   margin-top: 25px;
   padding-top: 20px;
-  border-top: 1px solid #00ff00;
+  border-top: 1px solid white;
 }
 
 .convert-btn {
   width: 100%;
-  background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
-  color: #000000;
-  border: 1px solid #00ff00;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
   padding: 15px 20px;
-  border-radius: 3px;
   font-size: 1.1rem;
   font-weight: 600;
   font-family: 'Source Code Pro', monospace;
   cursor: pointer;
   transition: all 0.3s ease;
   margin-bottom: 20px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  box-shadow: 
-    0 0 20px rgba(0, 255, 0, 0.4),
-    inset 0 0 20px rgba(0, 255, 0, 0.2);
 }
 
 .convert-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 0 30px rgba(0, 255, 0, 0.6),
-    inset 0 0 30px rgba(0, 255, 0, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .convert-btn:disabled {
-  background: #333333;
-  color: #666666;
-  border-color: #666666;
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .progress-section {
@@ -395,45 +353,38 @@
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #000000;
-  border: 1px solid #00ff00;
-  border-radius: 0;
+  background-color: #191919;
+  border: 1px solid white;
   overflow: hidden;
   margin-bottom: 10px;
-  box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.2);
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00ff00, #00cc00);
+  background-color: green;
   transition: width 0.3s ease;
-  box-shadow: 0 0 10px #00ff00;
 }
 
 .progress-text {
   text-align: center;
-  color: #00cc00;
+  color: white;
   font-size: 0.9rem;
   margin: 0;
-  text-shadow: 0 0 3px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .results-section {
   margin-bottom: 20px;
   padding: 15px;
-  background: rgba(0, 255, 0, 0.1);
-  border: 1px solid #00ff00;
-  border-radius: 3px;
-  box-shadow: 
-    0 0 15px rgba(0, 255, 0, 0.3),
-    inset 0 0 15px rgba(0, 255, 0, 0.1);
+  background-color: transparent;
+  border: 1px solid white;
 }
 
 .results-section h4 {
-  color: #00ff00;
+  color: white;
   margin-bottom: 15px;
   font-size: 1.1rem;
-  text-shadow: 0 0 5px #00ff00;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .converted-files {
@@ -447,8 +398,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(0, 255, 0, 0.3);
-  color: #00ff00;
+  border-bottom: 1px solid white;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .converted-file-item:last-child {
@@ -456,75 +408,64 @@
 }
 
 .download-btn {
-  background: #00ff00;
-  color: #000000;
-  border: 1px solid #00ff00;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
   padding: 4px 12px;
-  border-radius: 3px;
   cursor: pointer;
   font-size: 0.8rem;
   font-family: 'Source Code Pro', monospace;
   font-weight: 600;
   transition: all 0.2s ease;
-  box-shadow: 0 0 5px #00ff00;
 }
 
 .download-btn:hover {
-  background: #00cc00;
-  box-shadow: 0 0 10px #00ff00;
+  color: green;
+  border-color: green;
 }
 
 .download-all-btn {
   width: 100%;
-  background: #00ff00;
-  color: #000000;
-  border: 1px solid #00ff00;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
   padding: 10px 15px;
-  border-radius: 3px;
   cursor: pointer;
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
   font-weight: 600;
   transition: all 0.2s ease;
   margin-bottom: 15px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  box-shadow: 0 0 10px #00ff00;
 }
 
 .download-all-btn:hover {
-  background: #00cc00;
-  box-shadow: 0 0 15px #00ff00;
+  color: green;
+  border-color: green;
 }
 
 .clear-btn {
   width: 100%;
-  background: #ff0000;
+  background-color: transparent;
   color: white;
-  border: 1px solid #ff0000;
+  border: 1px solid white;
   padding: 10px 15px;
-  border-radius: 3px;
   cursor: pointer;
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
   font-weight: 600;
   transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  box-shadow: 0 0 10px #ff0000;
 }
 
 .clear-btn:hover:not(:disabled) {
-  background: #cc0000;
-  box-shadow: 0 0 15px #ff0000;
+  color: green;
+  border-color: green;
 }
 
 .clear-btn:disabled {
-  background: #333333;
-  color: #666666;
-  border-color: #666666;
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* Responsive Design */

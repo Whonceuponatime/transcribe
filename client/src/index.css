@@ -1,28 +1,20 @@
-/* Mr. Robot Theme - Global Styles */
+/* Mr. Robot Theme - Clean Minimalist Global Styles */
 
 body {
   margin: 0;
-  font-family: 'Source Code Pro', 'Courier New', monospace;
+  font-family: 'Source Code Pro', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0a0a !important;
-  background-image: 
-    radial-gradient(circle at 20% 50%, rgba(0, 255, 0, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(0, 255, 0, 0.02) 0%, transparent 50%),
-    radial-gradient(circle at 40% 80%, rgba(0, 255, 0, 0.02) 0%, transparent 50%) !important;
-  background-attachment: fixed;
-  min-height: 100vh;
-  color: #00ff00 !important;
+  background-color: black;
+  color: white;
   line-height: 1.6;
-  overflow-x: hidden;
 }
 
 code {
-  font-family: 'Source Code Pro', 'Courier New', monospace;
-  color: #00ff00;
-  background: rgba(0, 0, 0, 0.8);
+  font-family: 'Source Code Pro', monospace;
+  color: green;
+  background-color: #191919;
   padding: 2px 4px;
-  border-radius: 3px;
-  border: 1px solid #00ff00;
-  box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+  border-radius: 0;
+  border: 1px solid white;
 }
