@@ -508,20 +508,16 @@ const convertImage = async (inputPath, outputPath, settings) => {
         break;
         
       case 'svg':
-        // For SVG conversion, we'll need to handle this differently
-        // For now, we'll convert to PNG first, then provide instructions
-        await sharpInstance
-          .png({ quality: settings.quality })
-          .toFile(outputPath.replace('.svg', '.png'));
-        console.log('Note: SVG conversion requires special handling. Converted to PNG instead.');
-        break;
+        throw new Error('SVG conversion is not supported. SVG is a vector format and cannot be generated from raster images. Please use PNG, JPEG, or WebP instead.');
         
       case 'ico':
+        const icoPngOutputPath = outputPath.replace('.ico', '.png');
         await sharpInstance
           .png({ quality: settings.quality })
-          .toFile(outputPath.replace('.ico', '.png'));
+          .toFile(icoPngOutputPath);
         console.log('Note: ICO conversion requires special handling. Converted to PNG instead.');
-        break;
+        // Update the output path to reflect the actual file extension
+        return icoPngOutputPath;
         
       case 'avif':
         await sharpInstance
@@ -1869,10 +1865,12 @@ app.post('/api/convert-images', imageUpload.array('files', 10), async (req, res)
         const outputFilename = `converted_${Date.now()}_${baseName}${outputExtension}`;
         const outputPath = path.join(processedDir, outputFilename);
 
-        await convertImage(file.path, outputPath, conversionSettings);
-
-        convertedFiles.push(outputFilename);
-        console.log(`Successfully converted: ${file.originalname} -> ${outputFilename}`);
+        const actualOutputPath = await convertImage(file.path, outputPath, conversionSettings);
+        
+        // Get the actual filename from the returned path
+        const actualFilename = path.basename(actualOutputPath);
+        convertedFiles.push(actualFilename);
+        console.log(`Successfully converted: ${file.originalname} -> ${actualFilename}`);
 
       } catch (fileError) {
         console.error(`Error converting file ${file.originalname}:`, fileError);

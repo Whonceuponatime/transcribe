@@ -25,7 +25,6 @@ const ImageConverter = () => {
     { value: 'gif', label: 'GIF', description: 'Graphics Interchange Format' },
     { value: 'bmp', label: 'BMP', description: 'Bitmap Image' },
     { value: 'tiff', label: 'TIFF', description: 'Tagged Image File Format' },
-    { value: 'svg', label: 'SVG', description: 'Scalable Vector Graphics' },
     { value: 'ico', label: 'ICO', description: 'Windows Icon' },
     { value: 'avif', label: 'AVIF', description: 'AV1 Image File Format' }
   ];
@@ -157,6 +156,9 @@ const ImageConverter = () => {
       <div className="converter-header">
         <h2>🖼️ Image Format Converter</h2>
         <p>Convert images between different formats with quality and resize options</p>
+        <div className="format-note">
+          <p><strong>Note:</strong> SVG conversion is not supported as SVG is a vector format. Use PNG, JPEG, or WebP for best results.</p>
+        </div>
       </div>
 
       <div className="converter-container">
@@ -175,7 +177,7 @@ const ImageConverter = () => {
               <div className="upload-placeholder">
                 <div className="upload-icon">📤</div>
                 <p>Click to select or drag & drop</p>
-                <p className="upload-hint">Supports: PNG, JPG, GIF, WebP, SVG, TIFF, BMP, ICO, AVIF</p>
+                <p className="upload-hint">Supports: PNG, JPG, GIF, WebP, TIFF, BMP, ICO, AVIF</p>
               </div>
             </div>
           </div>
