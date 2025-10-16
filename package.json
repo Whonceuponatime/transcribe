@@ -5,11 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon --ignore 'client/*' --ignore 'node_modules/*' server.js",
+    "dev": "npm run fix-permissions && nodemon --ignore 'client/*' --ignore 'node_modules/*' server.js",
     "dev-server": "node server.js",
     "dev-client": "cd client && npm start",
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
+    "fix-permissions": "node fix-permissions.js",
+    "postinstall": "npm run fix-permissions",
     "heroku-postbuild": "npm run install-client && npm run build"
   },
   "dependencies": {
