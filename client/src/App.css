@@ -25,8 +25,7 @@ body {
 
 .App-header {
   background-color: #191919;
-  padding-bottom: 20vmax;
-  padding-top: 6vmax;
+  padding: 2rem 1rem;
   text-align: center;
   color: white;
 }
@@ -34,22 +33,20 @@ body {
 .App-header h1 {
   color: white;
   font-family: 'Source Code Pro', monospace;
-  font-size: 4vmax;
-  margin-top: 7vmax;
-  margin-bottom: 0;
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
 }
 
 .App-header p {
   color: white;
   font-family: 'Source Code Pro', monospace;
-  font-size: 2vmax;
-  margin-top: 5vmax;
-  margin-bottom: 6vmax;
+  font-size: 1.1rem;
+  margin: 0;
 }
 
 .App-main {
   flex: 1;
-  padding: 2rem;
+  padding: 1rem;
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
@@ -58,9 +55,9 @@ body {
 .tab-container {
   display: flex;
   justify-content: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  padding: 0 2rem;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
   flex-wrap: wrap;
 }
 
@@ -68,15 +65,13 @@ body {
   background-color: transparent;
   border: none;
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.75rem 1.5rem;
   cursor: pointer;
   font-family: 'Source Code Pro', monospace;
-  font-size: 1.8vmax;
+  font-size: 1rem;
   transition: all 0.3s ease;
   text-decoration: none;
   display: block;
-  padding-top: 1vmax;
-  padding-right: 2.5vmax;
 }
 
 .tab-button:hover {
@@ -90,15 +85,15 @@ body {
 .app-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: 1rem;
   height: calc(100vh - 200px);
-  min-height: 600px;
+  min-height: 500px;
 }
 
 .left-panel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .right-panel {
@@ -108,10 +103,10 @@ body {
 
 .App-footer {
   background-color: #191919;
-  padding: 1rem;
+  padding: 0.5rem;
   text-align: center;
   color: white;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-family: 'Source Code Pro', monospace;
 }
 
@@ -185,12 +180,12 @@ input:focus, textarea:focus, select:focus {
 /* Responsive Design */
 @media (max-width: 1200px) {
   .tab-container {
-    gap: 0.8rem;
+    gap: 0.5rem;
   }
   
   .tab-button {
-    font-size: 1.6vmax;
-    padding: 0.9rem 1.5rem;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
   }
 }
 
@@ -198,68 +193,64 @@ input:focus, textarea:focus, select:focus {
   .app-container {
     grid-template-columns: 1fr;
     height: auto;
-    gap: 1.5rem;
-  }
-  
-  .App-main {
-    padding: 1.5rem;
-  }
-  
-  .App-header h1 {
-    font-size: 3.5vmax;
-  }
-  
-  .App-header p {
-    font-size: 1.8vmax;
-  }
-  
-  .tab-container {
-    gap: 0.8rem;
-    padding: 0 1rem;
-  }
-  
-  .tab-button {
-    font-size: 1.6vmax;
-    padding: 0.8rem 1.5rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .App-header {
-    padding: 1.5rem 1rem;
-    padding-bottom: 15vmax;
-    padding-top: 4vmax;
-  }
-  
-  .App-header h1 {
-    font-size: 3vmax;
-    margin-top: 5vmax;
-  }
-  
-  .App-header p {
-    font-size: 1.6vmax;
-    margin-top: 3vmax;
+    gap: 1rem;
   }
   
   .App-main {
     padding: 1rem;
   }
   
+  .App-header h1 {
+    font-size: 2rem;
+  }
+  
+  .App-header p {
+    font-size: 1rem;
+  }
+  
+  .tab-container {
+    gap: 0.5rem;
+    padding: 0 1rem;
+  }
+  
+  .tab-button {
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .App-header {
+    padding: 1rem 0.5rem;
+  }
+  
+  .App-header h1 {
+    font-size: 1.8rem;
+  }
+  
+  .App-header p {
+    font-size: 0.9rem;
+  }
+  
+  .App-main {
+    padding: 0.5rem;
+  }
+  
   .app-container {
-    gap: 1rem;
+    gap: 0.5rem;
     min-height: auto;
   }
   
   .tab-container {
     flex-direction: column;
     align-items: center;
-    gap: 0.8rem;
+    gap: 0.3rem;
     padding: 0 0.5rem;
   }
   
   .tab-button {
-    font-size: 1.4vmax;
-    padding: 1rem 1.5rem;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
     width: 100%;
     max-width: 300px;
   }
@@ -267,54 +258,50 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 480px) {
   .App-header {
-    padding: 1rem 0.5rem;
-    padding-bottom: 12vmax;
-    padding-top: 3vmax;
+    padding: 0.8rem 0.5rem;
   }
   
   .App-header h1 {
-    font-size: 2.5vmax;
-    margin-top: 3vmax;
+    font-size: 1.5rem;
   }
   
   .App-header p {
-    font-size: 1.4vmax;
-    margin-top: 2vmax;
+    font-size: 0.8rem;
   }
   
   .App-main {
-    padding: 0.5rem;
+    padding: 0.3rem;
   }
   
   .tab-container {
-    gap: 0.6rem;
+    gap: 0.2rem;
     padding: 0;
   }
   
   .tab-button {
-    font-size: 1.2vmax;
-    padding: 0.8rem 1rem;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
     width: 100%;
     max-width: none;
   }
   
   .app-container {
-    gap: 0.8rem;
+    gap: 0.3rem;
   }
 }
 
 @media (max-width: 360px) {
   .App-header h1 {
-    font-size: 2.2vmax;
+    font-size: 1.3rem;
   }
   
   .App-header p {
-    font-size: 1.2vmax;
+    font-size: 0.7rem;
   }
   
   .tab-button {
-    font-size: 1.1vmax;
-    padding: 0.7rem 0.8rem;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
   }
 }
 
