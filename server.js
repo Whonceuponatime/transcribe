@@ -71,6 +71,7 @@ app.use((req, res, next) => {
 const uploadsDir = path.join(__dirname, 'uploads');
 const audioDir = path.join(__dirname, 'audio');
 const metadataDir = path.join(__dirname, 'metadata');
+const convertedDir = path.join(__dirname, 'converted');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
@@ -79,6 +80,9 @@ if (!fs.existsSync(audioDir)) {
 }
 if (!fs.existsSync(metadataDir)) {
   fs.mkdirSync(metadataDir);
+}
+if (!fs.existsSync(convertedDir)) {
+  fs.mkdirSync(convertedDir);
 }
 
 // Configure multer for file uploads
@@ -179,6 +183,30 @@ const mediaUpload = multer({
     }
   }
   // Removed file size limits to handle large files
+});
+
+// Configure multer for image conversion
+const imageStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, convertedDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const imageUpload = multer({ 
+  storage: imageStorage,
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+  // Removed file size limits to handle large images
 });
 
 // Socket.IO connection handling
@@ -414,6 +442,102 @@ const processVideoMetadata = async (inputPath, outputPath, options) => {
     });
   } catch (error) {
     console.error('Error processing video metadata:', error);
+    throw error;
+  }
+};
+
+// Image conversion functions
+const convertImage = async (inputPath, outputPath, settings) => {
+  try {
+    console.log(`Converting image: ${inputPath} -> ${outputPath}`);
+    console.log('Conversion settings:', settings);
+    
+    let sharpInstance = sharp(inputPath);
+    
+    // Apply resize if requested
+    if (settings.resize) {
+      if (settings.maintainAspectRatio) {
+        sharpInstance = sharpInstance.resize(settings.width, settings.height, {
+          fit: 'inside',
+          withoutEnlargement: true
+        });
+      } else {
+        sharpInstance = sharpInstance.resize(settings.width, settings.height);
+      }
+    }
+    
+    // Convert to the specified format
+    const outputFormat = settings.outputFormat.toLowerCase();
+    
+    switch (outputFormat) {
+      case 'png':
+        await sharpInstance
+          .png({ quality: settings.quality })
+          .toFile(outputPath);
+        break;
+        
+      case 'jpg':
+      case 'jpeg':
+        await sharpInstance
+          .jpeg({ quality: settings.quality })
+          .toFile(outputPath);
+        break;
+        
+      case 'webp':
+        await sharpInstance
+          .webp({ quality: settings.quality })
+          .toFile(outputPath);
+        break;
+        
+      case 'gif':
+        await sharpInstance
+          .gif()
+          .toFile(outputPath);
+        break;
+        
+      case 'bmp':
+        await sharpInstance
+          .bmp()
+          .toFile(outputPath);
+        break;
+        
+      case 'tiff':
+        await sharpInstance
+          .tiff({ quality: settings.quality })
+          .toFile(outputPath);
+        break;
+        
+      case 'svg':
+        // For SVG conversion, we'll need to handle this differently
+        // For now, we'll convert to PNG first, then provide instructions
+        await sharpInstance
+          .png({ quality: settings.quality })
+          .toFile(outputPath.replace('.svg', '.png'));
+        console.log('Note: SVG conversion requires special handling. Converted to PNG instead.');
+        break;
+        
+      case 'ico':
+        await sharpInstance
+          .png({ quality: settings.quality })
+          .toFile(outputPath.replace('.ico', '.png'));
+        console.log('Note: ICO conversion requires special handling. Converted to PNG instead.');
+        break;
+        
+      case 'avif':
+        await sharpInstance
+          .avif({ quality: settings.quality })
+          .toFile(outputPath);
+        break;
+        
+      default:
+        throw new Error(`Unsupported output format: ${outputFormat}`);
+    }
+    
+    console.log(`Successfully converted image to ${outputFormat}`);
+    return true;
+    
+  } catch (error) {
+    console.error('Error converting image:', error);
     throw error;
   }
 };
@@ -1706,6 +1830,149 @@ Total files: ${availableFiles.length}
     
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', 'attachment; filename="metadata-processing-results.txt"');
+    res.send(downloadInstructions);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Download failed', details: error.message });
+  }
+});
+
+// Image conversion endpoint
+app.post('/api/convert-images', imageUpload.array('files', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    console.log('Image conversion request received:', req.files.length, 'files');
+
+    // Parse conversion settings
+    const conversionSettings = JSON.parse(req.body.conversionSettings || '{}');
+    console.log('Conversion settings:', conversionSettings);
+
+    const convertedFiles = [];
+    const processedDir = path.join(__dirname, 'processed');
+    if (!fs.existsSync(processedDir)) {
+      fs.mkdirSync(processedDir);
+    }
+
+    // Process each file
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const fileExtension = path.extname(file.originalname).toLowerCase();
+      const baseName = path.basename(file.originalname, fileExtension);
+
+      console.log(`Converting file ${i + 1}/${req.files.length}: ${file.originalname}`);
+
+      try {
+        const outputExtension = `.${conversionSettings.outputFormat}`;
+        const outputFilename = `converted_${Date.now()}_${baseName}${outputExtension}`;
+        const outputPath = path.join(processedDir, outputFilename);
+
+        await convertImage(file.path, outputPath, conversionSettings);
+
+        convertedFiles.push(outputFilename);
+        console.log(`Successfully converted: ${file.originalname} -> ${outputFilename}`);
+
+      } catch (fileError) {
+        console.error(`Error converting file ${file.originalname}:`, fileError);
+        // Continue with other files even if one fails
+      }
+    }
+
+    // Clean up uploaded files
+    for (const file of req.files) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', file.originalname, cleanupError);
+      }
+    }
+
+    res.json({
+      success: true,
+      convertedFiles: convertedFiles,
+      totalFiles: req.files.length,
+      convertedCount: convertedFiles.length
+    });
+
+  } catch (error) {
+    console.error('Image conversion error:', error);
+    
+    // Clean up files if they exist
+    if (req.files) {
+      for (const file of req.files) {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', file.originalname, cleanupError);
+        }
+      }
+    }
+    
+    res.status(500).json({ 
+      error: 'Image conversion failed', 
+      details: error.message 
+    });
+  }
+});
+
+// Download converted image file
+app.get('/api/download-converted-file/:filename(*)', (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(__dirname, 'processed', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Download failed', details: error.message });
+  }
+});
+
+// Download all converted image files as ZIP
+app.post('/api/download-all-converted-files', (req, res) => {
+  try {
+    const { files } = req.body;
+    const processedDir = path.join(__dirname, 'processed');
+    
+    if (!fs.existsSync(processedDir)) {
+      return res.status(404).json({ error: 'No converted files found' });
+    }
+    
+    // For now, we'll create a simple directory listing
+    // In a real implementation, you'd use a ZIP library like archiver
+    const availableFiles = [];
+    files.forEach(filename => {
+      const filePath = path.join(processedDir, filename);
+      if (fs.existsSync(filePath)) {
+        availableFiles.push(filename);
+      }
+    });
+    
+    // Create a simple text file with download instructions
+    const downloadInstructions = `Image Conversion Results
+Generated: ${new Date().toISOString()}
+
+Converted files:
+${availableFiles.map(file => `  ${file}`).join('\n')}
+
+To download individual files, use the download links in the application.
+
+Total files: ${availableFiles.length}
+`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', 'attachment; filename="image-conversion-results.txt"');
     res.send(downloadInstructions);
   } catch (error) {
     console.error('Download error:', error);

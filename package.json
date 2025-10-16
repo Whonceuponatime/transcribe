@@ -1,7 +1,7 @@
 {
-  "name": "video-transcribe-app",
+  "name": "jack-of-clubs",
   "version": "1.0.0",
-  "description": "A modern web app for uploading videos and transcribing audio to text",
+  "description": "Jack of clubs - A comprehensive media processing suite for transcription, metadata removal, and image conversion",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
