@@ -58,40 +58,45 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>🃏 Jack of clubs</h1>
-        <p>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
+    <div className="App" style={{backgroundColor: '#0a0a0a', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}>
+      <header className="App-header" style={{backgroundColor: 'rgba(0, 0, 0, 0.9)', border: '1px solid #00ff00'}}>
+        <h1 style={{color: '#00ff00', textShadow: '0 0 10px #00ff00'}}>🃏 Jack of clubs</h1>
+        <p style={{color: '#00cc00'}}>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
       </header>
 
       <div className="tab-container">
         <button 
           className={`tab-button ${activeTab === 'transcription' ? 'active' : ''}`}
           onClick={() => setActiveTab('transcription')}
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}
         >
           🎬 Video Transcription
         </button>
         <button 
           className={`tab-button ${activeTab === 'audio' ? 'active' : ''}`}
           onClick={() => setActiveTab('audio')}
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}
         >
           🎵 Audio Transcription
         </button>
         <button 
           className={`tab-button ${activeTab === 'tts' ? 'active' : ''}`}
           onClick={() => setActiveTab('tts')}
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}
         >
           📖 Text to Speech
         </button>
         <button 
           className={`tab-button ${activeTab === 'metadata' ? 'active' : ''}`}
           onClick={() => setActiveTab('metadata')}
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}
         >
           🛡️ Metadata Tools
         </button>
         <button 
           className={`tab-button ${activeTab === 'converter' ? 'active' : ''}`}
           onClick={() => setActiveTab('converter')}
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'Source Code Pro, monospace'}}
         >
           🖼️ Image Converter
         </button>
