@@ -402,7 +402,21 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .metadata-container {
+    gap: 25px;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+}
+
 @media (max-width: 768px) {
+  .metadata-panel {
+    padding: 15px;
+  }
+  
   .metadata-container {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -410,6 +424,10 @@
   
   .metadata-header h2 {
     font-size: 1.8rem;
+  }
+  
+  .metadata-header p {
+    font-size: 1rem;
   }
   
   .left-section, .right-section {
@@ -422,5 +440,119 @@
   
   .upload-icon {
     font-size: 2.5rem;
+  }
+  
+  .option-group {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+  
+  .files-container {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metadata-panel {
+    padding: 10px;
+  }
+  
+  .metadata-header h2 {
+    font-size: 1.6rem;
+  }
+  
+  .metadata-header p {
+    font-size: 0.9rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 15px;
+  }
+  
+  .upload-area {
+    padding: 25px 10px;
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
+  }
+  
+  .upload-placeholder p {
+    font-size: 0.9rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
+  }
+  
+  .option-group {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  
+  .option-label {
+    font-size: 0.9rem;
+  }
+  
+  .option-description {
+    font-size: 0.8rem;
+  }
+  
+  .custom-field-input input {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  
+  .custom-field-input button {
+    font-size: 0.85rem;
+    padding: 6px 12px;
+  }
+  
+  .process-btn {
+    padding: 12px 15px;
+    font-size: 1rem;
+  }
+  
+  .files-container {
+    max-height: 120px;
+  }
+  
+  .file-item {
+    padding: 8px;
+  }
+  
+  .file-name {
+    font-size: 0.9rem;
+  }
+  
+  .file-size {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .metadata-header h2 {
+    font-size: 1.4rem;
+  }
+  
+  .metadata-header p {
+    font-size: 0.85rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 12px;
+  }
+  
+  .upload-area {
+    padding: 20px 8px;
+  }
+  
+  .upload-icon {
+    font-size: 1.8rem;
+  }
+  
+  .process-btn {
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }

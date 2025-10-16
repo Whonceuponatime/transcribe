@@ -5,7 +5,6 @@ import TranscriptionPanel from './components/TranscriptionPanel';
 import AudioTranscriptionPanel from './components/AudioTranscriptionPanel';
 import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
-import FileAnalysis from './components/FileAnalysis';
 import MetadataPanel from './components/MetadataPanel';
 import ImageConverter from './components/ImageConverter';
 
@@ -85,12 +84,6 @@ function App() {
           📖 Text to Speech
         </button>
         <button 
-          className={`tab-button ${activeTab === 'analysis' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analysis')}
-        >
-          📄 File Analysis
-        </button>
-        <button 
           className={`tab-button ${activeTab === 'metadata' ? 'active' : ''}`}
           onClick={() => setActiveTab('metadata')}
         >
@@ -138,8 +131,6 @@ function App() {
           <AudioTranscriptionPanel />
         ) : activeTab === 'tts' ? (
           <TextToSpeech />
-        ) : activeTab === 'analysis' ? (
-          <FileAnalysis />
         ) : activeTab === 'metadata' ? (
           <MetadataPanel />
         ) : (

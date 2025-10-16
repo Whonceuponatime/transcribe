@@ -419,7 +419,21 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .converter-container {
+    gap: 25px;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+}
+
 @media (max-width: 768px) {
+  .image-converter {
+    padding: 15px;
+  }
+  
   .converter-container {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -427,6 +441,19 @@
   
   .converter-header h2 {
     font-size: 1.8rem;
+  }
+  
+  .converter-header p {
+    font-size: 1rem;
+  }
+  
+  .format-note {
+    margin-top: 10px;
+    padding: 8px 12px;
+  }
+  
+  .format-note p {
+    font-size: 0.85rem;
   }
   
   .left-section, .right-section {
@@ -444,6 +471,133 @@
   .dimension-inputs {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+  
+  .setting-group {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+  
+  .files-container {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .image-converter {
+    padding: 10px;
+  }
+  
+  .converter-header h2 {
+    font-size: 1.6rem;
+  }
+  
+  .converter-header p {
+    font-size: 0.9rem;
+  }
+  
+  .format-note {
+    padding: 6px 10px;
+  }
+  
+  .format-note p {
+    font-size: 0.8rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 15px;
+  }
+  
+  .upload-area {
+    padding: 25px 10px;
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
+  }
+  
+  .upload-placeholder p {
+    font-size: 0.9rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
+  }
+  
+  .setting-group {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  
+  .setting-label {
+    font-size: 0.9rem;
+  }
+  
+  .setting-description {
+    font-size: 0.8rem;
+  }
+  
+  .format-select {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  
+  .dimension-input input {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+  
+  .convert-btn {
+    padding: 12px 15px;
+    font-size: 1rem;
+  }
+  
+  .files-container {
+    max-height: 120px;
+  }
+  
+  .file-item {
+    padding: 8px;
+  }
+  
+  .file-name {
+    font-size: 0.9rem;
+  }
+  
+  .file-format {
+    font-size: 0.7rem;
+    padding: 1px 4px;
+  }
+  
+  .file-size {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .converter-header h2 {
+    font-size: 1.4rem;
+  }
+  
+  .converter-header p {
+    font-size: 0.85rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 12px;
+  }
+  
+  .upload-area {
+    padding: 20px 8px;
+  }
+  
+  .upload-icon {
+    font-size: 1.8rem;
+  }
+  
+  .convert-btn {
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }
 
