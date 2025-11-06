@@ -7,6 +7,7 @@ import VideoPlayer from './components/VideoPlayer';
 import TextToSpeech from './components/TextToSpeech';
 import MetadataPanel from './components/MetadataPanel';
 import ImageConverter from './components/ImageConverter';
+import ZigzagMerger from './components/ZigzagMerger';
 
 function App() {
   const [activeTab, setActiveTab] = useState('transcription');
@@ -95,6 +96,12 @@ function App() {
         >
           🖼️ Image Converter
         </button>
+        <button 
+          className={`tab-button ${activeTab === 'zigzag' ? 'active' : ''}`}
+          onClick={() => setActiveTab('zigzag')}
+        >
+          📄 Zigzag
+        </button>
       </div>
 
       <main className="App-main">
@@ -133,6 +140,8 @@ function App() {
           <TextToSpeech />
         ) : activeTab === 'metadata' ? (
           <MetadataPanel />
+        ) : activeTab === 'zigzag' ? (
+          <ZigzagMerger />
         ) : (
           <ImageConverter />
         )}

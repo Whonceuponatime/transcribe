@@ -13,6 +13,7 @@ const { OpenAI } = require('openai');
 const axios = require('axios');
 const sharp = require('sharp');
 const ExifParser = require('exif-parser');
+const { PDFDocument } = require('pdf-lib');
 // const archiver = require('archiver'); // Temporarily disabled
 
 const app = express();
@@ -72,6 +73,7 @@ const uploadsDir = path.join(__dirname, 'uploads');
 const audioDir = path.join(__dirname, 'audio');
 const metadataDir = path.join(__dirname, 'metadata');
 const convertedDir = path.join(__dirname, 'converted');
+const pdfsDir = path.join(__dirname, 'pdfs');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
@@ -83,6 +85,9 @@ if (!fs.existsSync(metadataDir)) {
 }
 if (!fs.existsSync(convertedDir)) {
   fs.mkdirSync(convertedDir);
+}
+if (!fs.existsSync(pdfsDir)) {
+  fs.mkdirSync(pdfsDir);
 }
 
 // Configure multer for file uploads
@@ -191,6 +196,30 @@ const imageUpload = multer({
     }
   }
   // Removed file size limits to handle large images
+});
+
+// Configure multer for PDF uploads
+const pdfStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, pdfsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const pdfUpload = multer({ 
+  storage: pdfStorage,
+  fileFilter: (req, file, cb) => {
+    // Accept only PDF files
+    if (file.mimetype === 'application/pdf' || path.extname(file.originalname).toLowerCase() === '.pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed!'), false);
+    }
+  }
+  // Removed file size limits to handle large PDFs
 });
 
 // Socket.IO connection handling
@@ -1165,6 +1194,215 @@ Total files: ${availableFiles.length}
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', 'attachment; filename="image-conversion-results.txt"');
     res.send(downloadInstructions);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Download failed', details: error.message });
+  }
+});
+
+// Zigzag PDF merge endpoint
+app.post('/api/zigzag-merge', pdfUpload.fields([
+  { name: 'coverPage', maxCount: 1 },
+  { name: 'oldPdf', maxCount: 1 },
+  { name: 'newPdf', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    if (!req.files || !req.files.oldPdf || !req.files.newPdf) {
+      return res.status(400).json({ error: 'Both old and new PDF files are required' });
+    }
+
+    const oldPdfPath = req.files.oldPdf[0].path;
+    const newPdfPath = req.files.newPdf[0].path;
+    const coverPagePath = req.files.coverPage ? req.files.coverPage[0].path : null;
+
+    console.log('Zigzag merge request received');
+    if (coverPagePath) {
+      console.log('Cover page:', req.files.coverPage[0].originalname);
+    }
+    console.log('Old PDF:', req.files.oldPdf[0].originalname);
+    console.log('New PDF:', req.files.newPdf[0].originalname);
+
+    // Load both PDFs
+    const oldPdfBytes = fs.readFileSync(oldPdfPath);
+    const newPdfBytes = fs.readFileSync(newPdfPath);
+    
+    const oldPdfDoc = await PDFDocument.load(oldPdfBytes);
+    const newPdfDoc = await PDFDocument.load(newPdfBytes);
+
+    // Create new merged PDF
+    const mergedPdf = await PDFDocument.create();
+
+    // Add cover page first if provided
+    if (coverPagePath) {
+      const coverPageBytes = fs.readFileSync(coverPagePath);
+      const coverPageDoc = await PDFDocument.load(coverPageBytes);
+      const coverPages = coverPageDoc.getPages();
+      if (coverPages.length > 0) {
+        // Add only the first page of the cover PDF
+        const [copiedCoverPage] = await mergedPdf.copyPages(coverPageDoc, [0]);
+        mergedPdf.addPage(copiedCoverPage);
+      }
+    }
+
+    const oldPageCount = oldPdfDoc.getPageCount();
+    const newPageCount = newPdfDoc.getPageCount();
+    const maxPages = Math.max(oldPageCount, newPageCount);
+
+    console.log(`Old PDF has ${oldPageCount} pages`);
+    console.log(`New PDF has ${newPageCount} pages`);
+    console.log(`Merging ${maxPages} page pairs...`);
+
+    // Alternate pages: old, new, old, new, etc.
+    // Each addPage() call creates a separate page
+    for (let i = 0; i < maxPages; i++) {
+      try {
+        // Log progress every 10 pages
+        if (i % 10 === 0 || i === maxPages - 1) {
+          console.log(`Processing page ${i + 1} of ${maxPages}...`);
+        }
+
+        // Add old PDF page as a separate page
+        if (i < oldPageCount) {
+          const [copiedOldPage] = await mergedPdf.copyPages(oldPdfDoc, [i]);
+          mergedPdf.addPage(copiedOldPage);
+        }
+
+        // Add new PDF page as a separate page
+        if (i < newPageCount) {
+          const [copiedNewPage] = await mergedPdf.copyPages(newPdfDoc, [i]);
+          mergedPdf.addPage(copiedNewPage);
+        }
+      } catch (pageError) {
+        console.error(`Error processing page ${i + 1}:`, pageError);
+        throw new Error(`Failed to merge page ${i + 1}: ${pageError.message}`);
+      }
+    }
+
+    console.log(`Successfully merged all ${maxPages} page pairs`);
+
+    // Verify final page count
+    const finalPageCount = mergedPdf.getPageCount();
+    const expectedPageCount = (coverPagePath ? 1 : 0) + (oldPageCount + newPageCount);
+    console.log(`Final merged PDF has ${finalPageCount} pages (expected: ${expectedPageCount})`);
+    
+    if (finalPageCount !== expectedPageCount) {
+      console.warn(`Warning: Page count mismatch! Expected ${expectedPageCount} but got ${finalPageCount}`);
+    }
+
+    // Save merged PDF
+    const mergedPdfBytes = await mergedPdf.save();
+    const outputFilename = `zigzag-merged-${Date.now()}.pdf`;
+    const outputPath = path.join(pdfsDir, outputFilename);
+    fs.writeFileSync(outputPath, mergedPdfBytes);
+    
+    console.log(`Saved merged PDF: ${outputFilename} (${finalPageCount} pages, ${(mergedPdfBytes.length / 1024 / 1024).toFixed(2)} MB)`);
+
+    // Clean up uploaded files
+    fs.unlinkSync(oldPdfPath);
+    fs.unlinkSync(newPdfPath);
+    if (coverPagePath) {
+      fs.unlinkSync(coverPagePath);
+    }
+
+    console.log(`Successfully merged PDFs: ${outputFilename}`);
+
+    res.json({
+      message: 'PDFs merged successfully',
+      filename: outputFilename
+    });
+
+  } catch (error) {
+    console.error('Zigzag merge error:', error);
+    res.status(500).json({ 
+      error: 'Failed to merge PDFs', 
+      details: error.message 
+    });
+  }
+});
+
+// Unzigzag PDF endpoint
+app.post('/api/unzigzag', pdfUpload.single('zigzagPdf'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Zigzagged PDF file is required' });
+    }
+
+    const zigzagPdfPath = req.file.path;
+    console.log('Unzigzag request received');
+    console.log('Zigzag PDF:', req.file.originalname);
+
+    // Load zigzagged PDF
+    const zigzagPdfBytes = fs.readFileSync(zigzagPdfPath);
+    const zigzagPdfDoc = await PDFDocument.load(zigzagPdfBytes);
+
+    // Create two separate PDFs
+    const oldPdf = await PDFDocument.create();
+    const newPdf = await PDFDocument.create();
+
+    const pages = zigzagPdfDoc.getPages();
+    
+    if (pages.length === 0) {
+      throw new Error('Zigzagged PDF has no pages');
+    }
+
+    // Split alternating pages: even pages (0, 2, 4...) go to old, odd pages (1, 3, 5...) go to new
+    for (let i = 0; i < pages.length; i++) {
+      if (i % 2 === 0) {
+        // Even pages (0, 2, 4...) -> old PDF
+        const [copiedPage] = await oldPdf.copyPages(zigzagPdfDoc, [i]);
+        oldPdf.addPage(copiedPage);
+      } else {
+        // Odd pages (1, 3, 5...) -> new PDF
+        const [copiedPage] = await newPdf.copyPages(zigzagPdfDoc, [i]);
+        newPdf.addPage(copiedPage);
+      }
+    }
+
+    // Save both PDFs
+    const oldPdfBytes = await oldPdf.save();
+    const newPdfBytes = await newPdf.save();
+    
+    const oldFilename = `unzigzag-old-${Date.now()}.pdf`;
+    const newFilename = `unzigzag-new-${Date.now()}.pdf`;
+    
+    const oldPath = path.join(pdfsDir, oldFilename);
+    const newPath = path.join(pdfsDir, newFilename);
+    
+    fs.writeFileSync(oldPath, oldPdfBytes);
+    fs.writeFileSync(newPath, newPdfBytes);
+
+    // Clean up uploaded file
+    fs.unlinkSync(zigzagPdfPath);
+
+    console.log(`Successfully split PDF: ${oldFilename}, ${newFilename}`);
+
+    res.json({
+      message: 'PDF split successfully',
+      files: [oldFilename, newFilename]
+    });
+
+  } catch (error) {
+    console.error('Unzigzag error:', error);
+    res.status(500).json({ 
+      error: 'Failed to split PDF', 
+      details: error.message 
+    });
+  }
+});
+
+// Download PDF file
+app.get('/api/download-pdf/:filename(*)', (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(pdfsDir, filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(filePath);
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: 'Download failed', details: error.message });
