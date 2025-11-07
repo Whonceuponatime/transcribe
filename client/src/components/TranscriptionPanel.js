@@ -23,8 +23,8 @@ const TranscriptionPanel = ({
   const [progress, setProgress] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState('auto');
   const textareaRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
+  // const audioContextRef = useRef(null);
+  // const mediaRecorderRef = useRef(null);
 
   // Detect browser and provide specific guidance
   useEffect(() => {
