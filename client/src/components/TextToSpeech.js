@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './TextToSpeech.css';
+import { authenticatedFetch } from '../lib/api';
 
 const TextToSpeech = () => {
   const [text, setText] = useState('');

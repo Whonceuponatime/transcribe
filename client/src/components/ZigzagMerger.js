@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './ZigzagMerger.css';
+import { authenticatedFetch } from '../lib/api';
 
 const ZigzagMerger = () => {
   const [coverPage, setCoverPage] = useState(null);

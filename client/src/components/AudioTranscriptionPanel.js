@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './AudioTranscriptionPanel.css';
+import { authenticatedFetch } from '../lib/api';
 
 const AudioTranscriptionPanel = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -49,7 +50,7 @@ const AudioTranscriptionPanel = () => {
 
       setProgress(20);
       
-      const response = await fetch('http://localhost:3000/api/transcribe-audio', {
+      const response = await authenticatedFetch('/api/transcribe-audio', {
         method: 'POST',
         body: formData
       });

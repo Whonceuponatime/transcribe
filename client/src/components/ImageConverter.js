@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './ImageConverter.css';
+import { authenticatedFetch } from '../lib/api';
 
 const ImageConverter = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);

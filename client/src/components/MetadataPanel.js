@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './MetadataPanel.css';
+import { authenticatedFetch } from '../lib/api';
 
 const MetadataPanel = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
