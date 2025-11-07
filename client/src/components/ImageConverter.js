@@ -70,7 +70,7 @@ const ImageConverter = () => {
     formData.append('conversionSettings', JSON.stringify(conversionSettings));
 
     try {
-      const response = await fetch('/api/convert-images', {
+      const response = await authenticatedFetch('/api/convert-images', {
         method: 'POST',
         body: formData
       });

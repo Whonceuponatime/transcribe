@@ -51,11 +51,8 @@ const TextToSpeech = () => {
 
     setIsConverting(true);
     try {
-      const response = await fetch('/api/text-to-speech', {
+      const response = await authenticatedFetch('/api/text-to-speech', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           text: text,
           voice: selectedVoice,
