@@ -30,6 +30,69 @@ body {
   color: white;
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 2rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-email {
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.logout-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: black;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid green;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .App-header h1 {
   color: white;
   font-family: 'Source Code Pro', monospace;
@@ -140,9 +203,19 @@ input, textarea, select {
   padding: 0.5rem;
 }
 
+input::placeholder, textarea::placeholder {
+  color: #888;
+  opacity: 1;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: 2px solid green;
   border-color: green;
+}
+
+select option {
+  background-color: #191919;
+  color: white;
 }
 
 /* Progress bars */
@@ -206,6 +279,17 @@ input:focus, textarea:focus, select:focus {
   
   .App-header p {
     font-size: 1rem;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .user-info {
+    flex-direction: column;
+    gap: 0.5rem;
   }
   
   .tab-container {

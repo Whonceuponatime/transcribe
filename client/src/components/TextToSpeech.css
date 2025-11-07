@@ -1,7 +1,15 @@
+/* Mr. Robot Theme - Clean Minimalist Text to Speech */
+
 .text-to-speech {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  font-family: 'Source Code Pro', monospace;
+  background-color: transparent;
+}
+
+.text-to-speech * {
+  color: white;
 }
 
 .tts-header {
@@ -10,14 +18,16 @@
 }
 
 .tts-header h2 {
-  color: #333;
+  color: white;
   margin-bottom: 10px;
   font-size: 2.5rem;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .tts-header p {
-  color: #666;
+  color: white;
   font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .tts-container {
@@ -28,17 +38,17 @@
 }
 
 .tts-input-section {
-  background: #f8f9fa;
-  border-radius: 12px;
+  background-color: #191919 !important;
+  border: 1px solid white !important;
+  border-radius: 0;
   padding: 25px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .tts-output-section {
-  background: #f8f9fa;
-  border-radius: 12px;
+  background-color: #191919 !important;
+  border: 1px solid white !important;
+  border-radius: 0;
   padding: 25px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .file-upload-section,
@@ -52,51 +62,63 @@
 .voice-selection h3,
 .text-input-section h3,
 .tts-output-section h3 {
-  color: #333;
+  color: white;
   margin-bottom: 15px;
   font-size: 1.3rem;
   font-weight: 600;
+  font-family: 'Source Code Pro', monospace;
+  border-bottom: 1px solid white;
+  padding-bottom: 10px;
 }
 
 .upload-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: transparent;
   color: white;
-  border: none;
+  border: 1px solid white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 1rem;
   font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
   transition: all 0.3s ease;
   margin-bottom: 10px;
 }
 
 .upload-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .file-hint {
   display: block;
-  color: #666;
+  color: white;
   font-size: 0.9rem;
   margin-top: 5px;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .voice-select {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 1rem;
-  background: white;
+  background-color: #191919;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
   cursor: pointer;
   transition: border-color 0.3s ease;
 }
 
 .voice-select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: green;
+}
+
+.voice-select option {
+  background-color: #191919;
+  color: white;
 }
 
 .provider-selection {
@@ -109,70 +131,77 @@
   margin-bottom: 10px;
   cursor: pointer;
   font-size: 1rem;
-  color: #333;
+  color: white;
   padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.3s ease;
+  border: 1px solid white;
+  border-radius: 0;
+  transition: all 0.3s ease;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .provider-selection label:hover {
-  background-color: rgba(102, 126, 234, 0.1);
+  border-color: green;
+  color: green;
 }
 
 .provider-selection input[type="radio"] {
   margin-right: 10px;
   transform: scale(1.2);
-  accent-color: #667eea;
-}
-
-.provider-selection label:first-child {
-  color: #2c5aa0;
-  font-weight: 500;
-}
-
-.provider-selection label:last-child {
-  color: #8b5cf6;
-  font-weight: 500;
+  accent-color: green;
 }
 
 .text-name-input {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 1rem;
   margin-bottom: 15px;
+  background-color: #191919;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
   transition: border-color 0.3s ease;
 }
 
 .text-name-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: green;
 }
 
 .text-input {
   width: 100%;
   min-height: 200px;
   padding: 15px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 1rem;
-  font-family: inherit;
+  font-family: 'Source Code Pro', monospace;
   resize: vertical;
   transition: border-color 0.3s ease;
   line-height: 1.5;
+  background-color: #191919;
+  color: white;
+}
+
+.text-input::placeholder {
+  color: #888;
 }
 
 .text-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: green;
+}
+
+.text-name-input::placeholder {
+  color: #888;
 }
 
 .text-counter {
   text-align: right;
-  color: #666;
+  color: white;
   font-size: 0.9rem;
   margin-top: 5px;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .tts-controls {
@@ -184,48 +213,41 @@
 .convert-btn,
 .clear-btn {
   padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 1rem;
   font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
   cursor: pointer;
   transition: all 0.3s ease;
   flex: 1;
   min-width: 150px;
-}
-
-.convert-btn {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background-color: transparent;
   color: white;
 }
 
 .convert-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(79, 172, 254, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .convert-btn:disabled {
-  opacity: 0.6;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
-  transform: none;
-}
-
-.clear-btn {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-  color: white;
 }
 
 .clear-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(255, 107, 107, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .audio-player {
-  background: white;
-  border-radius: 8px;
+  background-color: #191919 !important;
+  border: 1px solid white !important;
+  border-radius: 0;
   padding: 20px;
   margin-bottom: 25px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .audio-controls {
@@ -239,59 +261,50 @@
 .pause-btn,
 .stop-btn {
   padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 0.9rem;
   font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
   cursor: pointer;
   transition: all 0.3s ease;
   flex: 1;
   min-width: 80px;
-}
-
-.play-btn {
-  background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+  background-color: transparent;
   color: white;
 }
 
 .play-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(86, 171, 47, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .play-btn:disabled {
-  opacity: 0.6;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
-}
-
-.pause-btn {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
 }
 
 .pause-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(240, 147, 251, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .pause-btn:disabled {
-  opacity: 0.6;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
 }
 
-.stop-btn {
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-  color: #333;
-}
-
 .stop-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(252, 182, 159, 0.3);
+  color: green;
+  border-color: green;
 }
 
 .audio-info {
-  color: #666;
+  color: white;
   font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .audio-info p {
@@ -310,36 +323,39 @@
 }
 
 .saved-texts-header h3 {
-  color: #333;
+  color: white;
   font-size: 1.3rem;
   font-weight: 600;
   margin: 0;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .clear-all-btn {
-  background: #dc3545;
+  background-color: transparent;
   color: white;
-  border: none;
+  border: 1px solid white;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
   transition: all 0.3s ease;
 }
 
 .clear-all-btn:hover {
-  background: #c82333;
-  transform: translateY(-1px);
+  color: green;
+  border-color: green;
 }
 
 .no-saved-texts {
   text-align: center;
-  color: #666;
+  color: white !important;
   font-style: italic;
   padding: 40px 20px;
-  background: white;
-  border-radius: 8px;
-  border: 2px dashed #e1e5e9;
+  background-color: #191919 !important;
+  border: 2px dashed white !important;
+  border-radius: 0;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .saved-texts-list {
@@ -348,29 +364,30 @@
 }
 
 .saved-text-item {
-  background: white;
-  border-radius: 8px;
+  background-color: #191919 !important;
+  border: 1px solid white !important;
+  border-radius: 0;
   padding: 15px;
   margin-bottom: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .saved-text-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  border-color: green;
 }
 
 .saved-text-info h4 {
-  color: #333;
+  color: white;
   margin-bottom: 8px;
   font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .saved-text-info p {
-  color: #666;
+  color: white;
   font-size: 0.9rem;
   margin: 3px 0;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .saved-text-actions {
@@ -383,43 +400,31 @@
 .download-btn,
 .delete-btn {
   padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid white;
+  border-radius: 0;
   font-size: 0.9rem;
   font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
   cursor: pointer;
   transition: all 0.3s ease;
   flex: 1;
-}
-
-.load-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: transparent;
   color: white;
 }
 
 .load-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-}
-
-.download-btn {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-  color: white;
+  color: green;
+  border-color: green;
 }
 
 .download-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-}
-
-.delete-btn {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-  color: white;
+  color: green;
+  border-color: green;
 }
 
 .delete-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
+  color: green;
+  border-color: green;
 }
 
 /* Responsive Design */
@@ -463,15 +468,13 @@
 }
 
 .saved-texts-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
+  background: #191919;
 }
 
 .saved-texts-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
+  background: white;
 }
 
 .saved-texts-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-} 
+  background: green;
+}

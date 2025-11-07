@@ -351,17 +351,10 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
 
       {/* Test button for debugging */}
       {process.env.NODE_ENV === 'development' && (
-        <div style={{ marginTop: '0.5rem' }}>
+        <div className="volume-section">
           <button 
             onClick={testVideoPlay}
-            style={{ 
-              padding: '0.5rem 1rem', 
-              background: '#3498db', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className="play-pause-btn"
           >
             Test Video Play
           </button>
@@ -370,7 +363,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
 
       {/* Debug info in development */}
       {process.env.NODE_ENV === 'development' && (
-        <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
+        <div className="time-info">
           Debug: Video loaded: {isVideoLoaded ? 'Yes' : 'No'} | 
           Playing: {isPlaying ? 'Yes' : 'No'} | 
           Duration: {formatTime(duration)} | 

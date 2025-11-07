@@ -8,8 +8,11 @@ import TextToSpeech from './components/TextToSpeech';
 import MetadataPanel from './components/MetadataPanel';
 import ImageConverter from './components/ImageConverter';
 import ZigzagMerger from './components/ZigzagMerger';
+import Login from './components/Login';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
+  const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('transcription');
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
@@ -58,11 +61,46 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="App">
+        <div className="loading-screen">
+          <div className="loading-spinner"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login if not authenticated
+  if (!user) {
+    return <Login />;
+  }
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🃏 Jack of clubs</h1>
-        <p>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
+        <div className="header-content">
+          <div>
+            <h1>🃏 Jack of clubs</h1>
+            <p>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
+          </div>
+          <div className="user-info">
+            <span className="user-email">{user.email}</span>
+            <button onClick={handleLogout} className="logout-btn">
+              Logout
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="tab-container">

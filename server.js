@@ -14,6 +14,7 @@ const axios = require('axios');
 const sharp = require('sharp');
 const ExifParser = require('exif-parser');
 const { PDFDocument } = require('pdf-lib');
+const { authenticateUser } = require('./middleware/auth');
 // const archiver = require('archiver'); // Temporarily disabled
 
 const app = express();
@@ -53,8 +54,12 @@ if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim() !== 
 }
 
 // Middleware
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ["http://localhost:3000", "http://localhost:3001", "http://localhost:5000"];
+
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:3001", "http://localhost:5000"],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '1gb' }));
@@ -563,7 +568,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Upload endpoint
-app.post('/api/upload', upload.single('video'), (req, res) => {
+app.post('/api/upload', authenticateUser, upload.single('video'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file uploaded' });
@@ -593,7 +598,7 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
 });
 
 // Transcribe video endpoint
-app.post('/api/transcribe', upload.single('video'), async (req, res) => {
+app.post('/api/transcribe', authenticateUser, upload.single('video'), async (req, res) => {
   try {
     console.log('Transcription request received');
     
@@ -907,7 +912,7 @@ app.post('/api/text-to-speech', async (req, res) => {
 
 
 // Metadata processing endpoint
-app.post('/api/process-metadata', mediaUpload.array('files', 10), async (req, res) => {
+app.post('/api/process-metadata', authenticateUser, mediaUpload.array('files', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -997,7 +1002,7 @@ app.post('/api/process-metadata', mediaUpload.array('files', 10), async (req, re
 });
 
 // Download processed metadata file
-app.get('/api/download-metadata-file/:filename(*)', (req, res) => {
+app.get('/api/download-metadata-file/:filename(*)', authenticateUser, (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
     const filePath = path.join(__dirname, 'processed', filename);
@@ -1015,7 +1020,7 @@ app.get('/api/download-metadata-file/:filename(*)', (req, res) => {
 });
 
 // Download all processed metadata files as ZIP
-app.post('/api/download-all-metadata-files', (req, res) => {
+app.post('/api/download-all-metadata-files', authenticateUser, (req, res) => {
   try {
     const { files } = req.body;
     const processedDir = path.join(__dirname, 'processed');
@@ -1056,7 +1061,7 @@ Total files: ${availableFiles.length}
 });
 
 // Image conversion endpoint
-app.post('/api/convert-images', imageUpload.array('files', 10), async (req, res) => {
+app.post('/api/convert-images', authenticateUser, imageUpload.array('files', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -1142,7 +1147,7 @@ app.post('/api/convert-images', imageUpload.array('files', 10), async (req, res)
 });
 
 // Download converted image file
-app.get('/api/download-converted-file/:filename(*)', (req, res) => {
+app.get('/api/download-converted-file/:filename(*)', authenticateUser, (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
     const filePath = path.join(__dirname, 'processed', filename);
@@ -1160,7 +1165,7 @@ app.get('/api/download-converted-file/:filename(*)', (req, res) => {
 });
 
 // Download all converted image files as ZIP
-app.post('/api/download-all-converted-files', (req, res) => {
+app.post('/api/download-all-converted-files', authenticateUser, (req, res) => {
   try {
     const { files } = req.body;
     const processedDir = path.join(__dirname, 'processed');
@@ -1201,7 +1206,7 @@ Total files: ${availableFiles.length}
 });
 
 // Zigzag PDF merge endpoint
-app.post('/api/zigzag-merge', pdfUpload.fields([
+app.post('/api/zigzag-merge', authenticateUser, pdfUpload.fields([
   { name: 'coverPage', maxCount: 1 },
   { name: 'oldPdf', maxCount: 1 },
   { name: 'newPdf', maxCount: 1 }
@@ -1321,7 +1326,7 @@ app.post('/api/zigzag-merge', pdfUpload.fields([
 });
 
 // Unzigzag PDF endpoint
-app.post('/api/unzigzag', pdfUpload.single('zigzagPdf'), async (req, res) => {
+app.post('/api/unzigzag', authenticateUser, pdfUpload.single('zigzagPdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Zigzagged PDF file is required' });
@@ -1335,27 +1340,59 @@ app.post('/api/unzigzag', pdfUpload.single('zigzagPdf'), async (req, res) => {
     const zigzagPdfBytes = fs.readFileSync(zigzagPdfPath);
     const zigzagPdfDoc = await PDFDocument.load(zigzagPdfBytes);
 
+    const totalPages = zigzagPdfDoc.getPageCount();
+    console.log(`Zigzag PDF has ${totalPages} pages`);
+    
+    if (totalPages === 0) {
+      throw new Error('Zigzagged PDF has no pages');
+    }
+
     // Create two separate PDFs
     const oldPdf = await PDFDocument.create();
     const newPdf = await PDFDocument.create();
 
-    const pages = zigzagPdfDoc.getPages();
+    // Split alternating pages: even pages (0, 2, 4...) go to old, odd pages (1, 3, 5...) go to new
+    // Note: Page 0 is the first page (cover page if present), so we need to handle it
+    // If there's a cover page, page 0 is cover, page 1 is old, page 2 is new, etc.
+    // If no cover page, page 0 is old, page 1 is new, etc.
     
-    if (pages.length === 0) {
-      throw new Error('Zigzagged PDF has no pages');
+    let oldPageCount = 0;
+    let newPageCount = 0;
+    
+    for (let i = 0; i < totalPages; i++) {
+      try {
+        // Log progress every 10 pages
+        if (i % 10 === 0 || i === totalPages - 1) {
+          console.log(`Processing page ${i + 1} of ${totalPages}...`);
+        }
+
+        if (i % 2 === 0) {
+          // Even pages (0, 2, 4...) -> old PDF
+          const [copiedPage] = await oldPdf.copyPages(zigzagPdfDoc, [i]);
+          oldPdf.addPage(copiedPage);
+          oldPageCount++;
+        } else {
+          // Odd pages (1, 3, 5...) -> new PDF
+          const [copiedPage] = await newPdf.copyPages(zigzagPdfDoc, [i]);
+          newPdf.addPage(copiedPage);
+          newPageCount++;
+        }
+      } catch (pageError) {
+        console.error(`Error processing page ${i + 1}:`, pageError);
+        throw new Error(`Failed to split page ${i + 1}: ${pageError.message}`);
+      }
     }
 
-    // Split alternating pages: even pages (0, 2, 4...) go to old, odd pages (1, 3, 5...) go to new
-    for (let i = 0; i < pages.length; i++) {
-      if (i % 2 === 0) {
-        // Even pages (0, 2, 4...) -> old PDF
-        const [copiedPage] = await oldPdf.copyPages(zigzagPdfDoc, [i]);
-        oldPdf.addPage(copiedPage);
-      } else {
-        // Odd pages (1, 3, 5...) -> new PDF
-        const [copiedPage] = await newPdf.copyPages(zigzagPdfDoc, [i]);
-        newPdf.addPage(copiedPage);
-      }
+    console.log(`Successfully split PDF: ${oldPageCount} pages to old PDF, ${newPageCount} pages to new PDF`);
+
+    // Verify final page counts
+    const finalOldPageCount = oldPdf.getPageCount();
+    const finalNewPageCount = newPdf.getPageCount();
+    console.log(`Old PDF has ${finalOldPageCount} pages (expected: ${oldPageCount})`);
+    console.log(`New PDF has ${finalNewPageCount} pages (expected: ${newPageCount})`);
+    
+    if (finalOldPageCount !== oldPageCount || finalNewPageCount !== newPageCount) {
+      console.warn(`Warning: Page count mismatch!`);
     }
 
     // Save both PDFs
@@ -1370,6 +1407,9 @@ app.post('/api/unzigzag', pdfUpload.single('zigzagPdf'), async (req, res) => {
     
     fs.writeFileSync(oldPath, oldPdfBytes);
     fs.writeFileSync(newPath, newPdfBytes);
+
+    console.log(`Saved old PDF: ${oldFilename} (${finalOldPageCount} pages, ${(oldPdfBytes.length / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`Saved new PDF: ${newFilename} (${finalNewPageCount} pages, ${(newPdfBytes.length / 1024 / 1024).toFixed(2)} MB)`);
 
     // Clean up uploaded file
     fs.unlinkSync(zigzagPdfPath);
@@ -1391,7 +1431,7 @@ app.post('/api/unzigzag', pdfUpload.single('zigzagPdf'), async (req, res) => {
 });
 
 // Download PDF file
-app.get('/api/download-pdf/:filename(*)', (req, res) => {
+app.get('/api/download-pdf/:filename(*)', authenticateUser, (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
     const filePath = path.join(pdfsDir, filename);

@@ -11,6 +11,41 @@
   font-family: 'Source Code Pro', monospace;
 }
 
+.language-selector {
+  margin-bottom: 1rem;
+}
+
+.language-selector label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.language-select {
+  padding: 0.5rem;
+  border-radius: 0;
+  border: 1px solid white;
+  font-size: 0.9rem;
+  width: 100%;
+  margin-bottom: 1rem;
+  background-color: #191919;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.language-select:focus {
+  outline: none;
+  border-color: green;
+}
+
+.language-select option {
+  background-color: #191919;
+  color: white;
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -76,7 +111,7 @@
 
 .browser-info {
   font-size: 0.8rem;
-  color: white;
+  color: white !important;
   margin-bottom: 0.5rem;
   padding: 0.5rem;
   background-color: #191919;
@@ -86,7 +121,7 @@
 
 .error-message {
   background-color: #191919;
-  color: white;
+  color: white !important;
   padding: 1rem;
   border: 1px solid white;
   display: flex;
@@ -95,9 +130,14 @@
   font-family: 'Source Code Pro', monospace;
 }
 
+.error-message strong,
+.error-message pre {
+  color: white !important;
+}
+
 .warning-message {
   background-color: #191919;
-  color: green;
+  color: green !important;
   padding: 1rem;
   border: 1px solid green;
   display: flex;
@@ -106,9 +146,14 @@
   font-family: 'Source Code Pro', monospace;
 }
 
+.warning-message strong,
+.warning-message pre {
+  color: green !important;
+}
+
 .debug-info {
   font-size: 0.8rem;
-  color: white;
+  color: white !important;
   margin-bottom: 0.5rem;
   padding: 0.5rem;
   background-color: #191919;
@@ -141,6 +186,11 @@
   line-height: 1.4;
   resize: vertical;
   transition: all 0.2s ease;
+}
+
+.transcription-textarea textarea::placeholder {
+  color: #888;
+  opacity: 1;
 }
 
 .transcription-textarea textarea:focus {

@@ -18,3 +18,42 @@ code {
   border-radius: 0;
   border: 1px solid white;
 }
+
+/* Ensure all text elements are white by default (unless overridden) */
+p, h1, h2, h3, h4, h5, h6, span, label, li, td, th, strong, em {
+  color: white;
+}
+
+/* Placeholder text styling - visible gray on dark background */
+::placeholder {
+  color: #888 !important;
+  opacity: 1 !important;
+}
+
+::-webkit-input-placeholder {
+  color: #888 !important;
+  opacity: 1 !important;
+}
+
+::-moz-placeholder {
+  color: #888 !important;
+  opacity: 1 !important;
+}
+
+:-ms-input-placeholder {
+  color: #888 !important;
+  opacity: 1 !important;
+}
+
+/* Ensure all inputs and selects have white text */
+input:not([type="checkbox"]):not([type="radio"]), 
+textarea, 
+select {
+  color: white !important;
+}
+
+/* Ensure option elements have proper styling */
+select option {
+  background-color: #191919 !important;
+  color: white !important;
+}

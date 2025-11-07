@@ -247,6 +247,11 @@
   font-family: 'Source Code Pro', monospace;
 }
 
+.custom-field-input input::placeholder {
+  color: #888;
+  opacity: 1;
+}
+
 .custom-field-input input:focus {
   border-color: green;
   outline: none;

@@ -1,19 +1,20 @@
+/* Mr. Robot Theme - Clean Minimalist Video Player */
+
 .video-player {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
+  background-color: #191919 !important;
+  border: 1px solid white !important;
+  border-radius: 0;
   padding: 1.5rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 400px;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .video-container {
   position: relative;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
   background: #000;
   margin-bottom: 1rem;
@@ -21,13 +22,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid white;
 }
 
 .video-element {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: 0;
 }
 
 .video-loading {
@@ -38,6 +40,7 @@
   text-align: center;
   color: white;
   z-index: 5;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .loading-spinner {
@@ -62,11 +65,13 @@
   transform: translate(-50%, -50%);
   text-align: center;
   color: white;
-  background: rgba(231, 76, 60, 0.9);
+  background-color: #191919;
+  border: 1px solid white;
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 0;
   max-width: 80%;
   z-index: 5;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .video-error p {
@@ -78,23 +83,24 @@
   position: absolute;
   top: 1rem;
   right: 1rem;
-  background: rgba(231, 76, 60, 0.9);
+  background-color: #191919;
+  border: 1px solid white;
   color: white;
   padding: 0.5rem 1rem;
-  border-radius: 20px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
   font-weight: 500;
-  backdrop-filter: blur(10px);
+  font-family: 'Source Code Pro', monospace;
   z-index: 10;
 }
 
 .pulse-dot {
   width: 8px;
   height: 8px;
-  background: white;
+  background: green;
   border-radius: 50%;
   animation: pulse 1.5s infinite;
 }
@@ -123,10 +129,10 @@
 }
 
 .play-pause-btn {
-  background: #667eea;
+  background-color: transparent;
   color: white;
-  border: none;
-  border-radius: 50%;
+  border: 1px solid white;
+  border-radius: 0;
   width: 48px;
   height: 48px;
   display: flex;
@@ -134,20 +140,18 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  font-family: 'Source Code Pro', monospace;
 }
 
 .play-pause-btn:hover:not(:disabled) {
-  background: #764ba2;
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(118, 75, 162, 0.4);
+  color: green;
+  border-color: green;
 }
 
 .play-pause-btn:disabled {
-  background: #bdc3c7;
+  color: #666;
+  border-color: #666;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .play-pause-btn:active:not(:disabled) {
@@ -158,9 +162,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-family: 'Courier New', monospace;
+  font-family: 'Source Code Pro', monospace;
   font-weight: 600;
-  color: #333;
+  color: white;
   font-size: 0.9rem;
 }
 
@@ -171,21 +175,22 @@
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: rgba(102, 126, 234, 0.2);
-  border-radius: 4px;
+  background-color: #191919;
+  border: 1px solid white;
+  border-radius: 0;
   cursor: pointer;
   position: relative;
   overflow: hidden;
 }
 
 .progress-bar:hover {
-  background: rgba(102, 126, 234, 0.3);
+  border-color: green;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  border-radius: 4px;
+  background-color: green;
+  border-radius: 0;
   transition: width 0.1s ease;
   position: relative;
 }
@@ -199,7 +204,6 @@
   height: 12px;
   background: white;
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -215,10 +219,10 @@
 }
 
 .mute-btn {
-  background: transparent;
-  color: #667eea;
-  border: none;
-  border-radius: 50%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  border-radius: 0;
   width: 32px;
   height: 32px;
   display: flex;
@@ -226,18 +230,20 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .mute-btn:hover {
-  background: rgba(102, 126, 234, 0.1);
-  color: #764ba2;
+  color: green;
+  border-color: green;
 }
 
 .volume-slider {
   flex: 1;
   height: 4px;
-  background: rgba(102, 126, 234, 0.2);
-  border-radius: 2px;
+  background-color: #191919;
+  border: 1px solid white;
+  border-radius: 0;
   outline: none;
   cursor: pointer;
   -webkit-appearance: none;
@@ -249,31 +255,28 @@
   appearance: none;
   width: 16px;
   height: 16px;
-  background: #667eea;
-  border-radius: 50%;
+  background: white;
+  border-radius: 0;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: all 0.2s ease;
 }
 
 .volume-slider::-webkit-slider-thumb:hover {
-  background: #764ba2;
+  background: green;
   transform: scale(1.1);
 }
 
 .volume-slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: #667eea;
-  border-radius: 50%;
-  cursor: pointer;
+  background: white;
   border: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .volume-slider::-moz-range-thumb:hover {
-  background: #764ba2;
+  background: green;
   transform: scale(1.1);
 }
 
@@ -306,6 +309,27 @@
   }
 }
 
+.volume-section {
+  margin-top: 0.5rem;
+  color: white;
+}
+
+.volume-section strong {
+  color: white !important;
+}
+
+.volume-section input {
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.time-info {
+  font-size: 0.8rem;
+  color: white !important;
+  margin-top: 0.5rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
 /* Fullscreen support */
 .video-container.fullscreen {
   position: fixed;
@@ -319,4 +343,4 @@
 
 .video-container.fullscreen .video-element {
   border-radius: 0;
-} 
+}

@@ -12,6 +12,7 @@
     "install-client": "cd client && npm install",
     "fix-permissions": "node fix-permissions.js",
     "postinstall": "npm run fix-permissions",
+    "vercel-build": "npm run install-client && npm run build",
     "heroku-postbuild": "npm run install-client && npm run build"
   },
   "dependencies": {

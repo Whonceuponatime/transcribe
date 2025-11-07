@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.local
+uploads
+audio
+metadata
+converted
+pdfs
+processed
+*.log
+.DS_Store
+

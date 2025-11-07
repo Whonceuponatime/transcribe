@@ -261,22 +261,15 @@ const TranscriptionPanel = ({
         <h3>🎵 Video Audio Transcription</h3>
         
         {/* Language selection */}
-        <div className="language-selector" style={{ marginBottom: '1rem' }}>
-          <label htmlFor="language-select" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
+        <div className="language-selector">
+          <label htmlFor="language-select">
             Language:
           </label>
           <select
             id="language-select"
             value={selectedLanguage}
             onChange={(e) => setSelectedLanguage(e.target.value)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              fontSize: '14px',
-              width: '100%',
-              marginBottom: '1rem'
-            }}
+            className="language-select"
           >
             <option value="auto">Auto-detect (Recommended)</option>
             <option value="ko">Korean (한국어)</option>
@@ -334,7 +327,7 @@ const TranscriptionPanel = ({
 
       {/* Browser info */}
       {browserInfo && (
-        <div className="browser-info" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+        <div className="browser-info" style={{ fontSize: '0.8rem', color: 'white', marginBottom: '0.5rem' }}>
           Browser: {browserInfo} | Audio Processing: {isSupported ? 'Supported' : 'Not Supported'}
         </div>
       )}
@@ -384,7 +377,7 @@ const TranscriptionPanel = ({
 
       {/* Debug info for troubleshooting */}
       {process.env.NODE_ENV === 'development' && debugInfo && (
-        <div className="debug-info" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+        <div className="debug-info" style={{ fontSize: '0.8rem', color: 'white', marginBottom: '0.5rem' }}>
           Debug: {debugInfo} | Processing: {isProcessing ? 'Yes' : 'No'} | Supported: {isSupported ? 'Yes' : 'No'} | Video: {videoFile ? 'Yes' : 'No'}
         </div>
       )}
