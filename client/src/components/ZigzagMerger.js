@@ -91,7 +91,7 @@ const ZigzagMerger = () => {
     formData.append('newPdf', newPdf);
 
     try {
-      const response = await fetch('/api/zigzag-merge', {
+      const response = await authenticatedFetch('/api/zigzag-merge', {
         method: 'POST',
         body: formData
       });
@@ -127,7 +127,7 @@ const ZigzagMerger = () => {
     formData.append('zigzagPdf', zigzagPdf);
 
     try {
-      const response = await fetch('/api/unzigzag', {
+      const response = await authenticatedFetch('/api/unzigzag', {
         method: 'POST',
         body: formData
       });

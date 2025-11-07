@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './TranscriptionPanel.css';
+import { authenticatedFetch } from '../lib/api';
 
 const TranscriptionPanel = ({
   transcription,
@@ -151,7 +152,7 @@ const TranscriptionPanel = ({
       }
       
       // Send to our transcription API (backend server on port 3000)
-      const response = await fetch('http://localhost:3000/api/transcribe', {
+      const response = await authenticatedFetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });

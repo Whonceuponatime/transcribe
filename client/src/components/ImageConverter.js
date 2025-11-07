@@ -103,11 +103,8 @@ const ImageConverter = () => {
 
   const downloadAllFiles = async () => {
     try {
-      const response = await fetch('/api/download-all-converted-files', {
+      const response = await authenticatedFetch('/api/download-all-converted-files', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ files: convertedFiles })
       });
 

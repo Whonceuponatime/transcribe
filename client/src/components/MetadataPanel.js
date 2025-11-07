@@ -78,7 +78,7 @@ const MetadataPanel = () => {
     formData.append('metadataOptions', JSON.stringify(metadataOptions));
 
     try {
-      const response = await fetch('/api/process-metadata', {
+      const response = await authenticatedFetch('/api/process-metadata', {
         method: 'POST',
         body: formData
       });
@@ -111,11 +111,8 @@ const MetadataPanel = () => {
 
   const downloadAllFiles = async () => {
     try {
-      const response = await fetch('/api/download-all-metadata-files', {
+      const response = await authenticatedFetch('/api/download-all-metadata-files', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ files: processedFiles })
       });
 
