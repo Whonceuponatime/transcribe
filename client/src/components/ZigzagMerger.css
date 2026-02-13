@@ -13,14 +13,14 @@
 }
 
 .merger-header h2 {
-  color: white;
+  color: var(--text);
   margin-bottom: 10px;
   font-size: 2.2rem;
   font-family: 'Source Code Pro', monospace;
 }
 
 .merger-header p {
-  color: white;
+  color: var(--text);
   font-size: 1.1rem;
   font-family: 'Source Code Pro', monospace;
 }
@@ -33,18 +33,18 @@
 }
 
 .left-section, .right-section {
-  background-color: #191919;
+  background: var(--bg-surface);
   border: 1px solid white;
   padding: 25px;
   font-family: 'Source Code Pro', monospace;
 }
 
 .merge-section h3, .unzigzag-section h3 {
-  color: white;
+  color: var(--text);
   margin-bottom: 20px;
   font-size: 1.4rem;
   font-family: 'Source Code Pro', monospace;
-  border-bottom: 1px solid white;
+  border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
 }
 
@@ -54,7 +54,7 @@
 
 .upload-label {
   display: block;
-  color: white;
+  color: var(--text);
   margin-bottom: 8px;
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
@@ -63,13 +63,13 @@
 
 .upload-area {
   position: relative;
-  border: 2px dashed white;
+  border: 2px dashed var(--border-strong);
   padding: 30px 20px;
   text-align: center;
   transition: all 0.3s ease;
   cursor: pointer;
   background-color: transparent;
-  color: white;
+  color: var(--text);
 }
 
 .upload-area:hover {
@@ -94,7 +94,7 @@
 .upload-icon {
   font-size: 2.5rem;
   margin-bottom: 10px;
-  color: white;
+  color: var(--text);
 }
 
 .upload-area:hover .upload-icon {
@@ -103,7 +103,7 @@
 
 .upload-placeholder p {
   margin: 5px 0;
-  color: white;
+  color: var(--text);
   font-family: 'Source Code Pro', monospace;
   font-size: 0.9rem;
 }
@@ -114,7 +114,7 @@
 
 .file-size-text {
   font-size: 0.8rem;
-  color: white;
+  color: var(--text);
   margin-top: 5px;
   font-family: 'Source Code Pro', monospace;
 }
@@ -126,7 +126,7 @@
 .merge-btn {
   width: 100%;
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 15px 20px;
   font-size: 1.1rem;
@@ -143,9 +143,9 @@
 }
 
 .merge-btn:disabled {
-  background-color: #191919;
-  color: #666;
-  border-color: #666;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--border);
   cursor: not-allowed;
 }
 
@@ -159,7 +159,7 @@
 
 .status-message p {
   margin: 0;
-  color: white;
+  color: var(--text);
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
 }
@@ -172,7 +172,7 @@
 }
 
 .results-section h4 {
-  color: white;
+  color: var(--text);
   margin-bottom: 15px;
   font-size: 1.1rem;
   font-family: 'Source Code Pro', monospace;
@@ -189,8 +189,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid white;
-  color: white;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   font-family: 'Source Code Pro', monospace;
 }
 
@@ -200,7 +200,7 @@
 
 .download-btn {
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 4px 12px;
   cursor: pointer;
@@ -218,7 +218,7 @@
 .clear-btn {
   width: 100%;
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 10px 15px;
   cursor: pointer;
@@ -234,9 +234,9 @@
 }
 
 .clear-btn:disabled {
-  background-color: #191919;
-  color: #666;
-  border-color: #666;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--border);
   cursor: not-allowed;
 }
 

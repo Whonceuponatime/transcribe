@@ -13,20 +13,20 @@
 }
 
 .converter-header h2 {
-  color: white;
+  color: var(--text);
   margin-bottom: 10px;
   font-size: 2.2rem;
   font-family: 'Source Code Pro', monospace;
 }
 
 .converter-header p {
-  color: white;
+  color: var(--text);
   font-size: 1.1rem;
   font-family: 'Source Code Pro', monospace;
 }
 
 .format-note {
-  background-color: #191919;
+  background: var(--bg-surface);
   border: 1px solid white;
   padding: 10px 15px;
   margin-top: 15px;
@@ -37,7 +37,7 @@
 
 .format-note p {
   margin: 0;
-  color: white;
+  color: var(--text);
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
 }
@@ -50,14 +50,14 @@
 }
 
 .left-section, .right-section {
-  background-color: #191919;
+  background: var(--bg-surface);
   border: 1px solid white;
   padding: 25px;
   font-family: 'Source Code Pro', monospace;
 }
 
 .upload-section h3, .settings-section h3 {
-  color: white;
+  color: var(--text);
   margin-bottom: 20px;
   font-size: 1.4rem;
   font-family: 'Source Code Pro', monospace;
@@ -67,24 +67,24 @@
 
 .upload-area {
   position: relative;
-  border: 2px dashed white;
+  border: 2px dashed var(--border-strong);
   padding: 40px 20px;
   text-align: center;
   transition: all 0.3s ease;
   cursor: pointer;
   background-color: transparent;
-  color: white;
+  color: var(--text);
 }
 
 .upload-area:hover {
-  border-color: green;
-  color: green;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .upload-area.dragging {
-  border-color: green;
-  background-color: rgba(0, 255, 0, 0.1);
-  color: green;
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent);
 }
 
 .file-input {
@@ -98,31 +98,31 @@
 .upload-icon {
   font-size: 3rem;
   margin-bottom: 15px;
-  color: white;
+  color: var(--text);
 }
 
 .upload-area:hover .upload-icon {
-  color: green;
+  color: var(--accent);
 }
 
 .upload-placeholder p {
   margin: 5px 0;
-  color: white;
+  color: var(--text);
   font-family: 'Source Code Pro', monospace;
 }
 
 .upload-area:hover .upload-placeholder p {
-  color: green;
+  color: var(--accent);
 }
 
 .upload-hint {
   font-size: 0.9rem;
-  color: white;
+  color: var(--text);
   font-family: 'Source Code Pro', monospace;
 }
 
 .upload-area:hover .upload-hint {
-  color: green;
+  color: var(--accent);
 }
 
 .image-converter .files-list {
@@ -153,10 +153,10 @@
   align-items: center;
   padding: 10px;
   transition: background-color 0.2s ease;
-  color: #ffffff !important;
+  color: var(--text) !important;
   font-family: 'Source Code Pro', monospace;
   background-color: #191919 !important;
-  border: 1px solid #333 !important;
+  border: 1px solid var(--border-strong) !important;
   border-radius: 2px;
 }
 
@@ -164,12 +164,12 @@
 .image-converter .file-item *,
 .image-converter .file-item span,
 .image-converter .file-item div {
-  color: #ffffff !important;
+  color: var(--text) !important;
 }
 
 .image-converter .file-item:hover {
-  background-color: #2a2a2a !important;
-  border-color: white !important;
+  background-color: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
 }
 
 .image-converter .file-info {
@@ -181,7 +181,7 @@
 .image-converter .file-name,
 .image-converter .file-name * {
   font-weight: 500;
-  color: #ffffff !important;
+  color: var(--text) !important;
   margin-bottom: 2px;
   font-family: 'Source Code Pro', monospace;
   background-color: transparent !important;
@@ -190,7 +190,7 @@
 .image-converter .file-format,
 .image-converter .file-format * {
   font-size: 0.75rem;
-  color: #ffffff !important;
+  color: var(--text) !important;
   background-color: #191919 !important;
   border: 1px solid white;
   padding: 2px 6px;
@@ -203,7 +203,7 @@
 .image-converter .file-size,
 .image-converter .file-size * {
   font-size: 0.85rem;
-  color: #ffffff !important;
+  color: var(--text) !important;
   font-family: 'Source Code Pro', monospace;
   background-color: transparent !important;
 }
@@ -224,7 +224,7 @@
 .image-converter .remove-file-btn:hover {
   color: green !important;
   border-color: green !important;
-  background-color: #2a2a2a !important;
+  background-color: var(--bg-elevated) !important;
 }
 
 .setting-group {
@@ -236,13 +236,13 @@
 }
 
 .setting-group:hover {
-  border-color: green;
+  border-color: var(--accent);
 }
 
 .setting-label {
   display: block;
   font-weight: 500;
-  color: white;
+  color: var(--text);
   margin-bottom: 8px;
   font-family: 'Source Code Pro', monospace;
 }
@@ -258,8 +258,8 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid white;
-  background-color: #191919;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text);
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
   cursor: pointer;
@@ -267,24 +267,24 @@
 
 .format-select:focus {
   outline: none;
-  border-color: green;
+  border-color: var(--accent);
 }
 
 .format-select option {
-  background-color: #191919;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text);
 }
 
 .quality-slider {
   width: 100%;
   margin: 10px 0;
   cursor: pointer;
-  accent-color: green;
+  accent-color: var(--accent);
 }
 
 .quality-hint {
   font-size: 0.8rem;
-  color: white;
+  color: var(--text);
   text-align: center;
   margin-top: 5px;
   font-family: 'Source Code Pro', monospace;
@@ -293,7 +293,7 @@
 .resize-settings {
   margin-top: 15px;
   padding: 15px;
-  background-color: #191919;
+  background: var(--bg-surface);
   border: 1px solid white;
 }
 
@@ -319,15 +319,15 @@
 .dimension-input input {
   padding: 8px 12px;
   border: 1px solid white;
-  background-color: #191919;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text);
   font-size: 0.9rem;
   font-family: 'Source Code Pro', monospace;
 }
 
 .dimension-input input:focus {
   outline: none;
-  border-color: green;
+  border-color: var(--accent);
 }
 
 .conversion-section {
@@ -339,7 +339,7 @@
 .convert-btn {
   width: 100%;
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 15px 20px;
   font-size: 1.1rem;
@@ -351,28 +351,28 @@
 }
 
 .convert-btn:hover:not(:disabled) {
-  color: green;
-  border-color: green;
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .convert-btn:disabled {
-  background-color: #191919;
-  color: #666;
-  border-color: #666;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .progress-section {
   margin-bottom: 20px;
   padding: 15px;
-  background-color: #191919;
+  background: var(--bg-surface);
   border: 1px solid white;
 }
 
 .progress-bar {
   width: 100%;
   height: 20px;
-  background-color: #0a0a0a;
+  background: var(--bg-page);
   border: 1px solid white;
   overflow: hidden;
   margin-bottom: 10px;
@@ -381,7 +381,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00ff00, #00cc00);
+  background: var(--accent);
   transition: width 0.5s ease;
   position: relative;
   overflow: hidden;
@@ -429,7 +429,7 @@
 }
 
 .results-section h4 {
-  color: white;
+  color: var(--text);
   margin-bottom: 15px;
   font-size: 1.1rem;
   font-family: 'Source Code Pro', monospace;
@@ -447,7 +447,7 @@
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid white;
-  color: white;
+  color: var(--text);
   font-family: 'Source Code Pro', monospace;
 }
 
@@ -457,7 +457,7 @@
 
 .download-btn {
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 4px 12px;
   cursor: pointer;
@@ -468,14 +468,14 @@
 }
 
 .download-btn:hover {
-  color: green;
-  border-color: green;
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .download-all-btn {
   width: 100%;
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 10px 15px;
   cursor: pointer;
@@ -487,14 +487,14 @@
 }
 
 .download-all-btn:hover {
-  color: green;
-  border-color: green;
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .clear-btn {
   width: 100%;
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 10px 15px;
   cursor: pointer;
@@ -505,20 +505,20 @@
 }
 
 .clear-btn:hover:not(:disabled) {
-  color: green;
-  border-color: green;
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .clear-btn:disabled {
-  background-color: #191919;
-  color: #666;
-  border-color: #666;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .bulk-select-btn {
   background-color: transparent;
-  color: white;
+  color: var(--text);
   border: 1px solid white;
   padding: 12px 20px;
   cursor: pointer;
@@ -529,9 +529,9 @@
 }
 
 .bulk-select-btn:hover {
-  color: green;
-  border-color: green;
-  background-color: rgba(0, 255, 0, 0.1);
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-muted);
 }
 
 /* Responsive Design */

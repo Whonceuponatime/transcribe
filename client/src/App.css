@@ -2,24 +2,45 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
 
+/* ========== Global design tokens (black + green theme) ========== */
 :root {
-  /* Brand (logo/title only) */
   --font-brand: 'Source Code Pro', monospace;
-  /* UI (forms, buttons, body) */
   --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Backgrounds */
   --bg-page: #0a0a0a;
-  --bg-card: #141414;
-  --bg-card-hover: #1a1a1a;
-  --border: rgba(255, 255, 255, 0.2);
-  --border-strong: rgba(255, 255, 255, 0.35);
+  --bg-surface: #141414;
+  --bg-surface-hover: #1a1a1a;
+  --bg-elevated: #1e1e1e;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.15);
+  --border-strong: rgba(255, 255, 255, 0.3);
+
+  /* Text */
   --text: rgba(255, 255, 255, 0.95);
   --text-muted: rgba(255, 255, 255, 0.7);
-  --text-hint: rgba(255, 255, 255, 0.55);
+  --text-hint: rgba(255, 255, 255, 0.5);
+
+  /* Accent (green only for focus/active/primary) */
   --accent: #22c55e;
   --accent-hover: #16a34a;
+  --accent-muted: rgba(34, 197, 94, 0.2);
+
+  /* Destructive */
+  --destructive: #dc2626;
+  --destructive-hover: #b91c1c;
+
+  /* Shape */
   --radius: 10px;
   --radius-sm: 6px;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Aliases for compatibility */
+:root {
+  --bg-card: var(--bg-surface);
+  --bg-card-hover: var(--bg-surface-hover);
 }
 
 * {
@@ -50,7 +71,7 @@ body {
 
 .App-loading {
   font-size: 1.2rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-muted);
 }
 
 .App-header {
@@ -130,7 +151,7 @@ body {
 .nav-category-btn:hover {
   color: var(--text);
   border-color: var(--border-strong);
-  background: var(--bg-card-hover);
+  background: var(--bg-surface-hover);
 }
 
 .nav-category-btn.active {
@@ -161,18 +182,18 @@ body {
 .nav-tool-btn:hover {
   color: var(--text);
   border-color: var(--border-strong);
-  background: var(--bg-card-hover);
+  background: var(--bg-surface-hover);
 }
 
 .nav-tool-btn.active {
-  background: rgba(34, 197, 94, 0.2);
+  background: var(--accent-muted);
   color: var(--accent);
   border-color: var(--accent);
 }
 
 /* Shared card (Template A/B) */
 .card {
-  background: var(--bg-card);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.25rem;
@@ -240,7 +261,7 @@ body {
 
 .btn-ghost:hover:not(:disabled) {
   color: var(--text);
-  background: var(--bg-card-hover);
+  background: var(--bg-surface-hover);
 }
 
 .btn-ghost:disabled {
@@ -248,10 +269,31 @@ body {
   cursor: not-allowed;
 }
 
-/* Inputs: higher contrast */
+.btn-destructive {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--destructive);
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-destructive:hover:not(:disabled) {
+  background: var(--destructive-hover);
+}
+
+.btn-destructive:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs: themed dark, green focus only */
 input, textarea, select {
   font-family: var(--font-ui);
-  background: var(--bg-card);
+  background: var(--bg-surface);
   border: 1px solid var(--border-strong);
   color: var(--text);
   padding: 0.5rem 0.65rem;
@@ -294,7 +336,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .tab-button.active {
-  background: rgba(34, 197, 94, 0.2);
+  background: var(--accent-muted);
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -319,26 +361,114 @@ input:focus, textarea:focus, select:focus {
 }
 
 .App-footer {
-  background-color: #191919;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border);
   padding: 0.5rem;
   text-align: center;
-  color: white;
+  color: var(--text-muted);
   font-size: 0.8rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-ui);
 }
 
-button:focus {
+button:focus,
+button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
+button:active:not(:disabled) {
+  outline-color: var(--accent);
+}
+
 /* Progress bars */
 .progress-bar {
-  background: var(--bg-card);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   height: 8px;
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+
+/* ========== Shared layout templates ========== */
+.template-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  min-height: 400px;
+}
+
+@media (max-width: 1024px) {
+  .template-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.template-single-card {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ========== Unified dropzone ========== */
+.dropzone {
+  background: var(--bg-surface);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 2rem;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dropzone:hover,
+.dropzone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.dropzone .dropzone-title {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.dropzone .dropzone-hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* ========== Unified output panel ========== */
+.output-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  min-height: 120px;
+}
+
+.output-panel .output-title {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.output-panel textarea.output-area {
+  width: 100%;
+  min-height: 160px;
+  padding: 0.75rem;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.output-panel textarea.output-area:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 
 .progress-fill {
@@ -347,21 +477,22 @@ button:focus {
   transition: width 0.3s ease;
 }
 
-/* Scrollbar styling */
+/* Scrollbar: themed */
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #191919;
+  background: var(--bg-surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: white;
+  background: var(--border-strong);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: green;
+  background: var(--accent);
 }
 
 /* Responsive Design */

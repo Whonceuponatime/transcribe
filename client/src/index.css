@@ -1,20 +1,19 @@
-/* Mr. Robot Theme - Clean Minimalist Global Styles */
-
+/* Base: theme comes from App.css tokens */
 body {
   margin: 0;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-ui, 'Inter', system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: black;
-  color: white;
+  background-color: var(--bg-page, #0a0a0a);
+  color: var(--text, rgba(255, 255, 255, 0.95));
   line-height: 1.6;
 }
 
 code {
-  font-family: 'Source Code Pro', monospace;
-  color: green;
-  background-color: #191919;
-  padding: 2px 4px;
-  border-radius: 0;
-  border: 1px solid white;
+  font-family: var(--font-brand, monospace);
+  color: var(--accent);
+  background: var(--bg-surface);
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }

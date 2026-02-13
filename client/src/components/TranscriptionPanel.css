@@ -75,7 +75,7 @@
 .error-message {
   padding: 1rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-card);
+  background: var(--bg-surface);
   color: var(--text);
   display: flex;
   align-items: flex-start;
@@ -118,7 +118,7 @@
   min-height: 150px;
   padding: 0.65rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-card);
+  background: var(--bg-surface);
   color: var(--text);
   font-size: 0.9rem;
   line-height: 1.5;
@@ -161,8 +161,8 @@
 }
 
 .history-item {
-  background-color: #191919;
-  border: 1px solid white;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   padding: 0.5rem;
   margin-bottom: 0.3rem;
   font-family: 'Source Code Pro', monospace;
@@ -237,15 +237,15 @@
 }
 
 .history-list::-webkit-scrollbar-track {
-  background: #191919;
+  background: var(--bg-surface);
 }
 
 .history-list::-webkit-scrollbar-thumb {
-  background: white;
+  background: var(--border-strong);
 }
 
 .history-list::-webkit-scrollbar-thumb:hover {
-  background: green;
+  background: var(--accent);
 }
 
 /* Animation for new history items */

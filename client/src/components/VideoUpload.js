@@ -51,7 +51,7 @@ const VideoUpload = ({ onVideoUpload }) => {
   return (
     <div className="video-upload">
       <div
-        className={`upload-area ${isDragOver ? 'drag-over' : ''}`}
+        className={`dropzone upload-area ${isDragOver ? 'drag-over' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
