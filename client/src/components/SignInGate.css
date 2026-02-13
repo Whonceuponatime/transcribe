@@ -3,50 +3,61 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #0d0d0d;
+  background-color: var(--bg-page, #0d0d0d);
   padding: 2rem;
 }
 
 .sign-in-gate__card {
   max-width: 420px;
   width: 100%;
+  min-height: 420px;
   padding: 2.5rem;
-  background-color: #191919;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background-color: var(--bg-card, #141414);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  border-radius: var(--radius, 12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Top = marketing / CTA */
+.sign-in-gate__cta {
   text-align: center;
 }
 
 .sign-in-gate__title {
   font-size: 2rem;
   margin: 0 0 0.5rem 0;
-  color: white;
+  color: var(--text, white);
+  font-family: var(--font-brand, inherit);
 }
 
 .sign-in-gate__subtitle {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0 0 1.5rem 0;
+  color: var(--text-muted, rgba(255, 255, 255, 0.8));
+  margin: 0 0 1rem 0;
 }
 
 .sign-in-gate__message {
   font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 1.5rem 0;
+  color: var(--text-muted);
+  margin: 0;
   line-height: 1.5;
 }
 
-.sign-in-gate__auth {
+/* Bottom = login form (pushed down by space-between) */
+.sign-in-gate__form-wrap {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
+  margin-top: 2rem;
 }
 
-.sign-in-gate__auth .auth-status {
+.sign-in-gate__form-wrap .auth-status {
   position: static;
 }
 
-.sign-in-gate__auth .auth-status__form {
+.sign-in-gate__form-wrap .auth-status__form {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
