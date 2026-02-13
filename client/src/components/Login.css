@@ -1,0 +1,170 @@
+/* Mr. Robot Theme - Login Page */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: black;
+  padding: 1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.login-box {
+  background-color: #191919;
+  border: 1px solid white;
+  border-radius: 0;
+  padding: 3rem 2rem;
+  max-width: 450px;
+  width: 100%;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.login-header h1 {
+  color: white;
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.login-header p {
+  color: white;
+  font-size: 1rem;
+  margin: 0;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.form-group input {
+  padding: 0.75rem 1rem;
+  border: 1px solid white;
+  border-radius: 0;
+  background-color: #191919;
+  color: white;
+  font-size: 1rem;
+  font-family: 'Source Code Pro', monospace;
+  transition: all 0.3s ease;
+}
+
+.form-group input::placeholder {
+  color: #888;
+  opacity: 1;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: green;
+}
+
+.form-group input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #191919;
+  border: 1px solid white;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.error-message svg {
+  flex-shrink: 0;
+  color: white;
+}
+
+.login-btn {
+  padding: 1rem 2rem;
+  border: 1px solid white;
+  border-radius: 0;
+  background-color: transparent;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.login-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.login-btn:disabled {
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid white;
+}
+
+.login-footer p {
+  color: white;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.admin-note {
+  color: #888;
+  font-size: 0.75rem !important;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .login-box {
+    padding: 2rem 1.5rem;
+  }
+  
+  .login-header h1 {
+    font-size: 2rem;
+  }
+  
+  .login-header p {
+    font-size: 0.9rem;
+  }
+  
+  .form-group input {
+    font-size: 0.9rem;
+  }
+  
+  .login-btn {
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+  }
+}
+
