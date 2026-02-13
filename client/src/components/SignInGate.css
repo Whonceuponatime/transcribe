@@ -1,16 +1,19 @@
+/* Gate: centered full viewport */
 .sign-in-gate {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  padding: 32px;
   background-color: var(--bg-page, #0d0d0d);
-  padding: 2rem;
 }
 
+/* Card: single column, gap (no space-between) */
 .sign-in-gate__card {
-  max-width: 420px;
-  width: 100%;
-  padding: 2.5rem;
+  width: min(520px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
   background-color: var(--bg-card, #141414);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
   border-radius: var(--radius, 12px);
@@ -19,7 +22,6 @@
 /* Top = marketing / CTA */
 .sign-in-gate__cta {
   text-align: center;
-  margin-bottom: 1.5rem;
 }
 
 .sign-in-gate__title {
@@ -42,8 +44,11 @@
   line-height: 1.5;
 }
 
-/* Login form directly below CTA (no space-between) */
+/* Form wrap: in-flow, no absolute/fixed/bottom/auto */
 .sign-in-gate__form-wrap {
+  position: static;
+  margin-top: 0;
+  width: 100%;
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
@@ -51,11 +56,17 @@
 
 .sign-in-gate__form-wrap .auth-status {
   position: static;
+  width: 100%;
 }
 
+/* Form inline in card (override dropdown positioning) */
 .sign-in-gate__form-wrap .auth-status__form {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  left: auto;
   right: auto;
+  transform: none;
+  margin-top: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }

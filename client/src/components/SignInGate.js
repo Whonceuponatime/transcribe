@@ -20,7 +20,7 @@ export default function SignInGate() {
           </p>
         </div>
         <div className="sign-in-gate__form-wrap">
-          <AuthStatus defaultExpanded />
+          <AuthStatus defaultExpanded={false} />
         </div>
       </div>
     </div>
