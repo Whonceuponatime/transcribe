@@ -20,6 +20,7 @@ const CATEGORIES = {
   utilities: {
     label: 'Utilities',
     tools: [
+      { id: 'rewriter', label: 'Email Rewriter', icon: '✉️' },
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
     ],

@@ -14,6 +14,7 @@ import ImageConverter from './components/ImageConverter';
 import ZigzagMerger from './components/ZigzagMerger';
 import LiveTranslator from './components/LiveTranslator';
 import MarkdownCSVConverter from './components/MarkdownCSVConverter';
+import Rewriter from './components/Rewriter';
 
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
@@ -125,6 +126,8 @@ function App() {
           <AudioTranscriptionPanel />
         ) : activeTab === 'tts' ? (
           <TextToSpeech />
+        ) : activeTab === 'rewriter' ? (
+          <Rewriter />
         ) : activeTab === 'metadata' ? (
           <MetadataPanel />
         ) : activeTab === 'zigzag' ? (

@@ -1,0 +1,151 @@
+/* Email/Announcement Rewriter – two-pane layout, design tokens */
+
+.rewriter {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.rewriter-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+}
+
+.rewriter-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rewriter-option label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rewriter-option select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  min-width: 120px;
+}
+
+.rewriter-option select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.rewriter-option--toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.rewriter-option--toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.rewriter-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  min-height: 280px;
+}
+
+@media (max-width: 768px) {
+  .rewriter-panes {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rewriter-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rewriter-pane-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rewriter-textarea {
+  flex: 1;
+  min-height: 200px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.rewriter-textarea::placeholder {
+  color: var(--text-hint);
+}
+
+.rewriter-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.rewriter-output {
+  flex: 1;
+  min-height: 200px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  overflow: auto;
+}
+
+.rewriter-plain {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.rewriter-placeholder {
+  color: var(--text-hint);
+  font-size: 0.9rem;
+}
+
+.rewriter-loading {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.rewriter-error {
+  color: var(--destructive);
+  font-size: 0.9rem;
+}
+
+.rewriter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
