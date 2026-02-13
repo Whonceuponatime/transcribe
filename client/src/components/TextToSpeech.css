@@ -1,8 +1,14 @@
 /* TextToSpeech: template-two-col, tokens only */
 .text-to-speech {
-  padding: 1rem;
+  padding: 0.5rem 0;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+@media (min-width: 769px) {
+  .text-to-speech {
+    padding: 1rem;
+  }
 }
 
 .tts-header {
@@ -24,14 +30,16 @@
 
 .tts-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  min-height: 500px;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  min-height: 200px;
 }
 
-@media (max-width: 1024px) {
+@media (min-width: 769px) {
   .tts-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    min-height: 500px;
   }
 }
 

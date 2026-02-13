@@ -1,4 +1,9 @@
-/* Base: theme comes from App.css tokens */
+/* Base: theme comes from App.css tokens — mobile-friendly */
+html {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: var(--font-ui, 'Inter', system-ui, sans-serif);
@@ -7,6 +12,9 @@ body {
   background-color: var(--bg-page, #0a0a0a);
   color: var(--text, rgba(255, 255, 255, 0.95));
   line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 code {

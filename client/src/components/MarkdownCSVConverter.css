@@ -24,14 +24,16 @@
 
 .converter-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  min-height: 500px;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  min-height: 200px;
 }
 
-@media (max-width: 1024px) {
+@media (min-width: 769px) {
   .converter-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    min-height: 500px;
   }
 }
 

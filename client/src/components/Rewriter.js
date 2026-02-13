@@ -53,11 +53,19 @@ export default function Rewriter() {
           preserveLineBreaks,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Rewrite failed');
+      const contentType = res.headers.get('content-type');
+      const text = await res.text();
+      if (!contentType || !contentType.includes('application/json')) {
+        if (res.status === 405) {
+          throw new Error('Rewrite request not allowed (405). Run the backend server and, if using React dev server, set proxy in client/package.json to the backend (e.g. http://localhost:3001).');
+        }
+        throw new Error(text || `Server error (${res.status})`);
+      }
+      const data = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(data.error || data.details || 'Rewrite failed');
       setRewritten(data.rewritten ?? '');
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Rewrite failed');
       setRewritten('');
     } finally {
       setLoading(false);

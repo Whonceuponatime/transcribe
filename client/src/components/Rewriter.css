@@ -12,8 +12,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
 }
 
 .rewriter-option {
@@ -61,14 +61,15 @@
 
 .rewriter-panes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
-  min-height: 280px;
+  min-height: 200px;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 769px) {
   .rewriter-panes {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    min-height: 280px;
   }
 }
 
