@@ -104,7 +104,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
         URL.revokeObjectURL(videoUrl);
       };
     }
-  }, [video]); // Removed onTimeUpdate from dependencies
+  }, [video, onTimeUpdate]);
 
   const togglePlayPause = async () => {
     const videoElement = videoRef.current;
