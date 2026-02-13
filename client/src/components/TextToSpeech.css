@@ -135,6 +135,14 @@
   font-weight: 500;
 }
 
+.input-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.35rem;
+}
+
 .text-name-input {
   width: 100%;
   padding: 12px;

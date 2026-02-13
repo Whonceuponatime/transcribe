@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import './AuthStatus.css';
 
-export default function AuthStatus() {
+export default function AuthStatus({ defaultExpanded = false }) {
   const { user, loading, isAuthenticated, signInWithEmail, signUpWithEmail, signOut, supabaseConfigured } = useAuth();
-  const [showAuth, setShowAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(defaultExpanded);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

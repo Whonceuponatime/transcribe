@@ -1,119 +1,103 @@
-/* Mr. Robot Theme - Clean Minimalist Transcription Panel */
+/* Transcription Panel – Template A right side, step flow */
 
 .transcription-panel {
-  background-color: #191919;
-  border: 1px solid white;
-  padding: 1rem;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  font-family: 'Source Code Pro', monospace;
 }
 
-.panel-header {
+.transcription-steps {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid white;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
 }
 
-.panel-header h3 {
-  margin: 0;
-  color: white;
-  font-size: 1.2rem;
-  font-weight: 600;
-  font-family: 'Source Code Pro', monospace;
+.step-pending {
+  color: var(--text-hint, rgba(255,255,255,0.5));
+}
+
+.step-done {
+  color: var(--accent, #22c55e);
+}
+
+.step-active {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.transcription-checklist {
+  margin-bottom: 0.75rem;
+}
+
+.check-item {
+  font-size: 0.85rem;
+  color: var(--text-muted, rgba(255,255,255,0.7));
+}
+
+.check-done {
+  color: var(--accent, #22c55e);
+}
+
+.transcription-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.toolbar-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.toolbar-select {
+  min-width: 140px;
 }
 
 .transcription-controls {
   display: flex;
-  gap: 0.3rem;
-}
-
-.start-btn, .stop-btn, .clear-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid white;
-  background-color: transparent;
-  color: white;
-  font-size: 0.8rem;
-  font-weight: 500;
-  font-family: 'Source Code Pro', monospace;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.start-btn:hover:not(:disabled) {
-  color: green;
-  border-color: green;
-}
-
-.start-btn:disabled {
-  color: #666;
-  border-color: #666;
-  cursor: not-allowed;
-}
-
-.stop-btn:hover {
-  color: green;
-  border-color: green;
-}
-
-.clear-btn:hover:not(:disabled) {
-  color: green;
-  border-color: green;
-}
-
-.clear-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .browser-info {
   font-size: 0.8rem;
-  color: white;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
   padding: 0.5rem;
-  background-color: #191919;
-  border: 1px solid white;
-  font-family: 'Source Code Pro', monospace;
 }
 
 .error-message {
-  background-color: #191919;
-  color: white;
   padding: 1rem;
-  border: 1px solid white;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--text);
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  font-family: 'Source Code Pro', monospace;
+  margin-bottom: 0.5rem;
 }
 
 .warning-message {
-  background-color: #191919;
-  color: green;
   padding: 1rem;
-  border: 1px solid green;
+  border: 1px solid var(--accent);
+  color: var(--accent);
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  font-family: 'Source Code Pro', monospace;
+  margin-bottom: 0.5rem;
 }
 
 .debug-info {
   font-size: 0.8rem;
-  color: white;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
   padding: 0.5rem;
-  background-color: #191919;
-  border: 1px solid white;
-  font-family: 'Source Code Pro', monospace;
 }
 
 .transcription-content {
@@ -132,62 +116,43 @@
   width: 100%;
   height: 100%;
   min-height: 150px;
-  padding: 0.5rem;
-  border: 1px solid white;
-  background-color: #191919;
-  color: white;
-  font-family: 'Source Code Pro', monospace;
+  padding: 0.65rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--text);
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.5;
   resize: vertical;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
 }
 
 .transcription-textarea textarea:focus {
-  outline: none;
-  border-color: green;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 
 .transcription-textarea textarea.listening {
-  border-color: green;
+  border-color: var(--accent);
 }
 
 .transcription-actions {
   display: flex;
-  gap: 0.3rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-.copy-btn, .download-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid white;
-  background-color: transparent;
-  color: white;
-  font-size: 0.8rem;
-  font-family: 'Source Code Pro', monospace;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.copy-btn:hover, .download-btn:hover {
-  color: green;
-  border-color: green;
-}
-
 .transcription-history {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid white;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 .transcription-history h4 {
   margin: 0 0 0.5rem 0;
-  color: white;
+  color: var(--text);
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
 }
 
 .history-list {
@@ -216,20 +181,20 @@
 }
 
 .video-time {
-  color: green;
+  color: var(--accent);
   font-weight: 600;
 }
 
 .history-text {
   font-size: 0.8rem;
   line-height: 1.3;
-  color: white;
+  color: var(--text);
 }
 
 .video-progress {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
-  border-top: 1px solid white;
+  border-top: 1px solid var(--border);
 }
 
 .progress-info {
@@ -237,50 +202,28 @@
   justify-content: space-between;
   margin-bottom: 0.3rem;
   font-size: 0.7rem;
-  color: white;
+  color: var(--text-muted);
 }
 
-/* Progress bar styles */
 .progress-container {
   margin: 0.5rem 0;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 6px;
-  background-color: #191919;
-  border: 1px solid white;
-  overflow: hidden;
-  margin-bottom: 0.3rem;
-}
-
-.progress-fill {
-  height: 100%;
-  background-color: green;
-  transition: width 0.3s ease;
-}
-
 .progress-text {
-  font-size: 0.7rem;
-  color: white;
+  font-size: 0.8rem;
+  color: var(--text-muted);
   text-align: center;
-  font-family: 'Source Code Pro', monospace;
+  margin-top: 0.25rem;
 }
 
-/* Responsive design */
 @media (max-width: 768px) {
-  .transcription-panel {
-    padding: 0.5rem;
-  }
-  
-  .panel-header {
+  .transcription-toolbar {
     flex-direction: column;
-    gap: 0.5rem;
     align-items: stretch;
   }
   
   .transcription-controls {
-    justify-content: center;
+    justify-content: flex-start;
   }
   
   .transcription-textarea textarea {
@@ -321,13 +264,7 @@
   }
 }
 
-/* Success state for copy/download buttons */
-.copy-btn.success, .download-btn.success {
-  color: green;
-  border-color: green;
-}
-
-.copy-btn.success:hover, .download-btn.success:hover {
-  color: white;
-  border-color: white;
+.copy-btn.success {
+  color: var(--accent);
+  border-color: var(--accent);
 }

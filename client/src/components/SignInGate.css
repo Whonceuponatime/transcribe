@@ -1,0 +1,54 @@
+.sign-in-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0d0d0d;
+  padding: 2rem;
+}
+
+.sign-in-gate__card {
+  max-width: 420px;
+  width: 100%;
+  padding: 2.5rem;
+  background-color: #191919;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.sign-in-gate__title {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: white;
+}
+
+.sign-in-gate__subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 1.5rem 0;
+}
+
+.sign-in-gate__message {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+.sign-in-gate__auth {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sign-in-gate__auth .auth-status {
+  position: static;
+}
+
+.sign-in-gate__auth .auth-status__form {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  right: auto;
+}

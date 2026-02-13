@@ -1,6 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import './App.css';
+import { useAuth } from './contexts/AuthContext';
 import AuthStatus from './components/AuthStatus';
+import AppNav from './components/AppNav';
+import SignInGate from './components/SignInGate';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import AudioTranscriptionPanel from './components/AudioTranscriptionPanel';
@@ -13,6 +16,7 @@ import LiveTranslator from './components/LiveTranslator';
 import MarkdownCSVConverter from './components/MarkdownCSVConverter';
 
 function App() {
+  const { isAuthenticated, loading, supabaseConfigured } = useAuth();
   const [activeTab, setActiveTab] = useState('transcription');
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
@@ -21,17 +25,17 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
+  const handleTimeUpdate = useCallback((currentTime, duration) => {
+    setCurrentTime(currentTime);
+    setVideoDuration(duration);
+  }, []);
+
   const handleVideoUpload = (videoFile) => {
     setUploadedVideo(videoFile);
     setTranscription('');
     setCurrentTime(0);
     setVideoDuration(0);
   };
-
-  const handleTimeUpdate = useCallback((currentTime, duration) => {
-    setCurrentTime(currentTime);
-    setVideoDuration(duration);
-  }, []);
 
   const startTranscription = () => {
     setIsTranscribing(true);
@@ -61,69 +65,36 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const canUseApp = supabaseConfigured && isAuthenticated;
+
+  if (loading) {
+    return (
+      <div className="App App--loading">
+        <div className="App-loading">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!canUseApp) {
+    return <SignInGate />;
+  }
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🃏 Jack of clubs</h1>
-        <p>Comprehensive media processing suite - transcription, metadata removal, and image conversion</p>
+        <div className="App-header__brand">
+          <h1>🃏 Jack of clubs</h1>
+          <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
+        </div>
         <AuthStatus />
       </header>
 
-      <div className="tab-container">
-        <button 
-          className={`tab-button ${activeTab === 'transcription' ? 'active' : ''}`}
-          onClick={() => setActiveTab('transcription')}
-        >
-          🎬 Video Transcription
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'audio' ? 'active' : ''}`}
-          onClick={() => setActiveTab('audio')}
-        >
-          🎵 Audio Transcription
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'tts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tts')}
-        >
-          📖 Text to Speech
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'metadata' ? 'active' : ''}`}
-          onClick={() => setActiveTab('metadata')}
-        >
-          🛡️ Metadata Tools
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'converter' ? 'active' : ''}`}
-          onClick={() => setActiveTab('converter')}
-        >
-          🖼️ Image Converter
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'zigzag' ? 'active' : ''}`}
-          onClick={() => setActiveTab('zigzag')}
-        >
-          📄 Zigzag
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'translator' ? 'active' : ''}`}
-          onClick={() => setActiveTab('translator')}
-        >
-          🌐 Live Translator
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'markdown-csv' ? 'active' : ''}`}
-          onClick={() => setActiveTab('markdown-csv')}
-        >
-          📊 Markdown/CSV Converter
-        </button>
-      </div>
+      <AppNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="App-main">
         {activeTab === 'transcription' ? (
           <div className="app-container">
-            <div className="left-panel">
+            <div className="left-panel card">
               <VideoUpload onVideoUpload={handleVideoUpload} />
               {uploadedVideo && (
                 <VideoPlayer 
@@ -134,7 +105,7 @@ function App() {
               )}
             </div>
 
-            <div className="right-panel">
+            <div className="right-panel card">
               <TranscriptionPanel
                 transcription={transcription}
                 setTranscription={setTranscription}

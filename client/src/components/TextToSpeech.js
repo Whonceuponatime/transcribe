@@ -229,9 +229,13 @@ const TextToSpeech = () => {
 
           <div className="text-input-section">
             <h3>Text Content</h3>
+            <label htmlFor="tts-text-name" className="input-label">
+              Name (optional) – for saving to history
+            </label>
             <input
+              id="tts-text-name"
               type="text"
-              placeholder="Enter a name for this text (optional)"
+              placeholder="e.g. Chapter 1"
               value={currentTextName}
               onChange={(e) => setCurrentTextName(e.target.value)}
               className="text-name-input"

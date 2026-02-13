@@ -7,6 +7,7 @@ const MarkdownCSVConverter = () => {
   const [outputText, setOutputText] = useState('');
   const [delimiter, setDelimiter] = useState(',');
   const [hasHeaders, setHasHeaders] = useState(true);
+  const [copyToast, setCopyToast] = useState(false);
   const textareaRef = useRef(null);
   const outputRef = useRef(null);
 
@@ -104,17 +105,11 @@ const MarkdownCSVConverter = () => {
   };
 
   const handleCopy = () => {
-    if (!outputText) {
-      alert('No output to copy. Please convert first.');
-      return;
-    }
-
+    if (!outputText) return;
     navigator.clipboard.writeText(outputText).then(() => {
-      alert('Copied to clipboard! You can now paste into Excel.');
-    }).catch(err => {
-      console.error('Copy failed:', err);
-      alert('Failed to copy to clipboard. Please select and copy manually.');
-    });
+      setCopyToast(true);
+      setTimeout(() => setCopyToast(false), 2500);
+    }).catch(() => {});
   };
 
   const handleClear = () => {
@@ -265,9 +260,16 @@ Bob,35,Chicago`);
               className="output-textarea"
               value={outputText}
               readOnly
-              placeholder="Converted output will appear here...\n\nThis is in TSV format (tab-separated values) that can be directly pasted into Excel."
+              placeholder="Converted output will appear here (TSV – paste into Excel)."
               rows={15}
+              style={{ whiteSpace: 'pre-wrap' }}
             />
+
+            {copyToast && (
+              <div className="copy-toast" role="status">
+                ✓ Copied to clipboard
+              </div>
+            )}
 
             {outputText && (
               <div className="output-info">

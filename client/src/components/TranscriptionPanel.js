@@ -169,24 +169,6 @@ const TranscriptionPanel = ({
     onClearTranscription();
   };
 
-  const copyToClipboard = () => {
-    if (transcription.trim()) {
-      navigator.clipboard.writeText(transcription).then(() => {
-        // Show a brief success message
-        const button = document.querySelector('.copy-btn');
-        if (button) {
-          const originalText = button.textContent;
-          button.textContent = 'Copied!';
-          setTimeout(() => {
-            button.textContent = originalText;
-          }, 2000);
-        }
-      }).catch(err => {
-        console.error('Failed to copy text: ', err);
-      });
-    }
-  };
-
   const downloadTranscription = () => {
     if (transcription.trim()) {
       const blob = new Blob([transcription], { type: 'text/plain' });
@@ -212,78 +194,76 @@ const TranscriptionPanel = ({
     return steps.join('\n');
   };
 
+  const [copySuccess, setCopySuccess] = useState(false);
+  const copyWithFeedback = () => {
+    if (!transcription.trim()) return;
+    navigator.clipboard.writeText(transcription).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }).catch(() => {});
+  };
+
   return (
-    <div className="transcription-panel">
-      <div className="panel-header">
-        <h3>🎵 Video Audio Transcription</h3>
-        
-        {/* Language selection */}
-        <div className="language-selector" style={{ marginBottom: '1rem' }}>
-          <label htmlFor="language-select" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
-            Language:
-          </label>
-          <select
-            id="language-select"
-            value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              fontSize: '14px',
-              width: '100%',
-              marginBottom: '1rem'
-            }}
-          >
-            <option value="auto">Auto-detect (Recommended)</option>
-            <option value="ko">Korean (한국어)</option>
-            <option value="en">English</option>
-            <option value="ja">Japanese (日本語)</option>
-            <option value="zh">Chinese (中文)</option>
-            <option value="es">Spanish (Español)</option>
-            <option value="fr">French (Français)</option>
-            <option value="de">German (Deutsch)</option>
-            <option value="it">Italian (Italiano)</option>
-            <option value="pt">Portuguese (Português)</option>
-            <option value="ru">Russian (Русский)</option>
-          </select>
-        </div>
-        
+    <div className="transcription-panel card">
+      <h3 className="card-title">Video transcription</h3>
+
+      {/* Step flow */}
+      <div className="transcription-steps">
+        <span className={videoFile ? 'step-done' : 'step-pending'}>1. Upload file</span>
+        <span className="step-done">2. Language</span>
+        <span className={transcription.trim() ? 'step-done' : isProcessing ? 'step-active' : 'step-pending'}>3. Transcribe</span>
+        <span className={transcription.trim() ? 'step-done' : 'step-pending'}>4. Copy / Download</span>
+      </div>
+
+      {/* Checklist */}
+      <div className="transcription-checklist">
+        <span className={videoFile ? 'check-item check-done' : 'check-item'}>
+          {videoFile ? '✓' : '○'} File selected
+        </span>
+      </div>
+
+      {/* Toolbar: Language + actions */}
+      <div className="transcription-toolbar">
+        <label htmlFor="language-select" className="toolbar-label">Language</label>
+        <select
+          id="language-select"
+          value={selectedLanguage}
+          onChange={(e) => setSelectedLanguage(e.target.value)}
+          className="toolbar-select"
+        >
+          <option value="auto">Auto-detect</option>
+          <option value="ko">Korean</option>
+          <option value="en">English</option>
+          <option value="ja">Japanese</option>
+          <option value="zh">Chinese</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ru">Russian</option>
+        </select>
         <div className="transcription-controls">
           {!isTranscribing ? (
             <button
-              className="start-btn"
+              type="button"
+              className="btn-primary start-btn"
               onClick={handleStartTranscription}
               disabled={!isSupported || !videoFile}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              Transcribe Video
+              {isProcessing ? 'Transcribing…' : 'Transcribe Video'}
             </button>
           ) : (
-            <button
-              className="stop-btn"
-              onClick={handleStopTranscription}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12"/>
-              </svg>
+            <button type="button" className="btn-secondary stop-btn" onClick={handleStopTranscription}>
               Stop
             </button>
           )}
-          
           <button
-            className="clear-btn"
+            type="button"
+            className="btn-ghost clear-btn"
             onClick={handleClearTranscription}
             disabled={!transcription.trim()}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 6h18"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
             Clear
           </button>
         </div>
@@ -360,20 +340,11 @@ const TranscriptionPanel = ({
 
         {transcription.trim() && (
           <div className="transcription-actions">
-            <button className="copy-btn" onClick={copyToClipboard}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              Copy
+            <button type="button" className="btn-secondary copy-btn" onClick={copyWithFeedback}>
+              {copySuccess ? '✓ Copied!' : 'Copy'}
             </button>
-            <button className="download-btn" onClick={downloadTranscription}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7,10 12,15 17,10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              Download
+            <button type="button" className="btn-secondary download-btn" onClick={downloadTranscription}>
+              Download TXT
             </button>
           </div>
         )}
