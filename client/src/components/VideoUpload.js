@@ -3,8 +3,10 @@ import './VideoUpload.css';
 
 const VideoUpload = ({ onVideoUpload }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  /* eslint-disable no-unused-vars -- progress UI reserved for future upload API */
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  /* eslint-enable no-unused-vars */
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (file) => {
@@ -44,14 +46,6 @@ const VideoUpload = ({ onVideoUpload }) => {
 
   const handleClick = () => {
     fileInputRef.current.click();
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (

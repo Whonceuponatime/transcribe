@@ -61,9 +61,21 @@ const LiveTranslator = () => {
 
     return () => {
       if (socketRef.current) {
+        socketRef.current.emit('stop-recording');
         socketRef.current.disconnect();
       }
-      stopRecording();
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     };
   }, []);
 
