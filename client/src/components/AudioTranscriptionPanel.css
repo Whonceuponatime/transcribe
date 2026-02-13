@@ -1,0 +1,273 @@
+.audio-transcription-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.panel-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.panel-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.language-selector {
+  margin-bottom: 1.5rem;
+}
+
+.language-selector label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.language-selector select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: white;
+  transition: border-color 0.3s ease;
+}
+
+.language-selector select:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.file-upload {
+  margin-bottom: 1rem;
+}
+
+.file-input-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 2px dashed #007bff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #007bff;
+  font-weight: 500;
+}
+
+.file-input-label:hover {
+  background: #f8f9ff;
+  border-color: #0056b3;
+}
+
+.file-input-label svg {
+  color: #007bff;
+}
+
+.file-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.supported-formats {
+  margin-bottom: 1.5rem;
+  padding: 0.75rem;
+  background: #e8f4fd;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.supported-formats p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0056b3;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #721c24;
+  margin-bottom: 1rem;
+}
+
+.error-message svg {
+  flex-shrink: 0;
+}
+
+.progress-container {
+  margin-bottom: 1.5rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.transcribe-btn, .clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.transcribe-btn {
+  background: #007bff;
+  color: white;
+  flex: 1;
+}
+
+.transcribe-btn:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.transcribe-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.clear-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.clear-btn:hover:not(:disabled) {
+  background: #545b62;
+}
+
+.clear-btn:disabled {
+  background: #adb5bd;
+  cursor: not-allowed;
+}
+
+.transcription-result {
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.result-header h4 {
+  margin: 0;
+  color: #333;
+}
+
+.result-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copy-btn, .download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #007bff;
+  background: white;
+  color: #007bff;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.copy-btn:hover, .download-btn:hover {
+  background: #007bff;
+  color: white;
+}
+
+.transcription-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  border: none;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+.transcription-textarea:focus {
+  outline: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .audio-transcription-panel {
+    padding: 1rem;
+    margin: 1rem;
+  }
+  
+  .controls {
+    flex-direction: column;
+  }
+  
+  .result-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .result-actions {
+    justify-content: center;
+  }
+}

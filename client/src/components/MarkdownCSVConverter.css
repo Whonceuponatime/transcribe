@@ -1,0 +1,234 @@
+/* Mr. Robot Theme - Markdown/CSV Converter */
+
+.markdown-csv-converter {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.converter-header h2 {
+  color: white;
+  margin-bottom: 10px;
+  font-size: 2.2rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-header p {
+  color: white;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  min-height: 600px;
+}
+
+.left-section, .right-section {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 25px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.input-section h3, .output-section h3 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+  font-family: 'Source Code Pro', monospace;
+  border-bottom: 1px solid white;
+  padding-bottom: 10px;
+}
+
+.input-header, .output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.input-type-selector {
+  display: flex;
+  gap: 15px;
+}
+
+.input-type-selector label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+}
+
+.input-type-selector input[type="radio"] {
+  cursor: pointer;
+}
+
+.csv-settings {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #0a0a0a;
+  border: 1px solid #333;
+}
+
+.csv-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+}
+
+.csv-settings select {
+  padding: 4px 8px;
+  background-color: #191919;
+  color: white;
+  border: 1px solid white;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+}
+
+.csv-settings select:focus {
+  outline: none;
+  border-color: green;
+}
+
+.csv-settings input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.input-actions, .output-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.example-btn, .upload-btn, .convert-btn, .copy-btn, .clear-btn {
+  padding: 8px 16px;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  cursor: pointer;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.example-btn:hover, .upload-btn:hover, .convert-btn:hover, .copy-btn:hover:not(:disabled), .clear-btn:hover {
+  color: green;
+  border-color: green;
+  background-color: rgba(0, 255, 0, 0.1);
+}
+
+.copy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upload-btn {
+  position: relative;
+}
+
+.input-textarea, .output-textarea {
+  width: 100%;
+  padding: 15px;
+  background-color: #0a0a0a;
+  color: white;
+  border: 1px solid white;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 400px;
+  line-height: 1.6;
+}
+
+.input-textarea:focus, .output-textarea:focus {
+  outline: none;
+  border-color: green;
+}
+
+.output-textarea {
+  background-color: #0a0a0a;
+  cursor: text;
+}
+
+.output-info {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #0a0a0a;
+  border: 1px solid green;
+}
+
+.output-info p {
+  color: white;
+  margin: 5px 0;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+}
+
+.output-info .hint {
+  color: #00ff00;
+  font-size: 0.85rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .converter-container {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .markdown-csv-converter {
+    padding: 15px;
+  }
+  
+  .converter-header h2 {
+    font-size: 1.8rem;
+  }
+  
+  .converter-header p {
+    font-size: 1rem;
+  }
+  
+  .input-header, .output-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .input-actions, .output-actions {
+    width: 100%;
+  }
+  
+  .example-btn, .upload-btn, .convert-btn, .copy-btn, .clear-btn {
+    flex: 1;
+    min-width: 120px;
+  }
+  
+  .csv-settings {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+

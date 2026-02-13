@@ -1,0 +1,43 @@
+{
+  "name": "jack-of-clubs",
+  "version": "1.0.0",
+  "description": "Jack of clubs - A comprehensive media processing suite for transcription, metadata removal, and image conversion",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "npm run fix-permissions && nodemon --ignore 'client/*' --ignore 'node_modules/*' server.js",
+    "dev-server": "node server.js",
+    "dev-client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-client": "cd client && npm install",
+    "fix-permissions": "node fix-permissions.js",
+    "postinstall": "npm run fix-permissions",
+    "heroku-postbuild": "npm run install-client && npm run build"
+  },
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "elevenlabs-node": "^2.0.3",
+    "exif-parser": "^0.1.12",
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "multer": "^1.4.5-lts.2",
+    "openai": "^4.20.1",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.34.4",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "video",
+    "transcription",
+    "audio",
+    "speech-to-text"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

@@ -1,0 +1,333 @@
+/* Mr. Robot Theme - Clean Minimalist Transcription Panel */
+
+.transcription-panel {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid white;
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.transcription-controls {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.start-btn, .stop-btn, .clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid white;
+  background-color: transparent;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.start-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.start-btn:disabled {
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+.stop-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.browser-info {
+  font-size: 0.8rem;
+  color: white;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #191919;
+  border: 1px solid white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.error-message {
+  background-color: #191919;
+  color: white;
+  padding: 1rem;
+  border: 1px solid white;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.warning-message {
+  background-color: #191919;
+  color: green;
+  padding: 1rem;
+  border: 1px solid green;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.debug-info {
+  font-size: 0.8rem;
+  color: white;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #191919;
+  border: 1px solid white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.transcription-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.transcription-textarea {
+  flex: 1;
+  margin-bottom: 0.5rem;
+}
+
+.transcription-textarea textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  padding: 0.5rem;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+.transcription-textarea textarea:focus {
+  outline: none;
+  border-color: green;
+}
+
+.transcription-textarea textarea.listening {
+  border-color: green;
+}
+
+.transcription-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.copy-btn, .download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid white;
+  background-color: transparent;
+  color: white;
+  font-size: 0.8rem;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover, .download-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.transcription-history {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid white;
+}
+
+.transcription-history h4 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.history-item {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 0.5rem;
+  margin-bottom: 0.3rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  color: white;
+}
+
+.history-time {
+  font-weight: 500;
+}
+
+.video-time {
+  color: green;
+  font-weight: 600;
+}
+
+.history-text {
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: white;
+}
+
+.video-progress {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid white;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  color: white;
+}
+
+/* Progress bar styles */
+.progress-container {
+  margin: 0.5rem 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: #191919;
+  border: 1px solid white;
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: green;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.7rem;
+  color: white;
+  text-align: center;
+  font-family: 'Source Code Pro', monospace;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .transcription-panel {
+    padding: 0.5rem;
+  }
+  
+  .panel-header {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  
+  .transcription-controls {
+    justify-content: center;
+  }
+  
+  .transcription-textarea textarea {
+    min-height: 120px;
+  }
+}
+
+/* Scrollbar for history */
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: #191919;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: white;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+  background: green;
+}
+
+/* Animation for new history items */
+.history-item {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Success state for copy/download buttons */
+.copy-btn.success, .download-btn.success {
+  color: green;
+  border-color: green;
+}
+
+.copy-btn.success:hover, .download-btn.success:hover {
+  color: white;
+  border-color: white;
+}

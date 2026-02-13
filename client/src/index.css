@@ -1,0 +1,20 @@
+/* Mr. Robot Theme - Clean Minimalist Global Styles */
+
+body {
+  margin: 0;
+  font-family: 'Source Code Pro', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: black;
+  color: white;
+  line-height: 1.6;
+}
+
+code {
+  font-family: 'Source Code Pro', monospace;
+  color: green;
+  background-color: #191919;
+  padding: 2px 4px;
+  border-radius: 0;
+  border: 1px solid white;
+}

@@ -1,0 +1,617 @@
+/* Mr. Robot Theme - Clean Minimalist Metadata Panel */
+
+.metadata-panel {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.metadata-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.metadata-header h2 {
+  color: white;
+  margin-bottom: 10px;
+  font-size: 2.2rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.metadata-header p {
+  color: white;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.metadata-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  min-height: 600px;
+}
+
+.left-section, .right-section {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 25px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-section h3, .options-section h3 {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  font-family: 'Source Code Pro', monospace;
+  border-bottom: 1px solid white;
+  padding-bottom: 10px;
+}
+
+.upload-area {
+  position: relative;
+  border: 2px dashed white;
+  padding: 40px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background-color: transparent;
+  color: white;
+}
+
+.upload-area:hover {
+  border-color: green;
+  color: green;
+}
+
+.file-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-placeholder {
+  pointer-events: none;
+}
+
+.upload-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  color: white;
+}
+
+.upload-area:hover .upload-icon {
+  color: green;
+}
+
+.upload-placeholder p {
+  margin: 5px 0;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-placeholder p {
+  color: green;
+}
+
+.upload-hint {
+  font-size: 0.9rem;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-hint {
+  color: green;
+}
+
+.files-list {
+  margin-top: 25px;
+}
+
+.files-list h4 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.files-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid white;
+  padding: 10px;
+  background-color: transparent;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid white;
+  transition: background-color 0.2s ease;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.file-item:hover {
+  background-color: #191919;
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
+.file-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.file-name {
+  font-weight: 500;
+  color: white;
+  margin-bottom: 2px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.file-size {
+  font-size: 0.85rem;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.remove-file-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.remove-file-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.option-group {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid white;
+  transition: all 0.2s ease;
+  background-color: transparent;
+}
+
+.option-group:hover {
+  border-color: green;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  margin-bottom: 5px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.option-label input[type="checkbox"] {
+  margin-right: 10px;
+  transform: scale(1.2);
+  accent-color: green;
+}
+
+.option-description {
+  font-size: 0.9rem;
+  color: white;
+  margin: 0;
+  margin-left: 28px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.custom-fields {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid white;
+}
+
+.custom-fields h4 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.custom-field-input {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.custom-field-input input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.custom-field-input input:focus {
+  border-color: green;
+  outline: none;
+}
+
+.custom-field-input button {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.custom-field-input button:hover {
+  color: green;
+  border-color: green;
+}
+
+.custom-fields-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.custom-field-item {
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  border: 1px solid white;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  gap: 8px;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.custom-field-item button {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.custom-field-item button:hover {
+  color: green;
+  border-color: green;
+}
+
+.processing-section {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid white;
+}
+
+.process-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 15px 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.process-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.process-btn:disabled {
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+.progress-section {
+  margin-bottom: 20px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #191919;
+  border: 1px solid white;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: green;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  text-align: center;
+  color: white;
+  font-size: 0.9rem;
+  margin: 0;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.results-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: transparent;
+  border: 1px solid white;
+}
+
+.results-section h4 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.processed-files {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.processed-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid white;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.processed-file-item:last-child {
+  border-bottom: none;
+}
+
+.download-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.download-all-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  margin-bottom: 15px;
+}
+
+.download-all-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.clear-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn:disabled {
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .metadata-container {
+    gap: 25px;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .metadata-panel {
+    padding: 15px;
+  }
+  
+  .metadata-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .metadata-header h2 {
+    font-size: 1.8rem;
+  }
+  
+  .metadata-header p {
+    font-size: 1rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+  
+  .upload-area {
+    padding: 30px 15px;
+  }
+  
+  .upload-icon {
+    font-size: 2.5rem;
+  }
+  
+  .option-group {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+  
+  .files-container {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metadata-panel {
+    padding: 10px;
+  }
+  
+  .metadata-header h2 {
+    font-size: 1.6rem;
+  }
+  
+  .metadata-header p {
+    font-size: 0.9rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 15px;
+  }
+  
+  .upload-area {
+    padding: 25px 10px;
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
+  }
+  
+  .upload-placeholder p {
+    font-size: 0.9rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
+  }
+  
+  .option-group {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  
+  .option-label {
+    font-size: 0.9rem;
+  }
+  
+  .option-description {
+    font-size: 0.8rem;
+  }
+  
+  .custom-field-input input {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  
+  .custom-field-input button {
+    font-size: 0.85rem;
+    padding: 6px 12px;
+  }
+  
+  .process-btn {
+    padding: 12px 15px;
+    font-size: 1rem;
+  }
+  
+  .files-container {
+    max-height: 120px;
+  }
+  
+  .file-item {
+    padding: 8px;
+  }
+  
+  .file-name {
+    font-size: 0.9rem;
+  }
+  
+  .file-size {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .metadata-header h2 {
+    font-size: 1.4rem;
+  }
+  
+  .metadata-header p {
+    font-size: 0.85rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 12px;
+  }
+  
+  .upload-area {
+    padding: 20px 8px;
+  }
+  
+  .upload-icon {
+    font-size: 1.8rem;
+  }
+  
+  .process-btn {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}

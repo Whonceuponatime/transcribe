@@ -1,0 +1,91 @@
+# Ignore Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore environment variable files (keep .env.example committed)
+.env
+.env.*
+!.env.example
+*.env
+
+# Ignore build artifacts
+build/
+dist/
+client/build/
+client/dist/
+
+# Uploaded files and temporary audio
+uploads/
+audio/
+*.mp4
+*.mp3
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm
+
+# Logs
+logs
+*.log
+
+# Ignore runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Ignore code coverage and test output
+coverage/
+.nyc_output/
+
+# Ignore npm/yarn specific files
+jspm_packages/
+.npm/
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# Editor and system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore temp files
+*.tmp
+*.temp
+
+# Optionally ignore uploads or output directories (uncomment if needed)
+# uploads/
+# audio/
+# *.mp4
+# *.mp3
+# *.avi
+# *.mov
+# *.mkv
+# *.wmv
+# *.flv
+# *.webm
+
+# Ignore sensitive config - edit/add as relevant for your project
+api-keys.txt
+secrets.json
+config.json
+
+# Ignore Windows bat files (optional)
+*.bat
+
+# Ignore permission-related files
+fix-permissions.sh

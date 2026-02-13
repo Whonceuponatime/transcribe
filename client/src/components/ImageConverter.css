@@ -1,0 +1,718 @@
+/* Mr. Robot Theme - Clean Minimalist Image Converter */
+
+.image-converter {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.converter-header h2 {
+  color: white;
+  margin-bottom: 10px;
+  font-size: 2.2rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-header p {
+  color: white;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.format-note {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 10px 15px;
+  margin-top: 15px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.format-note p {
+  margin: 0;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converter-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  min-height: 600px;
+}
+
+.left-section, .right-section {
+  background-color: #191919;
+  border: 1px solid white;
+  padding: 25px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-section h3, .settings-section h3 {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  font-family: 'Source Code Pro', monospace;
+  border-bottom: 1px solid white;
+  padding-bottom: 10px;
+}
+
+.upload-area {
+  position: relative;
+  border: 2px dashed white;
+  padding: 40px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background-color: transparent;
+  color: white;
+}
+
+.upload-area:hover {
+  border-color: green;
+  color: green;
+}
+
+.upload-area.dragging {
+  border-color: green;
+  background-color: rgba(0, 255, 0, 0.1);
+  color: green;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-placeholder {
+  pointer-events: none;
+}
+
+.upload-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  color: white;
+}
+
+.upload-area:hover .upload-icon {
+  color: green;
+}
+
+.upload-placeholder p {
+  margin: 5px 0;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-placeholder p {
+  color: green;
+}
+
+.upload-hint {
+  font-size: 0.9rem;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.upload-area:hover .upload-hint {
+  color: green;
+}
+
+.image-converter .files-list {
+  margin-top: 25px;
+}
+
+.image-converter .files-list h4 {
+  color: white !important;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.image-converter .files-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid white;
+  padding: 10px;
+  background-color: #191919 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.image-converter .file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  transition: background-color 0.2s ease;
+  color: #ffffff !important;
+  font-family: 'Source Code Pro', monospace;
+  background-color: #191919 !important;
+  border: 1px solid #333 !important;
+  border-radius: 2px;
+}
+
+.image-converter .file-item,
+.image-converter .file-item *,
+.image-converter .file-item span,
+.image-converter .file-item div {
+  color: #ffffff !important;
+}
+
+.image-converter .file-item:hover {
+  background-color: #2a2a2a !important;
+  border-color: white !important;
+}
+
+.image-converter .file-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.image-converter .file-name,
+.image-converter .file-name * {
+  font-weight: 500;
+  color: #ffffff !important;
+  margin-bottom: 2px;
+  font-family: 'Source Code Pro', monospace;
+  background-color: transparent !important;
+}
+
+.image-converter .file-format,
+.image-converter .file-format * {
+  font-size: 0.75rem;
+  color: #ffffff !important;
+  background-color: #191919 !important;
+  border: 1px solid white;
+  padding: 2px 6px;
+  display: inline-block;
+  margin-bottom: 2px;
+  width: fit-content;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.image-converter .file-size,
+.image-converter .file-size * {
+  font-size: 0.85rem;
+  color: #ffffff !important;
+  font-family: 'Source Code Pro', monospace;
+  background-color: transparent !important;
+}
+
+.image-converter .remove-file-btn {
+  background-color: #191919 !important;
+  color: white !important;
+  border: 1px solid white !important;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  font-family: 'Source Code Pro', monospace;
+  flex-shrink: 0;
+}
+
+.image-converter .remove-file-btn:hover {
+  color: green !important;
+  border-color: green !important;
+  background-color: #2a2a2a !important;
+}
+
+.setting-group {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid white;
+  transition: all 0.2s ease;
+  background-color: transparent;
+}
+
+.setting-group:hover {
+  border-color: green;
+}
+
+.setting-label {
+  display: block;
+  font-weight: 500;
+  color: white;
+  margin-bottom: 8px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.setting-description {
+  font-size: 0.9rem;
+  color: white !important;
+  margin: 5px 0 0 0;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.format-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+}
+
+.format-select:focus {
+  outline: none;
+  border-color: green;
+}
+
+.format-select option {
+  background-color: #191919;
+  color: white;
+}
+
+.quality-slider {
+  width: 100%;
+  margin: 10px 0;
+  cursor: pointer;
+  accent-color: green;
+}
+
+.quality-hint {
+  font-size: 0.8rem;
+  color: white;
+  text-align: center;
+  margin-top: 5px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.resize-settings {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #191919;
+  border: 1px solid white;
+}
+
+.dimension-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.dimension-input {
+  display: flex;
+  flex-direction: column;
+}
+
+.dimension-input label {
+  font-size: 0.9rem;
+  color: white !important;
+  margin-bottom: 5px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.dimension-input input {
+  padding: 8px 12px;
+  border: 1px solid white;
+  background-color: #191919;
+  color: white;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.dimension-input input:focus {
+  outline: none;
+  border-color: green;
+}
+
+.conversion-section {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid white;
+}
+
+.convert-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 15px 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'Source Code Pro', monospace;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.convert-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.convert-btn:disabled {
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+.progress-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #191919;
+  border: 1px solid white;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #0a0a0a;
+  border: 1px solid white;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00cc00);
+  transition: width 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-text {
+  text-align: center;
+  color: white !important;
+  font-size: 0.9rem;
+  margin: 0;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 500;
+}
+
+.results-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: transparent;
+  border: 1px solid white;
+}
+
+.results-section h4 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converted-files {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.converted-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid white;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.converted-file-item:last-child {
+  border-bottom: none;
+}
+
+.download-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.download-all-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  margin-bottom: 15px;
+}
+
+.download-all-btn:hover {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn {
+  width: 100%;
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.clear-btn:hover:not(:disabled) {
+  color: green;
+  border-color: green;
+}
+
+.clear-btn:disabled {
+  background-color: #191919;
+  color: #666;
+  border-color: #666;
+  cursor: not-allowed;
+}
+
+.bulk-select-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.bulk-select-btn:hover {
+  color: green;
+  border-color: green;
+  background-color: rgba(0, 255, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .converter-container {
+    gap: 25px;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .image-converter {
+    padding: 15px;
+  }
+  
+  .converter-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .converter-header h2 {
+    font-size: 1.8rem;
+  }
+  
+  .converter-header p {
+    font-size: 1rem;
+  }
+  
+  .format-note {
+    margin-top: 10px;
+    padding: 8px 12px;
+  }
+  
+  .format-note p {
+    font-size: 0.85rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 20px;
+  }
+  
+  .upload-area {
+    padding: 30px 15px;
+  }
+  
+  .upload-icon {
+    font-size: 2.5rem;
+  }
+  
+  .dimension-inputs {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .setting-group {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+  
+  .files-container {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .image-converter {
+    padding: 10px;
+  }
+  
+  .converter-header h2 {
+    font-size: 1.6rem;
+  }
+  
+  .converter-header p {
+    font-size: 0.9rem;
+  }
+  
+  .format-note {
+    padding: 6px 10px;
+  }
+  
+  .format-note p {
+    font-size: 0.8rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 15px;
+  }
+  
+  .upload-area {
+    padding: 25px 10px;
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
+  }
+  
+  .upload-placeholder p {
+    font-size: 0.9rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
+  }
+  
+  .setting-group {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  
+  .setting-label {
+    font-size: 0.9rem;
+  }
+  
+  .setting-description {
+    font-size: 0.8rem;
+  }
+  
+  .format-select {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  
+  .dimension-input input {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+  
+  .convert-btn {
+    padding: 12px 15px;
+    font-size: 1rem;
+  }
+  
+  .files-container {
+    max-height: 120px;
+  }
+  
+  .file-item {
+    padding: 8px;
+  }
+  
+  .file-name {
+    font-size: 0.9rem;
+  }
+  
+  .file-format {
+    font-size: 0.7rem;
+    padding: 1px 4px;
+  }
+  
+  .file-size {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .converter-header h2 {
+    font-size: 1.4rem;
+  }
+  
+  .converter-header p {
+    font-size: 0.85rem;
+  }
+  
+  .left-section, .right-section {
+    padding: 12px;
+  }
+  
+  .upload-area {
+    padding: 20px 8px;
+  }
+  
+  .upload-icon {
+    font-size: 1.8rem;
+  }
+  
+  .convert-btn {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}
