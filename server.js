@@ -1160,6 +1160,7 @@ Output rules (must follow):
 - Keep the original intent and tone. Do not introduce new claims, promises, or commitments.
 - Keep structure similar unless improvement is necessary for clarity. Keep paragraphs and line breaks appropriate for the chosen channel.
 - If the draft contains placeholders like [Attachment], [Name], TBD, keep them as-is.
+- Vocabulary placeholder: If the draft contains <??TEXT??> (or <??...??> with any hint inside), replace it with a single suitable word or correct phrase that fits the context. TEXT may be a rough idea, a near-synonym, a wrong word, or a short description—choose the most natural, professional vocabulary for the sentence, tone, and channel. Output only the replacement word/phrase in place; do not keep the angle brackets or add explanations.
 - If the draft includes a subject line, keep it as a subject line. Do not invent a subject if none is provided.
 
 Now apply the language + channel style rules provided below.`;

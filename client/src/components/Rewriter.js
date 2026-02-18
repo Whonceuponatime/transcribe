@@ -135,6 +135,7 @@ export default function Rewriter() {
       <div className="rewriter-panes">
         <div className="rewriter-pane rewriter-pane--draft">
           <label className="rewriter-pane-label">Draft</label>
+          <span className="rewriter-hint">Use <code>&lt;??word or hint??&gt;</code> for the AI to suggest the right vocabulary.</span>
           <textarea
             className="rewriter-textarea"
             placeholder="Paste or type your email or announcement draft…"
