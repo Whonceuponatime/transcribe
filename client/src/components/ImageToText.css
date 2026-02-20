@@ -1,0 +1,209 @@
+/* Image to Text – two-pane layout, design tokens */
+
+.image-to-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.image-to-text-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.image-to-text-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.image-to-text-option label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.image-to-text-option select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  min-width: 160px;
+}
+
+.image-to-text-option select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.image-to-text-panes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  min-height: 200px;
+}
+
+@media (min-width: 769px) {
+  .image-to-text-panes {
+    grid-template-columns: 1fr 1fr;
+    min-height: 280px;
+  }
+}
+
+.image-to-text-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.image-to-text-pane-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.image-to-text-dropzone {
+  flex: 1;
+  min-height: 180px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.image-to-text-dropzone.has-image {
+  border-style: solid;
+  padding: 0.5rem;
+}
+
+.image-to-text-dropzone-hint {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.image-to-text-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.image-to-text-preview-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.image-to-text-preview {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.image-to-text-filename {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.image-to-text-remove {
+  font-size: 0.8rem;
+}
+
+.image-to-text-instructions {
+  margin-top: 0.25rem;
+}
+
+.image-to-text-instructions label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+}
+
+.image-to-text-instructions-input {
+  width: 100%;
+  min-height: 56px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.image-to-text-instructions-input::placeholder {
+  color: var(--text-hint);
+}
+
+.image-to-text-instructions-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.image-to-text-output {
+  flex: 1;
+  min-height: 200px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  overflow: auto;
+}
+
+.image-to-text-plain {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.image-to-text-placeholder {
+  color: var(--text-hint);
+  font-size: 0.9rem;
+}
+
+.image-to-text-loading {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.image-to-text-error {
+  color: var(--destructive);
+  font-size: 0.9rem;
+}
+
+.image-to-text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

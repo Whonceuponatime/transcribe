@@ -27,6 +27,7 @@ const CATEGORIES = {
     shortLabel: 'Tools',
     tools: [
       { id: 'rewriter', label: 'Email Rewriter', icon: '✉️' },
+      { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
     ],
