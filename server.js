@@ -1254,7 +1254,7 @@ app.post('/api/rewrite', async (req, res) => {
         { role: 'system', content: instructions },
         { role: 'user', content: userInput }
       ],
-      max_tokens: Math.max(2048, Math.ceil(draftTrimmed.length * 2.5)),
+      max_completion_tokens: Math.max(2048, Math.ceil(draftTrimmed.length * 2.5)),
       temperature: 0.3
     });
 
