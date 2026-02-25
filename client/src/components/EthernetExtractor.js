@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import './EthernetExtractor.css';
+import { supabase } from '../lib/supabase';
 
 export default function EthernetExtractor() {
   const [files, setFiles] = useState([]);
   const [vesselId, setVesselId] = useState('');
   const [strictEthernet, setStrictEthernet] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(''); // "uploading" | "extracting"
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [activeTab, setActiveTab] = useState('edges');
@@ -38,26 +40,56 @@ export default function EthernetExtractor() {
       setError('Please upload at least one PDF.');
       return;
     }
+    if (!supabase) {
+      setError('Supabase is not configured. Ethernet extraction requires Supabase Storage.');
+      return;
+    }
     setError(null);
     setLoading(true);
     setResult(null);
+    setLoadingStatus('uploading');
+    const statusTimer = setTimeout(() => setLoadingStatus('extracting'), 2000);
     try {
-      const form = new FormData();
-      files.forEach(f => form.append('files', f));
-      form.append('vesselId', vesselId || 'default');
-      form.append('strictEthernet', strictEthernet);
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const storagePaths = [];
+      const fileNames = files.map(f => f.name);
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const ext = file.name.toLowerCase().endsWith('.pdf') ? '' : '.pdf';
+        const path = `temp/${jobId}/${encodeURIComponent(file.name)}${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('ethernet-pdfs')
+          .upload(path, file, { contentType: 'application/pdf', upsert: true });
+        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
+        storagePaths.push(path);
+      }
+
+      clearTimeout(statusTimer);
+      setLoadingStatus('extracting');
+
       const res = await fetch('/api/ethernet/extract', {
         method: 'POST',
-        body: form
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storagePaths,
+          vesselId: vesselId || 'default',
+          strictEthernet,
+          fileNames
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.details || data.error || 'Extraction failed');
       setResult(data);
+
+      await supabase.storage.from('ethernet-pdfs').remove(storagePaths);
     } catch (e) {
       setError(e.message);
       setResult(null);
     } finally {
+      clearTimeout(statusTimer);
       setLoading(false);
+      setLoadingStatus('');
     }
   };
 
@@ -171,14 +203,21 @@ export default function EthernetExtractor() {
           />
         </div>
         {files.length > 0 && (
-          <ul className="ethernet-file-list">
-            {files.map((f, i) => (
-              <li key={i}>
-                <span>{f.name}</span>
-                <button type="button" className="btn-ghost" onClick={() => removeFile(i)}>Remove</button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="ethernet-ready-banner">
+              <span className="ethernet-ready-icon" aria-hidden>✓</span>
+              <span>{files.length} PDF{files.length !== 1 ? 's' : ''} ready — click Extract to start</span>
+            </div>
+            <ul className="ethernet-file-list">
+              {files.map((f, i) => (
+                <li key={i}>
+                  <span>{f.name}</span>
+                  <span className="ethernet-file-size">({(f.size / 1024).toFixed(1)} KB)</span>
+                  <button type="button" className="btn-ghost" onClick={() => removeFile(i)}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
         <div className="ethernet-actions">
           <button
@@ -187,10 +226,26 @@ export default function EthernetExtractor() {
             disabled={!files.length || loading}
             onClick={runExtraction}
           >
-            {loading ? 'Extracting…' : 'Extract Ethernet Connections'}
+            {loading ? (
+              <span className="ethernet-btn-loading">
+                <span className="ethernet-spinner" aria-hidden />
+                {loadingStatus === 'uploading' ? 'Uploading PDFs…' : 'Extracting connections…'}
+              </span>
+            ) : (
+              'Extract Ethernet Connections'
+            )}
           </button>
-          <button type="button" className="btn-ghost" onClick={clearAll}>Clear</button>
+          <button type="button" className="btn-ghost" onClick={clearAll} disabled={loading}>Clear</button>
         </div>
+        {loading && (
+          <div className="ethernet-loading-status">
+            <div className="ethernet-loading-row">
+              <span className="ethernet-spinner" aria-hidden />
+              <span>{loadingStatus === 'uploading' ? 'Uploading PDFs to server…' : 'Analyzing cable diagrams…'}</span>
+            </div>
+            <p className="ethernet-loading-hint">This may take a moment for large files.</p>
+          </div>
+        )}
       </div>
 
       {error && <div className="ethernet-error">{error}</div>}

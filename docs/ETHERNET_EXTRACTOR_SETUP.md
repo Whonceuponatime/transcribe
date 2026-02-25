@@ -4,35 +4,42 @@
 
 The **Extract Ethernet Connections (PDF)** feature parses vessel cable-diagram PDFs and produces a system-to-system Ethernet connection list with cable IDs, media types, page references, confidence scores, and a review list for unpaired/ambiguous items.
 
-## Supabase Setup (Optional for MVP)
+**PDFs are uploaded to Supabase Storage first**, then the API fetches them for processing. This avoids Vercel’s ~4.5 MB request body limit.
 
-To persist jobs and store PDFs in Supabase:
+## Supabase Setup (Required)
 
-### 1. Run Migration
+### 1. Run Migrations
 
 ```bash
 # If using Supabase CLI
 supabase db push
 
 # Or run manually in Supabase SQL Editor:
-# Copy contents of supabase/migrations/001_ethernet_jobs.sql
+# 1. supabase/migrations/001_ethernet_jobs.sql
+# 2. supabase/migrations/002_ethernet_storage.sql
 ```
 
 ### 2. Storage Bucket
 
-Create a bucket `vessel-cables` in Supabase Storage (Dashboard → Storage → New bucket).
-Set RLS policies as needed for your app.
+The migration `002_ethernet_storage.sql` creates the `ethernet-pdfs` bucket and RLS policies. Authenticated users can upload; the service role can read for processing.
 
 ### 3. Environment Variables
 
+**Client** (already configured for auth):
+- `REACT_APP_SUPABASE_URL`
+- `REACT_APP_SUPABASE_ANON_KEY`
+
+**Server / Vercel API** (required for ethernet extraction):
 - `SUPABASE_URL` – Project URL
-- `SUPABASE_SERVICE_ROLE_KEY` – For server-side uploads and DB writes
+- `SUPABASE_SERVICE_ROLE_KEY` – For server-side Storage downloads
 
-## Current Behavior (MVP)
+Add these in Vercel → Project → Settings → Environment Variables.
 
-- **Without Supabase**: PDFs are uploaded to the server, processed in-memory, and results are returned directly. No persistence.
-- **Local dev**: Run `npm run dev` (backend) and ensure client proxy points to it. Use `/api/ethernet/extract`.
-- **Vercel**: The `api/ethernet/extract.js` serverless function handles the request. Uses `/tmp` for temporary file storage. Large PDFs may hit execution limits (60s pro plan).
+## Current Behavior
+
+- **Client**: Uploads PDFs to `ethernet-pdfs` bucket → calls API with storage paths (small JSON payload).
+- **API**: Fetches PDFs from Storage → processes → returns results → client deletes temp files from Storage.
+- **Vercel**: No payload limit issue; execution time limits still apply (60s pro plan).
 
 ## Cable ID Patterns Supported
 

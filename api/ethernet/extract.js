@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { IncomingForm } = require('formidable');
+const { createClient } = require('@supabase/supabase-js');
 const { extractEthernetConnections } = require('../../lib/ethernetExtractor');
 
 module.exports = async function handler(req, res) {
@@ -11,56 +11,49 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    res.status(503).json({
+      error: 'Supabase not configured',
+      details: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for ethernet extraction.'
+    });
+    return;
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ethernet-'));
   const pdfPaths = [];
 
   try {
-    const form = new IncomingForm({
-      uploadDir: tmpDir,
-      keepExtensions: true,
-      maxFileSize: 50 * 1024 * 1024
-    });
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const { storagePaths, vesselId = 'default', strictEthernet = false, fileNames = [] } = body;
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, f, fileList) => {
-        if (err) reject(err);
-        else resolve({ fields: f, files: fileList });
-      });
-    });
-
-    const fileList = Array.isArray(files.files) ? files.files : (files.files ? [files.files] : []);
-    if (fileList.length === 0) {
-      cleanup();
-      res.status(400).json({ error: 'No PDF files uploaded' });
+    if (!storagePaths || !Array.isArray(storagePaths) || storagePaths.length === 0) {
+      res.status(400).json({ error: 'storagePaths array is required (upload PDFs to Supabase Storage first).' });
       return;
     }
 
-    for (const f of fileList) {
-      if (f.filepath && fs.existsSync(f.filepath)) {
-        const ext = path.extname(f.originalFilename || '').toLowerCase();
-        const dest = path.join(tmpDir, `file-${Date.now()}-${Math.random().toString(36).slice(2)}${ext || '.pdf'}`);
-        fs.renameSync(f.filepath, dest);
-        pdfPaths.push(dest);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    for (let i = 0; i < storagePaths.length; i++) {
+      const storagePath = storagePaths[i];
+      const { data, error } = await supabase.storage.from('ethernet-pdfs').download(storagePath);
+      if (error) {
+        throw new Error(`Failed to fetch ${storagePath}: ${error.message}`);
       }
+      const buf = Buffer.from(await data.arrayBuffer());
+      const localPath = path.join(tmpDir, `file-${i}${path.extname(storagePath) || '.pdf'}`);
+      fs.writeFileSync(localPath, buf);
+      pdfPaths.push(localPath);
     }
-
-    if (pdfPaths.length === 0) {
-      cleanup();
-      res.status(400).json({ error: 'No valid PDF files' });
-      return;
-    }
-
-    const vesselId = (fields.vesselId && fields.vesselId[0]) ? String(fields.vesselId[0]).trim() : 'default';
-    const strictEthernet = (fields.strictEthernet && fields.strictEthernet[0]) === 'true';
-    const fileNames = fileList.map(f => f.originalFilename || 'unknown.pdf');
 
     const result = await extractEthernetConnections(pdfPaths, { strictEthernet });
     cleanup();
 
     res.status(200).json({
       success: true,
-      vesselId,
-      fileNames,
+      vesselId: String(vesselId).trim() || 'default',
+      fileNames: Array.isArray(fileNames) ? fileNames : storagePaths.map(p => path.basename(p)),
       edges: result.edges,
       review: result.review,
       summary: result.summary
