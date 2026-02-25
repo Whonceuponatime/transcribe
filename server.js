@@ -1318,6 +1318,49 @@ Preserve line breaks and paragraph structure. Do not add commentary or labels—
   }
 });
 
+// ========== Ethernet cable extraction (vessel cable diagrams) ==========
+const { extractEthernetConnections } = require('./lib/ethernetExtractor');
+
+app.post('/api/ethernet/extract', pdfUpload.array('files', 20), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No PDF files uploaded' });
+    }
+    const vesselId = (req.body.vesselId || '').trim() || 'default';
+    const strictEthernet = req.body.strictEthernet === 'true' || req.body.strictEthernet === true;
+
+    const pdfPaths = req.files.map(f => f.path);
+    const fileNames = req.files.map(f => f.originalname);
+
+    const result = await extractEthernetConnections(pdfPaths, { strictEthernet });
+
+    // Clean up
+    for (const f of req.files) {
+      try { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); } catch (_) {}
+    }
+
+    res.json({
+      success: true,
+      vesselId,
+      fileNames,
+      edges: result.edges,
+      review: result.review,
+      summary: result.summary
+    });
+  } catch (error) {
+    console.error('Ethernet extraction error:', error);
+    if (req.files) {
+      for (const f of req.files) {
+        try { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); } catch (_) {}
+      }
+    }
+    res.status(500).json({
+      error: 'Ethernet extraction failed',
+      details: error.message
+    });
+  }
+});
+
 // Metadata processing endpoint
 app.post('/api/process-metadata', mediaUpload.array('files', 10), async (req, res) => {
   try {

@@ -16,6 +16,7 @@ import LiveTranslator from './components/LiveTranslator';
 import MarkdownCSVConverter from './components/MarkdownCSVConverter';
 import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
+import EthernetExtractor from './components/EthernetExtractor';
 
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
@@ -137,6 +138,8 @@ function App() {
           <ZigzagMerger />
         ) : activeTab === 'translator' ? (
           <LiveTranslator />
+        ) : activeTab === 'ethernet' ? (
+          <EthernetExtractor />
         ) : activeTab === 'markdown-csv' ? (
           <MarkdownCSVConverter />
         ) : (
