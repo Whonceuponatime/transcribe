@@ -1247,8 +1247,9 @@ app.post('/api/rewrite', async (req, res) => {
     const instructions = REWRITE_GLOBAL_INSTRUCTIONS + '\n\n' +
       (language === 'ko' ? REWRITE_KOREAN_INSTRUCTIONS : REWRITE_ENGLISH_INSTRUCTIONS);
 
+    const rewriteModel = process.env.REWRITE_MODEL || 'gpt-5.2-2025-12-11';
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: rewriteModel,
       messages: [
         { role: 'system', content: instructions },
         { role: 'user', content: userInput }
