@@ -56,13 +56,12 @@ export default function EthernetExtractor() {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const ext = file.name.toLowerCase().endsWith('.pdf') ? '' : '.pdf';
-        const path = `temp/${jobId}/${encodeURIComponent(file.name)}${ext}`;
+        const safePath = `temp/${jobId}/${i}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('ethernet-pdfs')
-          .upload(path, file, { contentType: 'application/pdf', upsert: true });
+          .upload(safePath, file, { contentType: 'application/pdf', upsert: true });
         if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
-        storagePaths.push(path);
+        storagePaths.push(safePath);
       }
 
       clearTimeout(statusTimer);

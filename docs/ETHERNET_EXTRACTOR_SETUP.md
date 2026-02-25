@@ -23,6 +23,18 @@ supabase db push
 
 The migration `002_ethernet_storage.sql` creates the `ethernet-pdfs` bucket and RLS policies. Authenticated users can upload; the service role can read for processing.
 
+### 2b. CORS / 502 errors on upload
+
+If you see "Access-Control-Allow-Origin" or 502 when uploading:
+
+1. **Create bucket manually** (if migration failed): Dashboard → **Storage** → **New bucket** → Name: `ethernet-pdfs`, Private, Max size: 50 MB, Allowed types: `application/pdf`.
+
+2. **Set Site URL**: Dashboard → **Project Settings** → **Authentication** → **URL Configuration** → **Site URL** = your app URL (e.g. `https://your-app.vercel.app` or `http://localhost:3000`). Add `http://localhost:3000` to **Redirect URLs** for local dev.
+
+3. **RLS policies**: Ensure the migration `002_ethernet_storage.sql` ran so `authenticated` users can INSERT and SELECT. Or add policies in Storage → `ethernet-pdfs` → Policies.
+
+4. **Check Supabase status**: [status.supabase.com](https://status.supabase.com) for outages.
+
 ### 3. Environment Variables
 
 **Client** (already configured for auth):

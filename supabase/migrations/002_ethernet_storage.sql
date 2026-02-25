@@ -1,4 +1,5 @@
 -- Storage bucket for Ethernet PDF uploads (avoids Vercel payload limit)
+-- Run this in Supabase SQL Editor, or create bucket manually: Storage → New bucket → id: ethernet-pdfs, Private, 50MB, PDF only
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'ethernet-pdfs',
@@ -7,7 +8,9 @@ VALUES (
   52428800,
   ARRAY['application/pdf']
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  file_size_limit = 52428800,
+  allowed_mime_types = ARRAY['application/pdf'];
 
 -- Allow authenticated users to upload
 DROP POLICY IF EXISTS "Authenticated users can upload ethernet PDFs" ON storage.objects;
