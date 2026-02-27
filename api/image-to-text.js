@@ -22,26 +22,38 @@ module.exports = async function handler(req, res) {
 
     const openai = new OpenAI({ apiKey });
     const body = req.body || {};
-    const { image: imageDataUrl, format = 'plain', instructions: userInstructions } = body;
+    const { image: imageDataUrl, images: imagesRaw, format = 'plain', instructions: userInstructions } = body;
 
-    if (!imageDataUrl || typeof imageDataUrl !== 'string') {
-      res.status(400).json({ error: 'Image is required (data URL or base64).' });
+    const imageList = Array.isArray(imagesRaw) && imagesRaw.length > 0
+      ? imagesRaw.filter(u => u && typeof u === 'string')
+      : (imageDataUrl && typeof imageDataUrl === 'string' ? [imageDataUrl] : []);
+
+    if (imageList.length === 0) {
+      res.status(400).json({ error: 'At least one image is required (images array or image).' });
       return;
     }
 
-    const systemText = `You are an accurate OCR and transcription assistant. Your task is to transcribe all text visible in the image into the requested format.
+    const multiImage = imageList.length > 1;
+    const systemText = `You are an accurate OCR and transcription assistant. Your task is to transcribe all text visible in the image(s) into the requested format.
 ${FORMAT_INSTRUCTIONS[format] || FORMAT_INSTRUCTIONS.plain}
-Preserve line breaks and paragraph structure. Do not add commentary or labels—output only the transcribed content.`;
+Preserve line breaks and paragraph structure. Do not add commentary or labels—output only the transcribed content.${multiImage ? `
 
-    const userContent = [
-      { type: 'image_url', image_url: { url: imageDataUrl } }
-    ];
+You will receive ${imageList.length} images in sequence. Transcribe each image in order. Between transcriptions, add a clear separator so the reader knows where one image ends and the next begins. Use this format:
+--- Image 2 ---
+(or --- Image 3 ---, etc. for subsequent images)
+
+Maintain consistent formatting within each section. The first image needs no header.` : ''}`;
+
+    const userContent = [];
     if (userInstructions && userInstructions.trim()) {
-      userContent.unshift({
+      userContent.push({
         type: 'text',
-        text: `User instructions: ${userInstructions.trim()}\n\nTranscribe the image below according to these instructions.`
+        text: `User instructions: ${userInstructions.trim()}\n\nTranscribe the image(s) below according to these instructions.${multiImage ? ` Process ${imageList.length} images in order.` : ''}`
       });
     }
+    imageList.forEach((url) => {
+      userContent.push({ type: 'image_url', image_url: { url } });
+    });
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -49,7 +61,7 @@ Preserve line breaks and paragraph structure. Do not add commentary or labels—
         { role: 'system', content: systemText },
         { role: 'user', content: userContent }
       ],
-      max_tokens: 4096,
+      max_tokens: Math.min(16384, 4096 * imageList.length),
       temperature: 0.2
     });
 
