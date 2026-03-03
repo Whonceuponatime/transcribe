@@ -37,10 +37,18 @@ function getCableId(edge) {
   return edge.cableIdNormalized ?? edge.cableId ?? '—';
 }
 
-function applyFilters(edges, filters) {
+function applyFilters(edges, filters, sheetFilter) {
   const { minConfidence, showInternal, includeUnknown, search } = filters;
+  let list = edges || [];
+  if (sheetFilter) {
+    list = list.filter((e) =>
+      (e.sheetRefs || e.pageRefs || []).some(
+        (r) => r.fileName === sheetFilter.fileName && r.page === sheetFilter.page
+      )
+    );
+  }
   const conf = minConfidence / 100;
-  let list = (edges || []).filter((e) => (e.confidence ?? 0) >= conf);
+  list = list.filter((e) => (e.confidence ?? 0) >= conf);
   const tagOk = (e) => {
     if (e.tag === 'internal') return showInternal;
     if (e.tag === 'unknown') return includeUnknown;
@@ -87,8 +95,8 @@ function getLayoutedNodesEdges(nodes, edges, direction = 'LR') {
   return { nodes: layoutedNodes, edges };
 }
 
-function buildTopologyGraph(result, filters) {
-  const edges = applyFilters(result.edges || [], filters);
+function buildTopologyGraph(result, filters, sheetFilter = null) {
+  const edges = applyFilters(result.edges || [], filters, sheetFilter);
   const nodeIds = new Set();
   edges.forEach((e) => {
     const fromL = getEndpointLabel(e.from);
@@ -121,7 +129,7 @@ function buildTopologyGraph(result, filters) {
 }
 
 function buildCableCentricGraph(result, filters) {
-  const review = result.review || [];
+  const review = (result.review || []).filter((r) => r.type !== 'symbol_or_component');
   const { minConfidence, search } = filters;
   const conf = minConfidence / 100;
   const q = search && search.trim() ? search.trim().toLowerCase() : '';
@@ -193,43 +201,66 @@ function CableNode({ data }) {
 
 const nodeTypes = { cable: CableNode };
 
+function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge }) {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  return (
+    <div className="ethernet-diagram-flow-wrap">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={(_, node) => onSelectNode(node.id, node.data)}
+        onEdgeClick={(_, edge) => onSelectEdge(edge.id, edge.data)}
+        nodeTypes={nodeTypes}
+        fitView
+        minZoom={0.2}
+        maxZoom={1.5}
+      >
+        <Background />
+        <Controls />
+        <MiniMap />
+      </ReactFlow>
+    </div>
+  );
+}
+
 function DiagramInner({ result, onSelectNode, onSelectEdge }) {
   const [mode, setMode] = useState('topology');
   const [minConfidence, setMinConfidence] = useState(0);
   const [showInternal, setShowInternal] = useState(false);
   const [includeUnknown, setIncludeUnknown] = useState(true);
   const [search, setSearch] = useState('');
+  const [groupBySheet, setGroupBySheet] = useState(false);
   const filters = useMemo(
     () => ({ minConfidence, showInternal, includeUnknown, search }),
     [minConfidence, showInternal, includeUnknown, search]
   );
 
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+  const sheets = result?.sheets || [];
+  const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0;
+
+  const singleGraph = useMemo(() => {
     if (!result) return { nodes: [], edges: [] };
     if (mode === 'cable') return buildCableCentricGraph(result, filters);
-    return buildTopologyGraph(result, filters);
+    return buildTopologyGraph(result, filters, null);
   }, [result, mode, filters]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
-
-  const onNodeClick = useCallback(
-    (_, node) => {
-      onSelectNode(node.id, node.data);
-    },
-    [onSelectNode]
-  );
-  const onEdgeClick = useCallback(
-    (_, edge) => {
-      onSelectEdge(edge.id, edge.data);
-    },
-    [onSelectEdge]
-  );
+  const sheetsGraphs = useMemo(() => {
+    if (!groupBySheetEnabled || !result) return [];
+    return sheets.map((sheet) => {
+      const { nodes: n, edges: e } = buildTopologyGraph(result, filters, {
+        fileName: sheet.fileName,
+        page: sheet.page
+      });
+      return { sheet, nodes: n, edges: e };
+    });
+  }, [result, filters, sheets, groupBySheetEnabled]);
 
   return (
     <div className="ethernet-diagram-toolbar">
@@ -237,7 +268,7 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
         <label>
           Mode:
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="topology">Topology</option>
+            <option value="topology">Topology (system-level)</option>
             <option value="cable">Cable-centric</option>
           </select>
         </label>
@@ -261,6 +292,12 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
               <input type="checkbox" checked={includeUnknown} onChange={(e) => setIncludeUnknown(e.target.checked)} />
               Include unknown
             </label>
+            {sheets.length > 0 && (
+              <label>
+                <input type="checkbox" checked={groupBySheet} onChange={(e) => setGroupBySheet(e.target.checked)} />
+                Group by sheet
+              </label>
+            )}
           </>
         )}
         <input
@@ -271,24 +308,34 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      <div className="ethernet-diagram-flow-wrap">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          minZoom={0.2}
-          maxZoom={1.5}
-        >
-          <Background />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
-      </div>
+      {groupBySheetEnabled && sheetsGraphs.length > 0 ? (
+        <div className="ethernet-diagram-by-sheet">
+          {sheetsGraphs.map(({ sheet, nodes: n, edges: e }) => (
+            <div key={`${sheet.fileName}-${sheet.page}`} className="ethernet-diagram-sheet-group">
+              <h4 className="ethernet-diagram-sheet-title">
+                {sheet.sheetTitle} — {sheet.fileName} p.{sheet.page}
+              </h4>
+              {n.length > 0 || e.length > 0 ? (
+                <SingleDiagram
+                  initialNodes={n}
+                  initialEdges={e}
+                  onSelectNode={onSelectNode}
+                  onSelectEdge={onSelectEdge}
+                />
+              ) : (
+                <p className="ethernet-diagram-sheet-empty">No system-level edges on this sheet.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <SingleDiagram
+          initialNodes={singleGraph.nodes}
+          initialEdges={singleGraph.edges}
+          onSelectNode={onSelectNode}
+          onSelectEdge={onSelectEdge}
+        />
+      )}
     </div>
   );
 }
@@ -373,9 +420,13 @@ function SidePanel({ selection, result, onClose }) {
             <button type="button" className="ethernet-diagram-panel-close" onClick={onClose}>×</button>
           </div>
           <div className="ethernet-diagram-panel-section">
-            <strong>Occurrences</strong>
+            <strong>Two occurrences used to pair (file + page)</strong>
             {occ.map((o, i) => (
-              <div key={i}>{o.fileName} p.{o.page} — “{o.foundCableIdText}” → {o.endpointLabelPicked}</div>
+              <div key={i} className="ethernet-diagram-occurrence-ref">
+                <span className="ethernet-diagram-file-page">{o.fileName} p.{o.page}</span>
+                {o.sheetTitle && <span className="ethernet-diagram-sheet-ref"> — {o.sheetTitle}</span>}
+                <span> “{o.foundCableIdText}” → {o.endpointLabelPicked}</span>
+              </div>
             ))}
             <strong>Evidence</strong>
             <ul className="ethernet-diagram-evidence">
@@ -385,6 +436,9 @@ function SidePanel({ selection, result, onClose }) {
                 </li>
               ))}
             </ul>
+            <p className="ethernet-diagram-highlight-hint">
+              Highlight on original page: open the PDF at the file and page above to verify. In-app overlay (future).
+            </p>
           </div>
         </div>
       );

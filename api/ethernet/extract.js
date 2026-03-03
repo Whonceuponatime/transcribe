@@ -43,7 +43,8 @@ function emptyResponse(job, vesselId, fileNames) {
       ai: { used: false, passesRun: 0 }
     },
     warnings: [],
-    errors: []
+    errors: [],
+    sheets: []
   };
 }
 
@@ -138,7 +139,8 @@ module.exports = async function handler(req, res) {
       review: result.review,
       summary: result.summary,
       warnings: result.warnings || [],
-      errors: result.errors || []
+      errors: result.errors || [],
+      sheets: result.sheets || []
     });
   } catch (error) {
     cleanup();

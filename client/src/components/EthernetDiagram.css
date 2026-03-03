@@ -169,3 +169,51 @@
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+.ethernet-diagram-by-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ethernet-diagram-sheet-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  background: var(--bg-surface);
+}
+
+.ethernet-diagram-sheet-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ethernet-diagram-sheet-empty {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ethernet-diagram-occurrence-ref {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.ethernet-diagram-file-page {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.ethernet-diagram-sheet-ref {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.ethernet-diagram-highlight-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

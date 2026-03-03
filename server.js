@@ -1440,7 +1440,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
         ai: { used: false, passesRun: 0 }
       },
       warnings: [],
-      errors: []
+      errors: [],
+      sheets: []
     };
   }
 
@@ -1487,7 +1488,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
       review: result.review,
       summary: result.summary,
       warnings: result.warnings || [],
-      errors: result.errors || []
+      errors: result.errors || [],
+      sheets: result.sheets || []
     });
   } catch (error) {
     console.error('Ethernet extraction error:', error);
