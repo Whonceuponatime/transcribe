@@ -80,6 +80,7 @@
   inset: 0;
   opacity: 0;
   cursor: pointer;
+  pointer-events: none;
 }
 
 .ethernet-file-list {

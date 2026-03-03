@@ -31,6 +31,12 @@ export default function EthernetExtractor() {
     e.target.value = '';
   };
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  };
+
   const removeFile = (idx) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));
   };
@@ -209,7 +215,12 @@ export default function EthernetExtractor() {
         <div
           className="ethernet-dropzone"
           onDrop={handleDrop}
-          onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragOver}
+          onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
         >
           <p>Drop PDFs here or click to select</p>
           <input
@@ -219,6 +230,7 @@ export default function EthernetExtractor() {
             multiple
             onChange={handleFileSelect}
             className="ethernet-file-input"
+            aria-hidden
           />
         </div>
         {files.length > 0 && (
