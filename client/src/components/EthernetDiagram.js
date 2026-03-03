@@ -242,7 +242,7 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
     [minConfidence, showInternal, includeUnknown, search]
   );
 
-  const sheets = result?.sheets || [];
+  const sheets = useMemo(() => result?.sheets ?? [], [result?.sheets]);
   const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0;
 
   const singleGraph = useMemo(() => {
