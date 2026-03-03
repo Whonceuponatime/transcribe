@@ -232,11 +232,14 @@ function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge 
 
 function DiagramInner({ result, onSelectNode, onSelectEdge }) {
   const [mode, setMode] = useState('topology');
-  const [minConfidence, setMinConfidence] = useState(0);
+  // Default to higher confidence to avoid spaghetti graphs
+  const [minConfidence, setMinConfidence] = useState(60);
   const [showInternal, setShowInternal] = useState(false);
-  const [includeUnknown, setIncludeUnknown] = useState(true);
+  // Default to system-level edges only; unknown can be toggled on
+  const [includeUnknown, setIncludeUnknown] = useState(false);
   const [search, setSearch] = useState('');
-  const [groupBySheet, setGroupBySheet] = useState(false);
+  // Group by sheet by default to keep each diagram small and readable
+  const [groupBySheet, setGroupBySheet] = useState(true);
   const filters = useMemo(
     () => ({ minConfidence, showInternal, includeUnknown, search }),
     [minConfidence, showInternal, includeUnknown, search]
