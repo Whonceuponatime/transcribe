@@ -1,0 +1,171 @@
+/* Ethernet Diagram – network graph view */
+
+.ethernet-diagram-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 420px;
+}
+
+.ethernet-diagram-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+.ethernet-diagram-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ethernet-diagram-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.ethernet-diagram-toolbar-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ethernet-diagram-toolbar-row select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.ethernet-diagram-slider-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ethernet-diagram-slider-label input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent);
+}
+
+.ethernet-diagram-search {
+  min-width: 180px;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.ethernet-diagram-flow-wrap {
+  width: 100%;
+  height: 420px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ethernet-diagram-flow-wrap .react-flow {
+  background: var(--bg-surface);
+}
+
+.ethernet-diagram-node {
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.ethernet-diagram-node--cable {
+  background: var(--accent-muted, rgba(34, 197, 94, 0.15));
+  border-color: var(--accent);
+}
+
+.ethernet-diagram-export {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ethernet-diagram-panel-wrap {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.ethernet-diagram-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.ethernet-diagram-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.ethernet-diagram-panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.ethernet-diagram-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.ethernet-diagram-panel-close:hover {
+  color: var(--text);
+}
+
+.ethernet-diagram-panel-section {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.ethernet-diagram-panel-section strong {
+  display: block;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-muted);
+}
+
+.ethernet-diagram-panel-item {
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ethernet-diagram-panel-cable {
+  font-family: var(--font-mono, monospace);
+  margin-right: 0.5rem;
+}
+
+.ethernet-diagram-evidence {
+  margin: 0.25rem 0 0 1rem;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

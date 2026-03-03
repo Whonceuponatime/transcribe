@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import './EthernetExtractor.css';
 import { supabase } from '../lib/supabase';
+import EthernetDiagram from './EthernetDiagram';
 
 export default function EthernetExtractor() {
   const [files, setFiles] = useState([]);
@@ -348,7 +349,17 @@ export default function EthernetExtractor() {
             >
               Review ({(result.review && result.review.length) || 0})
             </button>
+            <button
+              type="button"
+              className={activeTab === 'diagram' ? 'active' : ''}
+              onClick={() => setActiveTab('diagram')}
+            >
+              Diagram
+            </button>
           </div>
+          {activeTab === 'diagram' && (
+            <EthernetDiagram result={result} />
+          )}
           {activeTab === 'edges' && (
             <>
               <div className="ethernet-filter">
