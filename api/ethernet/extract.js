@@ -44,7 +44,8 @@ function emptyResponse(job, vesselId, fileNames) {
     },
     warnings: [],
     errors: [],
-    sheets: []
+    sheets: [],
+    debug: null
   };
 }
 
@@ -140,7 +141,8 @@ module.exports = async function handler(req, res) {
       summary: result.summary,
       warnings: result.warnings || [],
       errors: result.errors || [],
-      sheets: result.sheets || []
+      sheets: result.sheets || [],
+      debug: result.debug || null
     });
   } catch (error) {
     cleanup();
