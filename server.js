@@ -1376,19 +1376,80 @@ app.post('/api/ethernet/extract', async (req, res) => {
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) {
     return res.status(503).json({
+      success: false,
       error: 'Supabase not configured',
       details: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for ethernet extraction.'
     });
   }
 
+  const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const createdAt = new Date().toISOString();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ethernet-'));
   const pdfPaths = [];
 
-  try {
-    const { storagePaths, vesselId = 'default', strictEthernet = false, fileNames = [] } = req.body || {};
+  const body = req.body || {};
+  const {
+    storagePaths,
+    vesselId = 'default',
+    strictEthernet = false,
+    minConfidence = 0,
+    systemLevelOnly = false,
+    aiEnabled = false,
+    fileNames = []
+  } = body;
 
+  const params = { strictEthernet, minConfidence, systemLevelOnly, aiEnabled };
+  const resolvedFileNames = Array.isArray(fileNames) && fileNames.length > 0
+    ? fileNames
+    : (Array.isArray(storagePaths) ? storagePaths.map(p => path.basename(p)) : []);
+
+  function buildJob(status, completedAt) {
+    return {
+      jobId,
+      status,
+      createdAt,
+      completedAt,
+      schemaVersion: '1.0',
+      params: {
+        strictEthernet: !!params.strictEthernet,
+        minConfidence: Number(params.minConfidence) || 0,
+        systemLevelOnly: !!params.systemLevelOnly,
+        aiEnabled: !!params.aiEnabled
+      }
+    };
+  }
+
+  function emptyPayload() {
+    return {
+      success: false,
+      job: buildJob('failed', new Date().toISOString()),
+      vesselId: String(vesselId).trim() || 'default',
+      fileNames: resolvedFileNames,
+      edges: [],
+      review: [],
+      summary: {
+        totalEdges: 0,
+        totalReview: 0,
+        systemLevel: 0,
+        internal: 0,
+        unknown: 0,
+        pagesProcessed: 0,
+        charsExtracted: 0,
+        cableIdsFound: 0,
+        extractionNote: null,
+        ai: { used: false, passesRun: 0 }
+      },
+      warnings: [],
+      errors: []
+    };
+  }
+
+  try {
     if (!storagePaths || !Array.isArray(storagePaths) || storagePaths.length === 0) {
-      return res.status(400).json({ error: 'storagePaths array is required (upload PDFs to Supabase Storage first).' });
+      return res.status(400).json({
+        ...emptyPayload(),
+        errors: [{ message: 'storagePaths array is required (upload PDFs to Supabase Storage first).' }]
+      });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -1403,20 +1464,30 @@ app.post('/api/ethernet/extract', async (req, res) => {
       pdfPaths.push(localPath);
     }
 
-    const result = await extractEthernetConnections(pdfPaths, { strictEthernet });
+    const result = await extractEthernetConnections(pdfPaths, {
+      strictEthernet,
+      minConfidence,
+      systemLevelOnly,
+      aiEnabled,
+      fileNames: resolvedFileNames
+    });
 
     for (const p of pdfPaths) {
       try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
     }
     try { if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true }); } catch (_) {}
 
+    const completedAt = new Date().toISOString();
     res.json({
       success: true,
+      job: buildJob('done', completedAt),
       vesselId: String(vesselId).trim() || 'default',
-      fileNames: Array.isArray(fileNames) ? fileNames : storagePaths.map(p => path.basename(p)),
+      fileNames: resolvedFileNames,
       edges: result.edges,
       review: result.review,
-      summary: result.summary
+      summary: result.summary,
+      warnings: result.warnings || [],
+      errors: result.errors || []
     });
   } catch (error) {
     console.error('Ethernet extraction error:', error);
@@ -1425,8 +1496,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
     }
     try { if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true }); } catch (_) {}
     res.status(500).json({
-      error: 'Ethernet extraction failed',
-      details: error.message
+      ...emptyPayload(),
+      errors: [{ message: error.message || 'Ethernet extraction failed' }]
     });
   }
 });

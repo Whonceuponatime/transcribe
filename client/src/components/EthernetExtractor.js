@@ -83,11 +83,17 @@ export default function EthernetExtractor() {
           storagePaths,
           vesselId: vesselId || 'default',
           strictEthernet,
+          minConfidence: 0,
+          systemLevelOnly: false,
+          aiEnabled: false,
           fileNames
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.details || data.error || 'Extraction failed');
+      if (!res.ok) {
+        const errMsg = data.errors?.length ? data.errors.map(e => e.message).join('; ') : (data.details || data.error || 'Extraction failed');
+        throw new Error(errMsg);
+      }
       setResult(data);
 
       if (supabase) {
@@ -110,6 +116,12 @@ export default function EthernetExtractor() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Normalize edge for display (contract: from/to are objects with labelRaw/labelNormalized)
+  const edgeFrom = (e) => (e.from && typeof e.from === 'object' ? e.from.labelRaw || e.from.labelNormalized : e.from) ?? '—';
+  const edgeTo = (e) => (e.to && typeof e.to === 'object' ? e.to.labelRaw || e.to.labelNormalized : e.to) ?? '—';
+  const edgeCableId = (e) => e.cableIdNormalized ?? e.cableId ?? '—';
+  const edgePageRefs = (e) => (e.pageRefs && e.pageRefs.length) ? e.pageRefs.map(r => (typeof r === 'object' && r.fileName != null ? `${r.fileName} p.${r.page}` : String(r))).join('; ') : '';
+
   const filteredEdges = result?.edges
     ? result.edges.filter(e => {
         if (filterTag === 'all') return true;
@@ -121,11 +133,15 @@ export default function EthernetExtractor() {
   const downloadJson = () => {
     if (!result) return;
     const blob = new Blob([JSON.stringify({
+      success: result.success,
+      job: result.job,
       vesselId: result.vesselId,
       fileNames: result.fileNames,
       edges: result.edges,
       review: result.review,
-      summary: result.summary
+      summary: result.summary,
+      warnings: result.warnings || [],
+      errors: result.errors || []
     }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -138,12 +154,12 @@ export default function EthernetExtractor() {
   const downloadCsv = () => {
     if (!result) return;
     const headers = ['From', 'To', 'Cable ID', 'Media', 'Pages', 'Confidence', 'Tag'];
-    const rows = result.edges.map(e => [
-      e.from,
-      e.to,
-      e.cableId,
+    const rows = (result.edges || []).map(e => [
+      edgeFrom(e),
+      edgeTo(e),
+      edgeCableId(e),
       e.media,
-      (e.pageRefs || []).join(';'),
+      edgePageRefs(e) || (Array.isArray(e.pageRefs) ? e.pageRefs.map(r => typeof r === 'object' ? `${r.fileName} p.${r.page}` : r).join('; ') : ''),
       e.confidence,
       e.tag
     ]);
@@ -157,15 +173,24 @@ export default function EthernetExtractor() {
     URL.revokeObjectURL(url);
   };
 
+  const reviewPageRefs = (r) => {
+    if (!r.pageRefs || !r.pageRefs.length) return '';
+    return r.pageRefs.map(ref => typeof ref === 'object' && ref.fileName != null ? `${ref.fileName} p.${ref.page}` : String(ref)).join(', ');
+  };
+
   const downloadReview = () => {
     if (!result) return;
     let md = '# Ethernet Connections – Review List\n\n';
-    md += '## Unpaired / Ambiguous\n\n';
-    for (const r of result.review) {
-      md += `- **${r.cableId}** (${r.type})`;
+    md += '## Unpaired / Ambiguous / Extra / Unknown endpoint\n\n';
+    for (const r of result.review || []) {
+      const id = r.cableIdNormalized ?? r.cableIdRaw ?? r.cableId;
+      md += `- **${id}** (${r.type})`;
       if (r.endpoint) md += ` → ${r.endpoint}`;
-      if (r.pageRefs?.length) md += ` | Pages: ${r.pageRefs.join(', ')}`;
-      if (r.candidates?.length) md += ` | Candidates: ${r.candidates.join(', ')}`;
+      md += ` | ${reviewPageRefs(r)}`;
+      if (r.candidates?.length) {
+        md += ' | Candidates: ';
+        md += r.candidates.map(c => (c.fromLabel && c.toLabel ? `${c.fromLabel}–${c.toLabel}` : c)).join('; ');
+      }
       md += '\n';
     }
     const blob = new Blob([md], { type: 'text/markdown' });
@@ -268,16 +293,44 @@ export default function EthernetExtractor() {
 
       {result && (
         <div className="ethernet-results">
+          {result.job && (
+            <div className="ethernet-job-meta">
+              <span className="ethernet-job-id">Job: {result.job.jobId}</span>
+              <span>Status: {result.job.status}</span>
+              <span>Created: {result.job.createdAt}</span>
+              {result.job.completedAt && <span>Completed: {result.job.completedAt}</span>}
+              {result.job.params && (
+                <span className="ethernet-params">
+                  strictEthernet: {String(result.job.params.strictEthernet)} • minConfidence: {result.job.params.minConfidence} • aiEnabled: {String(result.job.params.aiEnabled)}
+                </span>
+              )}
+            </div>
+          )}
           <div className="ethernet-summary">
             {result.summary.totalEdges} paired • {result.summary.totalReview} in review •
             System-level: {result.summary.systemLevel} • Internal: {result.summary.internal}
             {result.summary.pagesProcessed != null && (
-              <span> • {result.summary.pagesProcessed} page(s), {result.summary.charsExtracted ?? 0} chars</span>
+              <span> • {result.summary.pagesProcessed} page(s), {result.summary.charsExtracted ?? 0} chars, {result.summary.cableIdsFound ?? 0} cable IDs</span>
+            )}
+            {result.summary.ai && (
+              <span> • AI: {result.summary.ai.used ? 'on' : 'off'} (passes: {result.summary.ai.passesRun})</span>
             )}
           </div>
           {result.summary.extractionNote && (
             <div className="ethernet-extraction-note" role="alert">
               {result.summary.extractionNote}
+            </div>
+          )}
+          {(result.warnings && result.warnings.length > 0) && (
+            <div className="ethernet-warnings" role="alert">
+              <strong>Warnings</strong>
+              <ul>{result.warnings.map((w, i) => <li key={i}>{w.message}{w.fileName ? ` (${w.fileName})` : ''}</li>)}</ul>
+            </div>
+          )}
+          {(result.errors && result.errors.length > 0) && (
+            <div className="ethernet-errors" role="alert">
+              <strong>Errors</strong>
+              <ul>{result.errors.map((err, i) => <li key={i}>{err.message}{err.fileName ? ` — ${err.fileName}` : ''}</li>)}</ul>
             </div>
           )}
           <div className="ethernet-tabs">
@@ -293,7 +346,7 @@ export default function EthernetExtractor() {
               className={activeTab === 'review' ? 'active' : ''}
               onClick={() => setActiveTab('review')}
             >
-              Review ({result.review.length})
+              Review ({(result.review && result.review.length) || 0})
             </button>
           </div>
           {activeTab === 'edges' && (
@@ -314,7 +367,7 @@ export default function EthernetExtractor() {
                       <th>To</th>
                       <th>Cable ID</th>
                       <th>Media</th>
-                      <th>Pages</th>
+                      <th>Pages (file)</th>
                       <th>Confidence</th>
                       <th>Evidence</th>
                     </tr>
@@ -322,13 +375,21 @@ export default function EthernetExtractor() {
                   <tbody>
                     {filteredEdges.map((e, i) => (
                       <tr key={i}>
-                        <td>{e.from}</td>
-                        <td>{e.to}</td>
-                        <td><code>{e.cableId}</code></td>
+                        <td>{edgeFrom(e)}</td>
+                        <td>{edgeTo(e)}</td>
+                        <td><code>{edgeCableId(e)}</code></td>
                         <td>{e.media}</td>
-                        <td>{(e.pageRefs || []).join(', ')}</td>
+                        <td className="ethernet-page-refs">{edgePageRefs(e)}</td>
                         <td>{(e.confidence ?? 0).toFixed(2)}</td>
-                        <td className="ethernet-evidence">{(e.evidence || []).slice(0, 3).join('; ')}</td>
+                        <td className="ethernet-evidence">
+                          {Array.isArray(e.evidence) && e.evidence.length > 0
+                            ? e.evidence.slice(0, 4).map((ev, j) =>
+                                typeof ev === 'object' && ev.text != null
+                                  ? <span key={j} title={`${ev.role || ''} ${ev.fileName || ''} p.${ev.page || ''}`}>{ev.text}{j < Math.min(3, e.evidence.length - 1) ? '; ' : ''}</span>
+                                  : <span key={j}>{String(ev)}; </span>
+                              )
+                            : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -338,15 +399,57 @@ export default function EthernetExtractor() {
           )}
           {activeTab === 'review' && (
             <div className="ethernet-review-list">
-              {result.review.map((r, i) => (
+              {(result.review && result.review.length > 0) ? result.review.map((r, i) => (
                 <div key={i} className="ethernet-review-item">
-                  <strong>{r.cableId}</strong> — {r.type}
-                  {r.endpoint && <span> → {r.endpoint}</span>}
-                  {r.pageRefs?.length && <span> (p.{r.pageRefs.join(', ')})</span>}
-                  {r.candidates?.length && <span> Candidates: {r.candidates.join(', ')}</span>}
+                  <div className="ethernet-review-header">
+                    <strong>{r.cableIdNormalized ?? r.cableIdRaw ?? r.cableId}</strong>
+                    <span className="ethernet-review-type">{r.type}</span>
+                    {r.confidence != null && <span className="ethernet-review-conf">{(r.confidence * 100).toFixed(0)}%</span>}
+                  </div>
+                  <div className="ethernet-review-page-refs">Refs: {reviewPageRefs(r)}</div>
+                  {r.occurrences && r.occurrences.length > 0 && (
+                    <div className="ethernet-review-occurrences">
+                      <strong>Occurrences:</strong>
+                      <ul>
+                        {r.occurrences.map((occ, j) => (
+                          <li key={j}>
+                            {occ.fileName} p.{occ.page} — “{occ.foundCableIdText}” → {occ.endpointLabelPicked}
+                            {occ.ethernetHintFound && ' [Ethernet]'}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {r.evidence && r.evidence.length > 0 && (
+                    <div className="ethernet-review-evidence">
+                      <strong>Evidence:</strong>
+                      <ul>
+                        {r.evidence.map((ev, j) => (
+                          <li key={j}>
+                            {typeof ev === 'object' && ev.text != null
+                              ? `${ev.role || '—'}: “${ev.text}”${ev.fileName ? ` (${ev.fileName} p.${ev.page})` : ''}`
+                              : String(ev)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {r.candidates && r.candidates.length > 0 && (
+                    <div className="ethernet-review-candidates">
+                      <strong>Candidates:</strong>
+                      <ul>
+                        {r.candidates.map((c, j) => (
+                          <li key={j}>
+                            {c.fromLabel} → {c.toLabel}
+                            {c.confidence != null && ` (${(c.confidence * 100).toFixed(0)}%)`}
+                            {c.reason && ` — ${c.reason}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              ))}
-              {result.review.length === 0 && <p className="ethernet-empty">No items for review.</p>}
+              )) : <p className="ethernet-empty">No items for review.</p>}
             </div>
           )}
           <div className="ethernet-export">
