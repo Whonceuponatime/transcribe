@@ -407,5 +407,65 @@
 .ethernet-export {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ethernet-export-sep {
+  color: var(--text-muted);
+  margin: 0 0.25rem;
+}
+
+.ethernet-debug-panel {
+  padding: 1rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.ethernet-debug-desc {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ethernet-debug-files {
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.ethernet-debug-files ul {
+  margin: 0.5rem 0 0 1rem;
+  padding: 0;
+}
+
+.ethernet-debug-files li {
+  margin: 0.25rem 0;
+}
+
+.ethernet-debug-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ethernet-debug-files code {
+  font-size: 0.8rem;
+  background: var(--bg-surface);
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+}
+
+.ethernet-debug-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ethernet-debug-separate {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }

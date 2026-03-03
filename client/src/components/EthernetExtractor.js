@@ -1,7 +1,14 @@
 import React, { useState, useRef } from 'react';
+import JSZip from 'jszip';
 import './EthernetExtractor.css';
 import { supabase } from '../lib/supabase';
 import EthernetDiagram from './EthernetDiagram';
+
+function csvEscape(val) {
+  const s = String(val ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
 export default function EthernetExtractor() {
   const [files, setFiles] = useState([]);
@@ -203,6 +210,124 @@ export default function EthernetExtractor() {
     URL.revokeObjectURL(url);
   };
 
+  const debug = result?.debug;
+  const hasDebug = !!debug;
+
+  const downloadDebugFile = (filename, content, mimeType) => {
+    const blob = new Blob([content], { type: mimeType || 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadNodeDedupReportJson = () => {
+    if (!debug) return;
+    downloadDebugFile('node_dedup_report.json', JSON.stringify(debug.nodeDedupReport || [], null, 2), 'application/json');
+  };
+
+  const downloadNodeDedupReportCsv = () => {
+    if (!debug) return;
+    const rows = (debug.nodeDedupReport || []).map((n) => [
+      n.nodeId,
+      n.labelNormalized,
+      (n.rawLabels || []).slice(0, 10).join('; '),
+      n.rawLabelCount ?? 0,
+      n.occurrenceCount ?? 0,
+      (n.pages || []).map((p) => `${p.fileName || ''} p.${p.page ?? ''}`).join('; '),
+      (n.topEvidenceSnippets || []).slice(0, 5).join(' | '),
+      n.type || ''
+    ]);
+    const headers = ['nodeId', 'labelNormalized', 'rawLabels', 'rawLabelCount', 'occurrenceCount', 'pages', 'topEvidenceSnippets', 'type'];
+    const csv = [headers.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    downloadDebugFile('node_dedup_report.csv', csv, 'text/csv');
+  };
+
+  const downloadCableOccurrencesCsv = () => {
+    if (!debug) return;
+    const occs = debug.cableOccurrencesForDebug || [];
+    const headers = [
+      'cableIdRaw', 'cableIdNormalized', 'fileName', 'page', 'position',
+      'ethernetHintFound', 'ethernetHintText', 'pickedEndpointRaw', 'pickedEndpointNormalized', 'endpointScore',
+      'filteredOut', 'filterReason', 'nearbyTextSample'
+    ];
+    const rows = occs.map((o) => [
+      o.cableIdRaw,
+      o.cableIdNormalized,
+      o.fileName,
+      o.page,
+      o.position ? (typeof o.position === 'object' && o.position.line != null ? `line ${o.position.line}` : JSON.stringify(o.position)) : '',
+      o.ethernetHintFound ?? false,
+      o.ethernetHintText ?? '',
+      o.pickedEndpointRaw ?? '',
+      o.pickedEndpointNormalized ?? '',
+      o.endpointScore ?? '',
+      o.filteredOut ?? false,
+      o.filterReason ?? '',
+      (o.nearbyTextSample || '').replace(/\r?\n/g, ' ')
+    ]);
+    const csv = [headers.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    downloadDebugFile('cable_occurrences.csv', csv, 'text/csv');
+  };
+
+  const downloadPairingLog = () => {
+    if (!debug) return;
+    downloadDebugFile('pairing_log.json', JSON.stringify(debug.pairingLog || [], null, 2), 'application/json');
+  };
+
+  const downloadSummaryDebug = () => {
+    if (!debug) return;
+    downloadDebugFile('summary_debug.json', JSON.stringify(debug.summaryDebug || {}, null, 2), 'application/json');
+  };
+
+  const downloadDebugBundleZip = async () => {
+    if (!debug) return;
+    const zip = new JSZip();
+    zip.file('node_dedup_report.json', JSON.stringify(debug.nodeDedupReport || [], null, 2));
+    const nodeCsvRows = (debug.nodeDedupReport || []).map((n) => [
+      n.nodeId,
+      n.labelNormalized,
+      (n.rawLabels || []).slice(0, 10).join('; '),
+      n.rawLabelCount ?? 0,
+      n.occurrenceCount ?? 0,
+      (n.pages || []).map((p) => `${p.fileName || ''} p.${p.page ?? ''}`).join('; '),
+      (n.topEvidenceSnippets || []).slice(0, 5).join(' | '),
+      n.type || ''
+    ]);
+    const nodeCsvHeaders = ['nodeId', 'labelNormalized', 'rawLabels', 'rawLabelCount', 'occurrenceCount', 'pages', 'topEvidenceSnippets', 'type'];
+    zip.file('node_dedup_report.csv', [nodeCsvHeaders.map(csvEscape).join(','), ...nodeCsvRows.map((r) => r.map(csvEscape).join(','))].join('\n'));
+    const occs = debug.cableOccurrencesForDebug || [];
+    const occHeaders = ['cableIdRaw', 'cableIdNormalized', 'fileName', 'page', 'position', 'ethernetHintFound', 'ethernetHintText', 'pickedEndpointRaw', 'pickedEndpointNormalized', 'endpointScore', 'filteredOut', 'filterReason', 'nearbyTextSample'];
+    const occRows = occs.map((o) => [
+      o.cableIdRaw,
+      o.cableIdNormalized,
+      o.fileName,
+      o.page,
+      o.position ? (typeof o.position === 'object' && o.position.line != null ? `line ${o.position.line}` : JSON.stringify(o.position)) : '',
+      o.ethernetHintFound ?? false,
+      o.ethernetHintText ?? '',
+      o.pickedEndpointRaw ?? '',
+      o.pickedEndpointNormalized ?? '',
+      o.endpointScore ?? '',
+      o.filteredOut ?? false,
+      o.filterReason ?? '',
+      (o.nearbyTextSample || '').replace(/\r?\n/g, ' ')
+    ]);
+    const occCsv = [occHeaders.map(csvEscape).join(','), ...occRows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    zip.file('cable_occurrences.csv', occCsv);
+    zip.file('pairing_log.json', JSON.stringify(debug.pairingLog || [], null, 2));
+    zip.file('summary_debug.json', JSON.stringify(debug.summaryDebug || {}, null, 2));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ethernet-debug-${result?.job?.jobId || Date.now()}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="ethernet-extractor">
       <div className="ethernet-upload-section">
@@ -356,9 +481,47 @@ export default function EthernetExtractor() {
             >
               Diagram
             </button>
+            {hasDebug && (
+              <button
+                type="button"
+                className={activeTab === 'debug' ? 'active' : ''}
+                onClick={() => setActiveTab('debug')}
+              >
+                Debug bundle
+              </button>
+            )}
           </div>
           {activeTab === 'diagram' && (
             <EthernetDiagram result={result} />
+          )}
+          {activeTab === 'debug' && hasDebug && (
+            <div className="ethernet-debug-panel">
+              <p className="ethernet-debug-desc">
+                Use the debug bundle to investigate duplicates, wrong edges, label normalization, repeated symbols/legends, cableId regex matches, or pairing logic.
+              </p>
+              <div className="ethernet-debug-files">
+                <strong>Contents:</strong>
+                <ul>
+                  <li><code>node_dedup_report.json/csv</code> — per nodeId: rawLabels, occurrenceCount, pages, evidence</li>
+                  <li><code>cable_occurrences.csv</code> — one row per detected cable occurrence before pairing (endpoint, score, filteredOut)</li>
+                  <li><code>pairing_log.json</code> — per cableId: status (paired/unpaired/ambiguous/extra/rejected), chosenPair, occurrences</li>
+                  <li><code>summary_debug.json</code> — diagnostics: uniqueCableIds, paired/ambiguous/unpaired lists, topRepeatedLabels, pagesWithLowText</li>
+                </ul>
+                <p className="ethernet-debug-note">Overlay images (PNG per page) are not generated; use file+page in the CSVs to correlate with the PDFs.</p>
+              </div>
+              <div className="ethernet-debug-actions">
+                <button type="button" className="btn-primary" onClick={downloadDebugBundleZip}>
+                  Download debug bundle (ZIP)
+                </button>
+                <div className="ethernet-debug-separate">
+                  <button type="button" className="btn-secondary" onClick={downloadNodeDedupReportJson}>node_dedup_report.json</button>
+                  <button type="button" className="btn-secondary" onClick={downloadNodeDedupReportCsv}>node_dedup_report.csv</button>
+                  <button type="button" className="btn-secondary" onClick={downloadCableOccurrencesCsv}>cable_occurrences.csv</button>
+                  <button type="button" className="btn-secondary" onClick={downloadPairingLog}>pairing_log.json</button>
+                  <button type="button" className="btn-secondary" onClick={downloadSummaryDebug}>summary_debug.json</button>
+                </div>
+              </div>
+            </div>
           )}
           {activeTab === 'edges' && (
             <>
@@ -467,6 +630,12 @@ export default function EthernetExtractor() {
             <button type="button" className="btn-secondary" onClick={downloadJson}>Download JSON</button>
             <button type="button" className="btn-secondary" onClick={downloadCsv}>Download CSV</button>
             <button type="button" className="btn-secondary" onClick={downloadReview}>Download Review.md</button>
+            {hasDebug && (
+              <>
+                <span className="ethernet-export-sep">|</span>
+                <button type="button" className="btn-secondary" onClick={downloadDebugBundleZip}>Debug bundle (ZIP)</button>
+              </>
+            )}
           </div>
         </div>
       )}
