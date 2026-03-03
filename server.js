@@ -1334,6 +1334,43 @@ Maintain consistent formatting within each section. The first image needs no hea
 const { extractEthernetConnections } = require('./lib/ethernetExtractor');
 const { createClient } = require('@supabase/supabase-js');
 
+// Server-side upload: client sends PDFs here, we upload to Supabase (avoids CORS)
+app.post('/api/ethernet/upload', pdfUpload.array('files', 20), async (req, res) => {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    if (req.files) {
+      req.files.forEach(f => { try { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); } catch (_) {} });
+    }
+    return res.status(503).json({ error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
+  }
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'No PDF files uploaded.' });
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const storagePaths = [];
+  try {
+    for (let i = 0; i < req.files.length; i++) {
+      const f = req.files[i];
+      const buf = fs.readFileSync(f.path);
+      const pathInBucket = `temp/${jobId}/${i}.pdf`;
+      const { error } = await supabase.storage.from('ethernet-pdfs').upload(pathInBucket, buf, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+      if (error) throw new Error(`Upload failed: ${error.message}`);
+      storagePaths.push(pathInBucket);
+    }
+    res.json({ success: true, storagePaths });
+  } catch (e) {
+    console.error('Ethernet upload error:', e);
+    res.status(500).json({ error: 'Upload failed', details: e.message });
+  } finally {
+    req.files.forEach(f => { try { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); } catch (_) {} });
+  }
+});
+
 app.post('/api/ethernet/extract', async (req, res) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

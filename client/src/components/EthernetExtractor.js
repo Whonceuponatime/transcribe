@@ -49,20 +49,38 @@ export default function EthernetExtractor() {
     setResult(null);
     setLoadingStatus('uploading');
     const statusTimer = setTimeout(() => setLoadingStatus('extracting'), 2000);
-    try {
-      const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const storagePaths = [];
-      const fileNames = files.map(f => f.name);
+    const fileNames = files.map(f => f.name);
+    let storagePaths = [];
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const safePath = `temp/${jobId}/${i}.pdf`;
-        const { error: uploadErr } = await supabase.storage
-          .from('ethernet-pdfs')
-          .upload(safePath, file, { contentType: 'application/pdf', upsert: true });
-        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
-        storagePaths.push(safePath);
+    try {
+      const uploadForm = new FormData();
+      files.forEach(f => uploadForm.append('files', f));
+
+      const uploadRes = await fetch('/api/ethernet/upload', {
+        method: 'POST',
+        body: uploadForm
+      });
+
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        storagePaths = uploadData.storagePaths || [];
+      } else if (uploadRes.status === 404 || uploadRes.status === 413 || uploadRes.status === 503) {
+        const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const safePath = `temp/${jobId}/${i}.pdf`;
+          const { error: uploadErr } = await supabase.storage
+            .from('ethernet-pdfs')
+            .upload(safePath, file, { contentType: 'application/pdf', upsert: true });
+          if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
+          storagePaths.push(safePath);
+        }
+      } else {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || `Upload failed (${uploadRes.status})`);
       }
+
+      if (!storagePaths.length) throw new Error('No storage paths returned.');
 
       clearTimeout(statusTimer);
       setLoadingStatus('extracting');
@@ -81,7 +99,9 @@ export default function EthernetExtractor() {
       if (!res.ok) throw new Error(data.details || data.error || 'Extraction failed');
       setResult(data);
 
-      await supabase.storage.from('ethernet-pdfs').remove(storagePaths);
+      if (supabase) {
+        await supabase.storage.from('ethernet-pdfs').remove(storagePaths);
+      }
     } catch (e) {
       setError(e.message);
       setResult(null);

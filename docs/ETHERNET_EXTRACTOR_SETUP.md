@@ -25,15 +25,23 @@ The migration `002_ethernet_storage.sql` creates the `ethernet-pdfs` bucket and 
 
 ### 2b. CORS / 502 errors on upload
 
-If you see "Access-Control-Allow-Origin" or 502 when uploading:
+The app **tries server-side upload first** (your backend or Vercel `/api/ethernet/upload`). That avoids CORS. If that fails (e.g. 404, or 413 when the request is too large on Vercel), it falls back to **direct upload from the browser to Supabase**, which requires CORS.
+
+If you see "Access-Control-Allow-Origin" missing or 502 when uploading:
 
 1. **Create bucket manually** (if migration failed): Dashboard → **Storage** → **New bucket** → Name: `ethernet-pdfs`, Private, Max size: 50 MB, Allowed types: `application/pdf`.
 
-2. **Set Site URL**: Dashboard → **Project Settings** → **Authentication** → **URL Configuration** → **Site URL** = your app URL (e.g. `https://your-app.vercel.app` or `http://localhost:3000`). Add `http://localhost:3000` to **Redirect URLs** for local dev.
+2. **Add your app origin for CORS** (required for direct browser upload):
+   - Dashboard → **Project Settings** (gear) → **API**.
+   - Find **“Allowed Origins”** or **“CORS”** / **“Additional allowed origins”** (exact label can vary).
+   - Add your app URL, e.g. `https://your-app.vercel.app` and `http://localhost:3000`, comma-separated if needed.
+   - Save.
 
-3. **RLS policies**: Ensure the migration `002_ethernet_storage.sql` ran so `authenticated` users can INSERT and SELECT. Or add policies in Storage → `ethernet-pdfs` → Policies.
+3. **Authentication URL Configuration**: **Project Settings** → **Authentication** → **URL Configuration** → **Site URL** = your app URL. Add `http://localhost:3000` to **Redirect URLs** for local dev.
 
-4. **Check Supabase status**: [status.supabase.com](https://status.supabase.com) for outages.
+4. **RLS policies**: Ensure `002_ethernet_storage.sql` ran so `authenticated` users can INSERT and SELECT on `ethernet-pdfs`. Or add policies in Storage → `ethernet-pdfs` → Policies.
+
+5. **Check Supabase status**: [status.supabase.com](https://status.supabase.com) for outages.
 
 ### 3. Environment Variables
 
