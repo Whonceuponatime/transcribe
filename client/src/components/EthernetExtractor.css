@@ -198,6 +198,16 @@
 .ethernet-summary {
   font-size: 0.8rem;
   color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.ethernet-extraction-note {
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
   margin-bottom: 1rem;
 }
 

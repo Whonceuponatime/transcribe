@@ -271,7 +271,15 @@ export default function EthernetExtractor() {
           <div className="ethernet-summary">
             {result.summary.totalEdges} paired • {result.summary.totalReview} in review •
             System-level: {result.summary.systemLevel} • Internal: {result.summary.internal}
+            {result.summary.pagesProcessed != null && (
+              <span> • {result.summary.pagesProcessed} page(s), {result.summary.charsExtracted ?? 0} chars</span>
+            )}
           </div>
+          {result.summary.extractionNote && (
+            <div className="ethernet-extraction-note" role="alert">
+              {result.summary.extractionNote}
+            </div>
+          )}
           <div className="ethernet-tabs">
             <button
               type="button"
