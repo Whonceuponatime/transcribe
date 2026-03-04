@@ -16,6 +16,23 @@ import './EthernetDiagram.css';
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 40;
 
+/** Conduit class colors for Zone & Conduit diagram */
+const CONDUIT_CLASS_COLORS = {
+  tcpip_untrusted: '#e11d48',
+  tcpip_internal: '#22c55e',
+  zone_traversal: '#3b82f6',
+  serial: '#a855f7'
+};
+const CONDUIT_CLASS_LABELS = {
+  tcpip_untrusted: 'TCP/IP (untrusted)',
+  tcpip_internal: 'TCP/IP (internal)',
+  zone_traversal: 'Zone traversal',
+  serial: 'Serial'
+};
+function getConduitPairKey(from, to) {
+  return [from, to].sort().join('|');
+}
+
 function normalizeNodeId(label) {
   if (label == null || label === '') return 'UNKNOWN';
   const s = String(label)
@@ -96,46 +113,59 @@ function getLayoutedNodesEdges(nodes, edges, direction = 'LR') {
 }
 
 /**
- * Build graph from scope-first result: nodes = systems, edges = edges_system (simplified topology).
+ * Build graph from scope-first result: nodes = systems (target-projected), edges = edges_system.
+ * When target_coverage exists: nodes = targets with edgesFound > 0, or all targets if showZeroEdgeTargets (greyed for 0 edges).
  */
-function buildSystemTopologyGraph(scopeResult) {
-  if (!scopeResult || !scopeResult.systems || !scopeResult.edges_system) {
+function buildSystemTopologyGraph(scopeResult, showZeroEdgeTargets = false) {
+  if (!scopeResult || !scopeResult.systems) {
     return { nodes: [], edges: [] };
   }
   const systems = scopeResult.systems || [];
+  const edges_system = scopeResult.edges_system || [];
+  const target_coverage = scopeResult.target_coverage || [];
   const byId = new Map();
   systems.forEach((s) => {
     const id = s.systemId || s.systemName;
     if (!id) return;
     byId.set(id, s);
   });
+  const coverageByTarget = new Map();
+  target_coverage.forEach((c) => { coverageByTarget.set(c.target, c); });
 
   const systemIds = new Set();
-  scopeResult.edges_system.forEach((e) => {
+  edges_system.forEach((e) => {
     systemIds.add(e.fromSystemId);
     systemIds.add(e.toSystemId);
   });
+  if (target_coverage.length > 0 && showZeroEdgeTargets) {
+    target_coverage.forEach((c) => systemIds.add(c.target));
+  }
 
   const nodes = [];
   systemIds.forEach((id) => {
     const sys = byId.get(id);
+    const cov = coverageByTarget.get(id);
+    const edgesFound = cov?.edgesFound ?? 1;
+    const zeroEdges = edgesFound === 0;
     const likelyNetworked = sys ? !!sys.likelyNetworked : true;
-    if (!likelyNetworked && !sys) return;
+    if (!likelyNetworked && !sys && !cov) return;
     const label = sys?.displayLabel || id;
     nodes.push({
       id,
       type: 'default',
       data: {
-        label,
+        label: zeroEdges ? `${label} (0 edges)` : label,
         isSystemNode: true,
         systemTag: sys?.systemTag,
         likelyNetworked,
-        systemId: id
+        systemId: id,
+        zeroEdges
       },
-      position: { x: 0, y: 0 }
+      position: { x: 0, y: 0 },
+      className: zeroEdges ? 'ethernet-diagram-node--zero-edges' : undefined
     });
   });
-  const flowEdges = scopeResult.edges_system.map((e, i) => {
+  const flowEdges = edges_system.map((e, i) => {
     const cableLabel = Array.isArray(e.cableIds) ? e.cableIds.slice(0, 3).join(', ') : (e.cableIds || e.cableIds?.[0] || '');
     const mediaStr = Array.isArray(e.mediaTypes) ? e.mediaTypes.join(', ') : (e.media || '');
     const countStr = e.edgeCount != null ? ` (${e.edgeCount})` : '';
@@ -149,6 +179,100 @@ function buildSystemTopologyGraph(scopeResult) {
     };
   });
   return getLayoutedNodesEdges(nodes, flowEdges);
+}
+
+const ZONE_ORDER = ['Cargo', 'Control', 'Nav & Comm', 'Untrusted'];
+const ZONE_WIDTH = 520;
+const ZONE_HEIGHT = 200;
+const SYSTEM_BOX_WIDTH = 100;
+const SYSTEM_BOX_HEIGHT = 36;
+const SYSTEM_PAD = 12;
+const ZONE_PAD = 24;
+
+/**
+ * Build Zone & Conduit diagram: zone containers, target systems in grid, only approved conduits as numbered lines.
+ */
+function buildZoneConduitGraph(scopeResult, conduitStatus, conduitClassOverride) {
+  if (!scopeResult?.systems?.length) return { nodes: [], edges: [], approvedConduits: [] };
+  const systems = scopeResult.systems || [];
+  const edges_system = scopeResult.edges_system || [];
+  const status = conduitStatus || {};
+  const override = conduitClassOverride || {};
+
+  const approvedConduits = edges_system.filter((e) => status[getConduitPairKey(e.fromSystemId, e.toSystemId)] === 'approved');
+  const zoneSet = new Set(systems.map((s) => s.zone || 'Control'));
+  const zones = ZONE_ORDER.filter((z) => zoneSet.has(z));
+  zones.push(...[...zoneSet].filter((z) => !ZONE_ORDER.includes(z)));
+
+  const nodes = [];
+  const edges = [];
+  let zoneY = 0;
+
+  zones.forEach((zoneName) => {
+    const zoneId = `zone:${zoneName.replace(/\s+/g, '_')}`;
+    const zoneSystems = systems.filter((s) => (s.zone || 'Control') === zoneName);
+    const rows = Math.ceil(Math.sqrt(zoneSystems.length)) || 1;
+    const cols = Math.ceil(zoneSystems.length / rows) || 1;
+    const innerW = cols * (SYSTEM_BOX_WIDTH + SYSTEM_PAD) - SYSTEM_PAD + ZONE_PAD * 2;
+    const innerH = rows * (SYSTEM_BOX_HEIGHT + SYSTEM_PAD) - SYSTEM_PAD + ZONE_PAD * 2;
+    const w = Math.max(ZONE_WIDTH, innerW);
+    const h = Math.max(ZONE_HEIGHT, innerH);
+
+    nodes.push({
+      id: zoneId,
+      type: 'zone',
+      data: { label: zoneName, zoneName },
+      position: { x: 0, y: zoneY },
+      style: { width: w, height: h, zIndex: 0 }
+    });
+
+    zoneSystems.forEach((sys, idx) => {
+      const systemId = sys.systemId || sys.systemName;
+      if (!systemId) return;
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const x = ZONE_PAD + col * (SYSTEM_BOX_WIDTH + SYSTEM_PAD);
+      const y = ZONE_PAD + row * (SYSTEM_BOX_HEIGHT + SYSTEM_PAD);
+      nodes.push({
+        id: systemId,
+        type: 'system',
+        data: {
+          label: sys.displayName || sys.displayLabel || systemId,
+          systemId,
+          zone: zoneName,
+          iconType: sys.iconType || 'box'
+        },
+        position: { x, y },
+        parentId: zoneId,
+        extent: 'parent',
+        style: { width: SYSTEM_BOX_WIDTH, height: SYSTEM_BOX_HEIGHT, zIndex: 1 }
+      });
+    });
+
+    zoneY += h + 40;
+  });
+
+  approvedConduits.forEach((e, i) => {
+    const num = i + 1;
+    const pairKey = getConduitPairKey(e.fromSystemId, e.toSystemId);
+    const conduitClass = override[pairKey] || e.conduitClass || 'tcpip_internal';
+    const color = CONDUIT_CLASS_COLORS[conduitClass] || CONDUIT_CLASS_COLORS.tcpip_internal;
+    edges.push({
+      id: `conduit-${num}-${e.fromSystemId}-${e.toSystemId}`,
+      source: e.fromSystemId,
+      target: e.toSystemId,
+      type: 'smoothstep',
+      label: String(num),
+      data: { conduitNumber: num, conduitPayload: e, conduitClass },
+      style: { stroke: color, strokeWidth: 2 },
+      labelStyle: { fill: color, fontWeight: 600 },
+      labelBgStyle: { fill: 'var(--bg-surface)', stroke: color },
+      labelBgPadding: [4, 2],
+      labelBgBorderRadius: 4
+    });
+  });
+
+  return { nodes, edges, approvedConduits };
 }
 
 function buildTopologyGraph(result, filters, sheetFilter = null) {
@@ -255,9 +379,119 @@ function CableNode({ data }) {
   );
 }
 
-const nodeTypes = { cable: CableNode };
+function ZoneNode({ data }) {
+  return (
+    <div className="ethernet-diagram-zone-node">
+      <span className="ethernet-diagram-zone-label">{data.label || data.zoneName}</span>
+    </div>
+  );
+}
 
-function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge }) {
+function SystemNode({ data }) {
+  return (
+    <div className="ethernet-diagram-system-node">
+      {data.label || data.systemId}
+    </div>
+  );
+}
+
+const nodeTypes = {
+  cable: CableNode,
+  zone: ZoneNode,
+  system: SystemNode
+};
+
+function ConduitBuilderTable({ edges_system, conduitStatus, conduitClassOverride, onStatusChange, onClassOverride }) {
+  const pairKey = (from, to) => getConduitPairKey(from, to);
+  const classes = Object.keys(CONDUIT_CLASS_LABELS);
+  if (!edges_system?.length) return <p className="ethernet-conduit-empty">No candidate conduits. Run extraction with targets in scope.</p>;
+  return (
+    <div className="ethernet-conduit-builder">
+      <h4>Conduit Builder</h4>
+      <p className="ethernet-hint">Approve conduits to include in the Zone &amp; Conduit diagram. Only approved conduits are drawn.</p>
+      <div className="ethernet-conduit-table-wrap">
+        <table className="ethernet-conduit-table">
+          <thead>
+            <tr>
+              <th>From</th>
+              <th>To</th>
+              <th>Class</th>
+              <th>Confidence</th>
+              <th>Evidence</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {edges_system.map((e, i) => {
+              const key = pairKey(e.fromSystemId, e.toSystemId);
+              const status = conduitStatus[key] || '';
+              const cls = conduitClassOverride[key] ?? e.conduitClass ?? 'tcpip_internal';
+              const ev = (e.evidence && e.evidence[0]) ? (typeof e.evidence[0] === 'object' && e.evidence[0].text != null ? e.evidence[0].text : String(e.evidence[0])).slice(0, 60) : '—';
+              return (
+                <tr key={i} className={status === 'approved' ? 'conduit-approved' : status === 'rejected' ? 'conduit-rejected' : ''}>
+                  <td>{e.fromSystemId}</td>
+                  <td>{e.toSystemId}</td>
+                  <td>
+                    <select
+                      value={cls}
+                      onChange={(evt) => onClassOverride(key, evt.target.value)}
+                      aria-label="Conduit class"
+                    >
+                      {classes.map((c) => (
+                        <option key={c} value={c}>{CONDUIT_CLASS_LABELS[c] || c}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{((e.confidence ?? 0) * 100).toFixed(0)}%</td>
+                  <td className="ethernet-conduit-evidence">{ev}{ev.length >= 60 ? '…' : ''}</td>
+                  <td>
+                    <div className="ethernet-conduit-actions">
+                      <button type="button" className={status === 'approved' ? 'active' : ''} onClick={() => onStatusChange(key, 'approved')}>Approve</button>
+                      <button type="button" className={status === 'rejected' ? 'active' : ''} onClick={() => onStatusChange(key, 'rejected')}>Reject</button>
+                      <button type="button" className={status === 'needs_info' ? 'active' : ''} onClick={() => onStatusChange(key, 'needs_info')}>Needs-info</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ConduitListPanel({ approvedConduits, conduitClassOverride }) {
+  if (!approvedConduits?.length) return <div className="ethernet-conduit-list-panel"><p>No approved conduits.</p></div>;
+  const pairKey = (from, to) => getConduitPairKey(from, to);
+  return (
+    <div className="ethernet-conduit-list-panel">
+      <h4>Conduit list</h4>
+      <ul className="ethernet-conduit-list">
+        {approvedConduits.map((e, i) => {
+          const num = i + 1;
+          const cls = (conduitClassOverride || {})[pairKey(e.fromSystemId, e.toSystemId)] ?? e.conduitClass ?? 'tcpip_internal';
+          const color = CONDUIT_CLASS_COLORS[cls];
+          return (
+            <li key={i} className="ethernet-conduit-list-item">
+              <span className="ethernet-conduit-num" style={{ borderColor: color }}>{num}</span>
+              <div>
+                <strong>{e.fromSystemId}</strong> ↔ <strong>{e.toSystemId}</strong>
+                <div className="ethernet-conduit-detail">Cable IDs: {(e.cableIds || []).slice(0, 5).join(', ')}{(e.cableIds?.length > 5 ? '…' : '')}</div>
+                <div className="ethernet-conduit-detail">Pages: {(e.pageRefs || []).slice(0, 3).map((r) => `${r.fileName} p.${r.page}`).join('; ')}</div>
+                {(e.evidence || []).slice(0, 2).map((ev, j) => (
+                  <div key={j} className="ethernet-conduit-evidence-line">{typeof ev === 'object' && ev.text != null ? ev.text : String(ev)}</div>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge, flowWrapClassName }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   useEffect(() => {
@@ -265,7 +499,7 @@ function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge 
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
   return (
-    <div className="ethernet-diagram-flow-wrap">
+    <div className={`ethernet-diagram-flow-wrap ${flowWrapClassName || ''}`.trim()}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -286,9 +520,18 @@ function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge 
   );
 }
 
-function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
+function DiagramInner({
+  result,
+  scopeResult,
+  onSelectNode,
+  onSelectEdge,
+  conduitStatus,
+  conduitClassOverride,
+  onConduitStatusChange,
+  onConduitClassOverride
+}) {
   const hasScope = scopeResult && scopeResult.systems && scopeResult.edges_system?.length >= 0;
-  const [mode, setMode] = useState(hasScope ? 'system' : 'topology');
+  const [mode, setMode] = useState(hasScope ? 'zone' : 'topology');
   // Default to higher confidence to avoid spaghetti graphs
   const [minConfidence, setMinConfidence] = useState(60);
   const [showInternal, setShowInternal] = useState(false);
@@ -298,6 +541,8 @@ function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
   // Group by sheet by default to keep each diagram small and readable
   const [groupBySheet, setGroupBySheet] = useState(true);
   const [showDrillDown, setShowDrillDown] = useState(false);
+  const [showZeroEdgeTargets, setShowZeroEdgeTargets] = useState(false);
+  const hasTargetCoverage = scopeResult?.target_coverage?.length > 0;
   const filters = useMemo(
     () => ({ minConfidence, showInternal, includeUnknown, search }),
     [minConfidence, showInternal, includeUnknown, search]
@@ -306,12 +551,18 @@ function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
   const sheets = useMemo(() => result?.sheets ?? [], [result?.sheets]);
   const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0 && !hasScope;
 
+  const zoneGraph = useMemo(() => {
+    if (mode !== 'zone' || !scopeResult) return { nodes: [], edges: [], approvedConduits: [] };
+    return buildZoneConduitGraph(scopeResult, conduitStatus, conduitClassOverride);
+  }, [mode, scopeResult, conduitStatus, conduitClassOverride]);
+
   const singleGraph = useMemo(() => {
     if (!result) return { nodes: [], edges: [] };
-    if (mode === 'system' && hasScope) return buildSystemTopologyGraph(scopeResult);
+    if (mode === 'zone' && hasScope) return { nodes: zoneGraph.nodes, edges: zoneGraph.edges };
+    if (mode === 'system' && hasScope) return buildSystemTopologyGraph(scopeResult, showZeroEdgeTargets);
     if (mode === 'cable') return buildCableCentricGraph(result, filters);
     return buildTopologyGraph(result, filters, null);
-  }, [result, scopeResult, mode, filters, hasScope]);
+  }, [result, scopeResult, mode, filters, hasScope, showZeroEdgeTargets, zoneGraph]);
 
   const sheetsGraphs = useMemo(() => {
     if (!groupBySheetEnabled || !result) return [];
@@ -331,17 +582,28 @@ function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
           Mode:
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
             {hasScope && (
-              <option value="system">System topology (scope)</option>
+              <>
+                <option value="zone">Zone &amp; Conduit</option>
+                <option value="system">System topology (scope)</option>
+              </>
             )}
             <option value="topology">Topology (device-level)</option>
             <option value="cable">Cable-centric</option>
           </select>
         </label>
         {hasScope && mode === 'system' && (
-          <label>
-            <input type="checkbox" checked={showDrillDown} onChange={(e) => setShowDrillDown(e.target.checked)} />
-            Drill-down (device-level edges)
-          </label>
+          <>
+            <label>
+              <input type="checkbox" checked={showDrillDown} onChange={(e) => setShowDrillDown(e.target.checked)} />
+              Drill-down (device-level edges)
+            </label>
+            {hasTargetCoverage && (
+              <label>
+                <input type="checkbox" checked={showZeroEdgeTargets} onChange={(e) => setShowZeroEdgeTargets(e.target.checked)} />
+                Show targets with 0 edges
+              </label>
+            )}
+          </>
         )}
         <label className="ethernet-diagram-slider-label">
           Min confidence: {minConfidence}%
@@ -401,12 +663,38 @@ function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
         </div>
       ) : (
         <>
-          <SingleDiagram
-            initialNodes={singleGraph.nodes}
-            initialEdges={singleGraph.edges}
-            onSelectNode={onSelectNode}
-            onSelectEdge={onSelectEdge}
-          />
+          {hasScope && mode === 'zone' && (
+            <>
+              <ConduitBuilderTable
+                edges_system={scopeResult.edges_system}
+                conduitStatus={conduitStatus}
+                conduitClassOverride={conduitClassOverride}
+                onStatusChange={onConduitStatusChange}
+                onClassOverride={onConduitClassOverride}
+              />
+              <div className="ethernet-conduit-legend">
+                <strong>Conduit classes:</strong>
+                {Object.entries(CONDUIT_CLASS_LABELS).map(([cls, label]) => (
+                  <span key={cls} className="ethernet-conduit-legend-item">
+                    <span className="ethernet-conduit-legend-swatch" style={{ background: CONDUIT_CLASS_COLORS[cls] }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="ethernet-diagram-main-wrap">
+            <SingleDiagram
+              initialNodes={singleGraph.nodes}
+              initialEdges={singleGraph.edges}
+              onSelectNode={onSelectNode}
+              onSelectEdge={onSelectEdge}
+              flowWrapClassName={mode === 'zone' ? 'ethernet-diagram-flow-wrap--zone' : undefined}
+            />
+            {hasScope && mode === 'zone' && zoneGraph.approvedConduits?.length > 0 && (
+              <ConduitListPanel approvedConduits={zoneGraph.approvedConduits} conduitClassOverride={conduitClassOverride} />
+            )}
+          </div>
           {hasScope && mode === 'system' && showDrillDown && scopeResult?.edges_detail?.length > 0 && (
             <div className="ethernet-diagram-drilldown">
               <h4>Device-level edges (drill-down)</h4>
@@ -433,6 +721,39 @@ function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
 function SidePanel({ selection, result, scopeResult, onClose }) {
   if (!selection || !result) return null;
   const { type, id, data } = selection;
+
+  if (type === 'edge' && data?.conduitPayload) {
+    const e = data.conduitPayload;
+    const num = data.conduitNumber;
+    const conduitClass = data.conduitClass || e.conduitClass;
+    return (
+      <div className="ethernet-diagram-panel">
+        <div className="ethernet-diagram-panel-header">
+          <h3>Conduit {num}: {e.fromSystemId} ↔ {e.toSystemId}</h3>
+          <button type="button" className="ethernet-diagram-panel-close" onClick={onClose}>×</button>
+        </div>
+        <div className="ethernet-diagram-panel-section">
+          <p><strong>Class:</strong> {conduitClass}</p>
+          <strong>Cable IDs</strong>
+          <ul>{((e.cableIds && e.cableIds.length) ? e.cableIds : []).map((c, i) => (
+            <li key={i}>{c}{e.cableIdCounts && e.cableIdCounts[c] != null ? ` (×${e.cableIdCounts[c]})` : ''}</li>
+          ))}</ul>
+          <strong>Page refs</strong>
+          <ul className="ethernet-diagram-evidence">
+            {(e.pageRefs || []).slice(0, 10).map((r, i) => (
+              <li key={i}>{r.fileName} p.{r.page}</li>
+            ))}
+          </ul>
+          <strong>Evidence</strong>
+          <ul className="ethernet-diagram-evidence">
+            {(e.evidence || []).slice(0, 10).map((ev, i) => (
+              <li key={i}>{typeof ev === 'object' && ev.text != null ? `${ev.fileName || ''} p.${ev.page ?? ''}: ${ev.text}` : String(ev)}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   if (type === 'edge' && data?.systemEdgePayload) {
     const e = data.systemEdgePayload;
@@ -652,7 +973,18 @@ function ExportButtons({ flowRef }) {
   );
 }
 
-function DiagramContent({ result, scopeResult, selection, onSelectNode, onSelectEdge, onClosePanel }) {
+function DiagramContent({
+  result,
+  scopeResult,
+  selection,
+  onSelectNode,
+  onSelectEdge,
+  onClosePanel,
+  conduitStatus,
+  conduitClassOverride,
+  onConduitStatusChange,
+  onConduitClassOverride
+}) {
   return (
     <div className="ethernet-diagram-root">
       <ReactFlowProvider>
@@ -661,6 +993,10 @@ function DiagramContent({ result, scopeResult, selection, onSelectNode, onSelect
           scopeResult={scopeResult}
           onSelectNode={onSelectNode}
           onSelectEdge={onSelectEdge}
+          conduitStatus={conduitStatus}
+          conduitClassOverride={conduitClassOverride}
+          onConduitStatusChange={onConduitStatusChange}
+          onConduitClassOverride={onConduitClassOverride}
         />
         <ExportButtons />
         {selection && (
@@ -675,6 +1011,8 @@ function DiagramContent({ result, scopeResult, selection, onSelectNode, onSelect
 
 export default function EthernetDiagram({ result, scopeResult }) {
   const [selection, setSelection] = useState(null);
+  const [conduitStatus, setConduitStatus] = useState({});
+  const [conduitClassOverride, setConduitClassOverride] = useState({});
 
   const onSelectNode = useCallback((id, data) => {
     setSelection({ type: 'node', id, data });
@@ -683,6 +1021,13 @@ export default function EthernetDiagram({ result, scopeResult }) {
     setSelection({ type: 'edge', id, data });
   }, []);
   const onClosePanel = useCallback(() => setSelection(null), []);
+
+  const onConduitStatusChange = useCallback((pairKey, status) => {
+    setConduitStatus((prev) => ({ ...prev, [pairKey]: status }));
+  }, []);
+  const onConduitClassOverride = useCallback((pairKey, conduitClass) => {
+    setConduitClassOverride((prev) => ({ ...prev, [pairKey]: conduitClass }));
+  }, []);
 
   if (!result) {
     return <div className="ethernet-diagram-empty">Run extraction first to see the diagram.</div>;
@@ -696,6 +1041,10 @@ export default function EthernetDiagram({ result, scopeResult }) {
       onSelectNode={onSelectNode}
       onSelectEdge={onSelectEdge}
       onClosePanel={onClosePanel}
+      conduitStatus={conduitStatus}
+      conduitClassOverride={conduitClassOverride}
+      onConduitStatusChange={onConduitStatusChange}
+      onConduitClassOverride={onConduitClassOverride}
     />
   );
 }

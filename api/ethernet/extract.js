@@ -145,7 +145,8 @@ module.exports = async function handler(req, res) {
             drawingListMapping: result.drawingListMapping || {}
           }, result.sheets || [], {
             minSystemMapConfidence: minSystemMapConfidence != null ? Number(minSystemMapConfidence) : undefined,
-            allowUnknownSystemEdges: !!allowUnknownSystemEdges
+            allowUnknownSystemEdges: !!allowUnknownSystemEdges,
+            manualAliases: (body.manualAliases && typeof body.manualAliases === 'object') ? body.manualAliases : {}
           });
         }
       } catch (scopeErr) {

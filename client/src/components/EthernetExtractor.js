@@ -14,6 +14,7 @@ export default function EthernetExtractor() {
   const [files, setFiles] = useState([]);
   const [vesselId, setVesselId] = useState('');
   const [systemsInScopeCsv, setSystemsInScopeCsv] = useState('');
+  const [manualAliases, setManualAliases] = useState({});
   const [strictEthernet, setStrictEthernet] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -93,6 +94,7 @@ export default function EthernetExtractor() {
           storagePaths,
           vesselId: vesselId || 'default',
           systemsInScopeCsv: systemsInScopeCsv.trim() || undefined,
+          manualAliases: Object.keys(manualAliases).length ? manualAliases : undefined,
           strictEthernet,
           minConfidence: 0,
           systemLevelOnly: false,
@@ -485,6 +487,13 @@ export default function EthernetExtractor() {
     const csCsv = [csHeaders.map(csvEscape).join(','), ...csRows.map((r) => r.map(csvEscape).join(','))].join('\n');
     zip.file('cable_stats.csv', csCsv);
 
+    if (result?.scopeResult?.target_coverage?.length) {
+      zip.file('target_coverage.json', JSON.stringify(result.scopeResult.target_coverage, null, 2));
+    }
+    if (result?.scopeResult?.excluded_edges?.length) {
+      zip.file('excluded_edges.json', JSON.stringify(result.scopeResult.excluded_edges, null, 2));
+    }
+
     const fpSamples = occs
       .filter((o) => o.filteredOut && o.filterReason)
       .slice(0, 200)
@@ -543,7 +552,7 @@ export default function EthernetExtractor() {
           aria-describedby="scope-csv-hint"
         />
         <p id="scope-csv-hint" className="ethernet-hint">
-          Optional: one system per line or CSV with columns system_name, vendor, tags. Enables simplified system-only topology.
+          Optional: one system per line or CSV with columns system_name, vendor, tags, code_patterns, zone. Zone (e.g. Control, Nav &amp; Comm, Untrusted, Cargo) is used for Zone &amp; Conduit diagram.
         </p>
         <div className="ethernet-option">
           <input
@@ -659,7 +668,9 @@ export default function EthernetExtractor() {
             {result.scopeResult && (
               <span className="ethernet-scope-summary">
                 • Scope: {result.scopeResult.systems?.length ?? 0} systems, {result.scopeResult.summary?.pagesMapped ?? 0} pages mapped, {result.scopeResult.summary?.pagesUnknown ?? 0} unknown, {result.scopeResult.edges_system?.length ?? 0} system-level edges
+                {result.scopeResult.summary?.excluded_edges > 0 && `, ${result.scopeResult.summary.excluded_edges} excluded`}
                 {result.scopeResult.summary?.mapping_conflicts > 0 && `, ${result.scopeResult.summary.mapping_conflicts} conflict(s)`}
+                {result.scopeResult.summary?.target_projected && ' (target-projected)'}
               </span>
             )}
           </div>
@@ -709,6 +720,15 @@ export default function EthernetExtractor() {
                 onClick={() => setActiveTab('scope')}
               >
                 Scope / Page map
+              </button>
+            )}
+            {result.scopeResult?.target_coverage?.length > 0 && (
+              <button
+                type="button"
+                className={activeTab === 'targets' ? 'active' : ''}
+                onClick={() => setActiveTab('targets')}
+              >
+                Targets
               </button>
             )}
             {hasDebug && (
@@ -780,6 +800,86 @@ export default function EthernetExtractor() {
                     </table>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+          {activeTab === 'targets' && result.scopeResult?.target_coverage?.length > 0 && (
+            <div className="ethernet-targets-panel">
+              <h4>Target coverage</h4>
+              <p className="ethernet-hint">Only targets with resolved endpoints and Ethernet evidence appear in the topology. Others are listed here.</p>
+              <div className="ethernet-scope-table-wrap">
+                <table className="ethernet-scope-table">
+                  <thead>
+                    <tr><th>Target</th><th>Pages mapped</th><th>Ethernet occurrences</th><th>Edges found</th><th>Reason (if 0)</th></tr>
+                  </thead>
+                  <tbody>
+                    {(result.scopeResult.target_coverage || []).map((row, i) => (
+                      <tr key={i} className={row.edgesFound === 0 ? 'target-zero-edges' : ''}>
+                        <td><strong>{row.target}</strong></td>
+                        <td>{row.pagesMapped}</td>
+                        <td>{row.ethernetOccurrences}</td>
+                        <td>{row.edgesFound}</td>
+                        <td>{row.reason || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {(result.scopeResult.unmappedLabels || []).length > 0 && (
+                <>
+                  <h4>Top unmapped labels</h4>
+                  <p className="ethernet-hint">Map these to a target via alias override below, then re-run Extract.</p>
+                  <ul className="ethernet-unmapped-list">
+                    {(result.scopeResult.unmappedLabels || []).slice(0, 20).map((u, i) => (
+                      <li key={i}><code>{u.label}</code> ({u.count}×)</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <h4>Manual alias override</h4>
+              <p className="ethernet-hint">Map a device label to a target system. Re-run Extract to apply.</p>
+              <div className="ethernet-alias-override">
+                <input
+                  type="text"
+                  id="alias-label"
+                  className="ethernet-input"
+                  placeholder="e.g. SMS RACK"
+                  aria-label="Endpoint label"
+                />
+                <span className="ethernet-alias-arrow">→</span>
+                <select id="alias-target" className="ethernet-input" aria-label="Target system">
+                  <option value="">Select target…</option>
+                  {(result.scopeResult.systems || []).map((s, i) => (
+                    <option key={i} value={s.systemId}>{s.displayLabel || s.systemId}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    const label = document.getElementById('alias-label')?.value?.trim();
+                    const target = document.getElementById('alias-target')?.value;
+                    if (label && target) {
+                      setManualAliases(prev => ({ ...prev, [label.toUpperCase()]: target }));
+                      document.getElementById('alias-label').value = '';
+                      document.getElementById('alias-target').value = '';
+                    }
+                  }}
+                >
+                  Add alias
+                </button>
+              </div>
+              {Object.keys(manualAliases).length > 0 && (
+                <div className="ethernet-alias-list">
+                  <strong>Current overrides:</strong>
+                  <ul>
+                    {Object.entries(manualAliases).map(([k, v]) => (
+                      <li key={k}><code>{k}</code> → {v}
+                        <button type="button" className="btn-ghost" onClick={() => setManualAliases(prev => { const n = { ...prev }; delete n[k]; return n; })}>Remove</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}

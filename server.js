@@ -1533,7 +1533,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
             drawingListMapping: deterministic.drawingListMapping || {}
           }, deterministic.sheets || [], {
             minSystemMapConfidence: minSystemMapConfidence != null ? Number(minSystemMapConfidence) : undefined,
-            allowUnknownSystemEdges: !!allowUnknownSystemEdges
+            allowUnknownSystemEdges: !!allowUnknownSystemEdges,
+            manualAliases: body.manualAliases && typeof body.manualAliases === 'object' ? body.manualAliases : {}
           });
         }
       } catch (scopeErr) {
