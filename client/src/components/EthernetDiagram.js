@@ -531,189 +531,47 @@ function DiagramInner({
   onConduitClassOverride
 }) {
   const hasScope = scopeResult && scopeResult.systems && scopeResult.edges_system?.length >= 0;
-  const [mode, setMode] = useState(hasScope ? 'zone' : 'topology');
-  // Default to higher confidence to avoid spaghetti graphs
-  const [minConfidence, setMinConfidence] = useState(60);
-  const [showInternal, setShowInternal] = useState(false);
-  // Default to system-level edges only; unknown can be toggled on
-  const [includeUnknown, setIncludeUnknown] = useState(false);
-  const [search, setSearch] = useState('');
-  // Group by sheet by default to keep each diagram small and readable
-  const [groupBySheet, setGroupBySheet] = useState(true);
-  const [showDrillDown, setShowDrillDown] = useState(false);
-  const [showZeroEdgeTargets, setShowZeroEdgeTargets] = useState(false);
-  const hasTargetCoverage = scopeResult?.target_coverage?.length > 0;
-  const filters = useMemo(
-    () => ({ minConfidence, showInternal, includeUnknown, search }),
-    [minConfidence, showInternal, includeUnknown, search]
-  );
-
-  const sheets = useMemo(() => result?.sheets ?? [], [result?.sheets]);
-  const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0 && !hasScope;
-
   const zoneGraph = useMemo(() => {
-    if (mode !== 'zone' || !scopeResult) return { nodes: [], edges: [], approvedConduits: [] };
+    if (!scopeResult || !hasScope) return { nodes: [], edges: [], approvedConduits: [] };
     return buildZoneConduitGraph(scopeResult, conduitStatus, conduitClassOverride);
-  }, [mode, scopeResult, conduitStatus, conduitClassOverride]);
-
-  const singleGraph = useMemo(() => {
-    if (!result) return { nodes: [], edges: [] };
-    if (mode === 'zone' && hasScope) return { nodes: zoneGraph.nodes, edges: zoneGraph.edges };
-    if (mode === 'system' && hasScope) return buildSystemTopologyGraph(scopeResult, showZeroEdgeTargets);
-    if (mode === 'cable') return buildCableCentricGraph(result, filters);
-    return buildTopologyGraph(result, filters, null);
-  }, [result, scopeResult, mode, filters, hasScope, showZeroEdgeTargets, zoneGraph]);
-
-  const sheetsGraphs = useMemo(() => {
-    if (!groupBySheetEnabled || !result) return [];
-    return sheets.map((sheet) => {
-      const { nodes: n, edges: e } = buildTopologyGraph(result, filters, {
-        fileName: sheet.fileName,
-        page: sheet.page
-      });
-      return { sheet, nodes: n, edges: e };
-    });
-  }, [result, filters, sheets, groupBySheetEnabled]);
+  }, [scopeResult, conduitStatus, conduitClassOverride, hasScope]);
 
   return (
     <div className="ethernet-diagram-toolbar">
       <div className="ethernet-diagram-toolbar-row">
-        <label>
-          Mode:
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            {hasScope && (
-              <>
-                <option value="zone">Zone &amp; Conduit</option>
-                <option value="system">System topology (scope)</option>
-              </>
-            )}
-            <option value="topology">Topology (device-level)</option>
-            <option value="cable">Cable-centric</option>
-          </select>
-        </label>
-        {hasScope && mode === 'system' && (
+        {hasScope && (
           <>
-            <label>
-              <input type="checkbox" checked={showDrillDown} onChange={(e) => setShowDrillDown(e.target.checked)} />
-              Drill-down (device-level edges)
-            </label>
-            {hasTargetCoverage && (
-              <label>
-                <input type="checkbox" checked={showZeroEdgeTargets} onChange={(e) => setShowZeroEdgeTargets(e.target.checked)} />
-                Show targets with 0 edges
-              </label>
-            )}
-          </>
-        )}
-        <label className="ethernet-diagram-slider-label">
-          Min confidence: {minConfidence}%
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={minConfidence}
-            onChange={(e) => setMinConfidence(Number(e.target.value))}
-          />
-        </label>
-        {mode === 'topology' && (
-          <>
-            <label>
-              <input type="checkbox" checked={showInternal} onChange={(e) => setShowInternal(e.target.checked)} />
-              Show internal
-            </label>
-            <label>
-              <input type="checkbox" checked={includeUnknown} onChange={(e) => setIncludeUnknown(e.target.checked)} />
-              Include unknown
-            </label>
-            {sheets.length > 0 && (
-              <label>
-                <input type="checkbox" checked={groupBySheet} onChange={(e) => setGroupBySheet(e.target.checked)} />
-                Group by sheet
-              </label>
-            )}
-          </>
-        )}
-        <input
-          type="text"
-          className="ethernet-diagram-search"
-          placeholder="Search cable or endpoint..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-      {groupBySheetEnabled && sheetsGraphs.length > 0 ? (
-        <div className="ethernet-diagram-by-sheet">
-          {sheetsGraphs.map(({ sheet, nodes: n, edges: e }) => (
-            <div key={`${sheet.fileName}-${sheet.page}`} className="ethernet-diagram-sheet-group">
-              <h4 className="ethernet-diagram-sheet-title">
-                {sheet.sheetTitle} — {sheet.fileName} p.{sheet.page}
-              </h4>
-              {n.length > 0 || e.length > 0 ? (
-                <SingleDiagram
-                  initialNodes={n}
-                  initialEdges={e}
-                  onSelectNode={onSelectNode}
-                  onSelectEdge={onSelectEdge}
-                />
-              ) : (
-                <p className="ethernet-diagram-sheet-empty">No system-level edges on this sheet.</p>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <>
-          {hasScope && mode === 'zone' && (
-            <>
-              <ConduitBuilderTable
-                edges_system={scopeResult.edges_system}
-                conduitStatus={conduitStatus}
-                conduitClassOverride={conduitClassOverride}
-                onStatusChange={onConduitStatusChange}
-                onClassOverride={onConduitClassOverride}
-              />
-              <div className="ethernet-conduit-legend">
-                <strong>Conduit classes:</strong>
-                {Object.entries(CONDUIT_CLASS_LABELS).map(([cls, label]) => (
-                  <span key={cls} className="ethernet-conduit-legend-item">
-                    <span className="ethernet-conduit-legend-swatch" style={{ background: CONDUIT_CLASS_COLORS[cls] }} />
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-          <div className="ethernet-diagram-main-wrap">
-            <SingleDiagram
-              initialNodes={singleGraph.nodes}
-              initialEdges={singleGraph.edges}
-              onSelectNode={onSelectNode}
-              onSelectEdge={onSelectEdge}
-              flowWrapClassName={mode === 'zone' ? 'ethernet-diagram-flow-wrap--zone' : undefined}
+            <ConduitBuilderTable
+              edges_system={scopeResult.edges_system}
+              conduitStatus={conduitStatus}
+              conduitClassOverride={conduitClassOverride}
+              onStatusChange={onConduitStatusChange}
+              onClassOverride={onConduitClassOverride}
             />
-            {hasScope && mode === 'zone' && zoneGraph.approvedConduits?.length > 0 && (
-              <ConduitListPanel approvedConduits={zoneGraph.approvedConduits} conduitClassOverride={conduitClassOverride} />
-            )}
-          </div>
-          {hasScope && mode === 'system' && showDrillDown && scopeResult?.edges_detail?.length > 0 && (
-            <div className="ethernet-diagram-drilldown">
-              <h4>Device-level edges (drill-down)</h4>
-              <p className="ethernet-diagram-drilldown-hint">Internal wiring; only boundary-to-boundary across systems appear in the graph above.</p>
-              <ul className="ethernet-diagram-drilldown-list">
-                {scopeResult.edges_detail.slice(0, 50).map((e, i) => (
-                  <li key={i}>
-                    {e.fromSystemId || '?'} → {e.toSystemId || '?'}: {getCableId(e)} {e.from?.labelRaw || e.from} → {e.to?.labelRaw || e.to}
-                    {e.fromBoundary && e.toBoundary ? ' [boundary↔boundary]' : ' [internal]'}
-                  </li>
-                ))}
-                {scopeResult.edges_detail.length > 50 && (
-                  <li>… and {scopeResult.edges_detail.length - 50} more</li>
-                )}
-              </ul>
+            <div className="ethernet-conduit-legend">
+              <strong>Conduit classes:</strong>
+              {Object.entries(CONDUIT_CLASS_LABELS).map(([cls, label]) => (
+                <span key={cls} className="ethernet-conduit-legend-item">
+                  <span className="ethernet-conduit-legend-swatch" style={{ background: CONDUIT_CLASS_COLORS[cls] }} />
+                  {label}
+                </span>
+              ))}
             </div>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </div>
+      <div className="ethernet-diagram-main-wrap">
+        <SingleDiagram
+          initialNodes={zoneGraph.nodes}
+          initialEdges={zoneGraph.edges}
+          onSelectNode={onSelectNode}
+          onSelectEdge={onSelectEdge}
+          flowWrapClassName="ethernet-diagram-flow-wrap--zone"
+        />
+        {hasScope && zoneGraph.approvedConduits?.length > 0 && (
+          <ConduitListPanel approvedConduits={zoneGraph.approvedConduits} conduitClassOverride={conduitClassOverride} />
+        )}
+      </div>
     </div>
   );
 }
@@ -945,21 +803,24 @@ function ExportButtons({ flowRef }) {
 
   const exportDrawio = useCallback(() => {
     const edges = reactFlowInstance.getEdges();
-    const lines = ['from,to,cableId,media,confidence'];
+    const lines = ['from,to,conduitNumber,cableIds,mediaTypes,confidence'];
     edges.forEach((e) => {
       const from = e.source;
       const to = e.target;
-      const cableId = e.data?.edgePayload ? getCableId(e.data.edgePayload) : (e.label || '').split(' ')[0] || '';
-      const media = (e.data?.edgePayload?.media ?? (e.label || '').split(' ').slice(1).join(' ')) || '';
-      const conf = (e.data?.edgePayload?.confidence ?? e.data?.reviewItem?.confidence) ?? '';
-      lines.push(`"${from}","${to}","${cableId}","${media}","${conf}"`);
+      const payload = e.data?.conduitPayload;
+      if (!payload) return;
+      const num = e.data?.conduitNumber ?? '';
+      const cableIds = (payload.cableIds || []).join('; ');
+      const media = (payload.mediaTypes || payload.media || '').toString();
+      const conf = payload.confidence ?? '';
+      lines.push(`"${from}","${to}","${num}","${cableIds}","${media}","${conf}"`);
     });
     const csv = lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ethernet-diagram-drawio.csv';
+    a.download = 'ethernet-conduits-drawio.csv';
     a.click();
     URL.revokeObjectURL(url);
   }, [reactFlowInstance]);

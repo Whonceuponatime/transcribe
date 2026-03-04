@@ -493,6 +493,12 @@ export default function EthernetExtractor() {
     if (result?.scopeResult?.excluded_edges?.length) {
       zip.file('excluded_edges.json', JSON.stringify(result.scopeResult.excluded_edges, null, 2));
     }
+    if (result?.scopeResult?.systems?.length) {
+      zip.file('zones_systems.json', JSON.stringify(result.scopeResult.systems, null, 2));
+    }
+    if (result?.scopeResult?.edges_system?.length) {
+      zip.file('conduits_system_level.json', JSON.stringify(result.scopeResult.edges_system, null, 2));
+    }
 
     const fpSamples = occs
       .filter((o) => o.filteredOut && o.filterReason)
