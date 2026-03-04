@@ -8,13 +8,9 @@ import ReactFlow, {
   ReactFlowProvider,
   useReactFlow
 } from 'reactflow';
-import dagre from 'dagre';
 import { toPng, toSvg } from 'html-to-image';
 import 'reactflow/dist/style.css';
 import './EthernetDiagram.css';
-
-const NODE_WIDTH = 160;
-const NODE_HEIGHT = 40;
 
 /** Conduit class colors for Zone & Conduit diagram */
 const CONDUIT_CLASS_COLORS = {
@@ -33,17 +29,6 @@ function getConduitPairKey(from, to) {
   return [from, to].sort().join('|');
 }
 
-function normalizeNodeId(label) {
-  if (label == null || label === '') return 'UNKNOWN';
-  const s = String(label)
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase()
-    .replace(/\s*\[[^\]]*\]\s*/g, '')
-    .trim();
-  return s || 'UNKNOWN';
-}
-
 function getEndpointLabel(ep) {
   if (!ep) return '—';
   if (typeof ep === 'object') return ep.labelRaw || ep.labelNormalized || '—';
@@ -52,64 +37,6 @@ function getEndpointLabel(ep) {
 
 function getCableId(edge) {
   return edge.cableIdNormalized ?? edge.cableId ?? '—';
-}
-
-function applyFilters(edges, filters, sheetFilter) {
-  const { minConfidence, showInternal, includeUnknown, search } = filters;
-  let list = edges || [];
-  if (sheetFilter) {
-    list = list.filter((e) =>
-      (e.sheetRefs || e.pageRefs || []).some(
-        (r) => r.fileName === sheetFilter.fileName && r.page === sheetFilter.page
-      )
-    );
-  }
-  const conf = minConfidence / 100;
-  list = list.filter((e) => (e.confidence ?? 0) >= conf);
-  const tagOk = (e) => {
-    if (e.tag === 'internal') return showInternal;
-    if (e.tag === 'unknown') return includeUnknown;
-    return e.tag === 'system_level';
-  };
-  list = list.filter(tagOk);
-  if (search && search.trim()) {
-    const q = search.trim().toLowerCase();
-    list = list.filter((e) => {
-      const fromL = getEndpointLabel(e.from);
-      const toL = getEndpointLabel(e.to);
-      const cableId = getCableId(e);
-      return (
-        fromL.toLowerCase().includes(q) ||
-        toL.toLowerCase().includes(q) ||
-        cableId.toLowerCase().includes(q)
-      );
-    });
-  }
-  return list;
-}
-
-function getLayoutedNodesEdges(nodes, edges, direction = 'LR') {
-  if (nodes.length === 0) return { nodes: [], edges };
-
-  const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: direction, nodesep: 60, ranksep: 80 });
-
-  nodes.forEach((n) => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
-  edges.forEach((e) => g.setEdge(e.source, e.target));
-
-  dagre.layout(g);
-
-  const layoutedNodes = nodes.map((n) => {
-    const pos = g.node(n.id);
-    const x = (pos && pos.x != null) ? pos.x - NODE_WIDTH / 2 : 0;
-    const y = (pos && pos.y != null) ? pos.y - NODE_HEIGHT / 2 : 0;
-    return {
-      ...n,
-      position: { x, y }
-    };
-  });
-
-  return { nodes: layoutedNodes, edges };
 }
 
 /**
