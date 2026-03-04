@@ -451,7 +451,6 @@ export default function EthernetExtractor() {
       zip.file('page_inventory.csv', piCsv);
     }
     const pairingLog = debug.pairingLog || [];
-    const occs = debug.cableOccurrencesForDebug || [];
     const ethernetByCable = {};
     occs.forEach((o) => {
       const id = o.cableIdNormalized || o.cableIdRaw;
