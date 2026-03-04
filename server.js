@@ -1331,7 +1331,9 @@ Maintain consistent formatting within each section. The first image needs no hea
 });
 
 // ========== Ethernet cable extraction (vessel cable diagrams) ==========
-const { extractEthernetConnections } = require('./lib/ethernetExtractor');
+const { extractEthernetConnections, extractEthernetCandidates } = require('./lib/ethernetExtractor');
+const { aiRefineEthernet } = require('./lib/ethernetAiRefiner');
+const { parseScopeCsv, runScopeFirstWorkflow } = require('./lib/ethernetScopeWorkflow');
 const { createClient } = require('@supabase/supabase-js');
 
 // Server-side upload: client sends PDFs here, we upload to Supabase (avoids CORS)
@@ -1395,7 +1397,10 @@ app.post('/api/ethernet/extract', async (req, res) => {
     minConfidence = 0,
     systemLevelOnly = false,
     aiEnabled = false,
-    fileNames = []
+    fileNames = [],
+    systemsInScopeCsv = '',
+    minSystemMapConfidence,
+    allowUnknownSystemEdges = false
   } = body;
 
   const params = { strictEthernet, minConfidence, systemLevelOnly, aiEnabled };
@@ -1442,7 +1447,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
       warnings: [],
       errors: [],
       sheets: [],
-      debug: null
+      debug: null,
+      scopeResult: null
     };
   }
 
@@ -1466,7 +1472,8 @@ app.post('/api/ethernet/extract', async (req, res) => {
       pdfPaths.push(localPath);
     }
 
-    const result = await extractEthernetConnections(pdfPaths, {
+    // Deterministic baseline extraction (Stage 1 / existing engine)
+    const deterministic = await extractEthernetConnections(pdfPaths, {
       strictEthernet,
       minConfidence,
       systemLevelOnly,
@@ -1474,10 +1481,65 @@ app.post('/api/ethernet/extract', async (req, res) => {
       fileNames: resolvedFileNames
     });
 
+    let finalEdges = deterministic.edges || [];
+    let finalReview = deterministic.review || [];
+    let finalSummary = deterministic.summary || {};
+    let finalSystems = [];
+    let finalDebug = deterministic.debug || null;
+
+    // Optional AI refinement / critic (Stage 2)
+    if (aiEnabled && openai) {
+      try {
+        const candidateBundle = await extractEthernetCandidates(pdfPaths, {
+          fileNames: resolvedFileNames
+        });
+        const refined = await aiRefineEthernet(openai, candidateBundle, deterministic, {
+          model: process.env.ETHERNET_MODEL || process.env.REWRITE_MODEL
+        });
+
+        if (refined && Array.isArray(refined.edges)) {
+          finalEdges = refined.edges;
+          finalReview = refined.review || [];
+          finalSummary = refined.summary || finalSummary;
+          finalSystems = refined.systems || [];
+
+          // Merge debug: keep existing debug and add candidate/AI info when available
+          finalDebug = {
+            ...(deterministic.debug || {}),
+            systems: refined.systems || [],
+            pageInventory: candidateBundle.pageInventory || []
+          };
+        }
+      } catch (aiErr) {
+        console.warn('Ethernet AI refinement failed; falling back to deterministic result:', aiErr.message);
+      }
+    }
+
     for (const p of pdfPaths) {
       try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
     }
     try { if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true }); } catch (_) {}
+
+    let scopeResult = null;
+    if (systemsInScopeCsv && String(systemsInScopeCsv).trim()) {
+      try {
+        const scopeList = parseScopeCsv(systemsInScopeCsv);
+        if (scopeList.length > 0) {
+          scopeResult = runScopeFirstWorkflow(scopeList, {
+            edges: finalEdges,
+            review: finalReview,
+            summary: finalSummary,
+            sheets: deterministic.sheets || [],
+            drawingListMapping: deterministic.drawingListMapping || {}
+          }, deterministic.sheets || [], {
+            minSystemMapConfidence: minSystemMapConfidence != null ? Number(minSystemMapConfidence) : undefined,
+            allowUnknownSystemEdges: !!allowUnknownSystemEdges
+          });
+        }
+      } catch (scopeErr) {
+        console.warn('Scope-first workflow failed:', scopeErr.message);
+      }
+    }
 
     const completedAt = new Date().toISOString();
     res.json({
@@ -1485,13 +1547,15 @@ app.post('/api/ethernet/extract', async (req, res) => {
       job: buildJob('done', completedAt),
       vesselId: String(vesselId).trim() || 'default',
       fileNames: resolvedFileNames,
-      edges: result.edges,
-      review: result.review,
-      summary: result.summary,
-      warnings: result.warnings || [],
-      errors: result.errors || [],
-      sheets: result.sheets || [],
-      debug: result.debug || null
+      systems: finalSystems,
+      edges: finalEdges,
+      review: finalReview,
+      summary: finalSummary,
+      warnings: deterministic.warnings || [],
+      errors: deterministic.errors || [],
+      sheets: deterministic.sheets || [],
+      debug: finalDebug,
+      scopeResult
     });
   } catch (error) {
     console.error('Ethernet extraction error:', error);

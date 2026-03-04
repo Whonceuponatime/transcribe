@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const { createClient } = require('@supabase/supabase-js');
 const { extractEthernetConnections } = require('../../lib/ethernetExtractor');
+const { parseScopeCsv, runScopeFirstWorkflow } = require('../../lib/ethernetScopeWorkflow');
 
 const SCHEMA_VERSION = '1.0';
 
@@ -45,7 +46,8 @@ function emptyResponse(job, vesselId, fileNames) {
     warnings: [],
     errors: [],
     sheets: [],
-    debug: null
+    debug: null,
+    scopeResult: null
   };
 }
 
@@ -80,7 +82,10 @@ module.exports = async function handler(req, res) {
     minConfidence = 0,
     systemLevelOnly = false,
     aiEnabled = false,
-    fileNames = []
+    fileNames = [],
+    systemsInScopeCsv = '',
+    minSystemMapConfidence,
+    allowUnknownSystemEdges = false
   } = body;
 
   const params = { strictEthernet, minConfidence, systemLevelOnly, aiEnabled };
@@ -126,6 +131,28 @@ module.exports = async function handler(req, res) {
       aiEnabled,
       fileNames: resolvedFileNames
     });
+
+    let scopeResult = null;
+    if (systemsInScopeCsv && String(systemsInScopeCsv).trim()) {
+      try {
+        const scopeList = parseScopeCsv(systemsInScopeCsv);
+        if (scopeList.length > 0) {
+          scopeResult = runScopeFirstWorkflow(scopeList, {
+            edges: result.edges,
+            review: result.review,
+            summary: result.summary,
+            sheets: result.sheets || [],
+            drawingListMapping: result.drawingListMapping || {}
+          }, result.sheets || [], {
+            minSystemMapConfidence: minSystemMapConfidence != null ? Number(minSystemMapConfidence) : undefined,
+            allowUnknownSystemEdges: !!allowUnknownSystemEdges
+          });
+        }
+      } catch (scopeErr) {
+        console.warn('Scope-first workflow failed:', scopeErr.message);
+      }
+    }
+
     cleanup();
 
     const completedAt = new Date().toISOString();
@@ -142,7 +169,8 @@ module.exports = async function handler(req, res) {
       warnings: result.warnings || [],
       errors: result.errors || [],
       sheets: result.sheets || [],
-      debug: result.debug || null
+      debug: result.debug || null,
+      scopeResult
     });
   } catch (error) {
     cleanup();

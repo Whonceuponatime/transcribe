@@ -217,3 +217,35 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+.ethernet-diagram-drilldown {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.ethernet-diagram-drilldown h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.ethernet-diagram-drilldown-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ethernet-diagram-drilldown-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ethernet-diagram-drilldown-list li {
+  margin-bottom: 0.25rem;
+}

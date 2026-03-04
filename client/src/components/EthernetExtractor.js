@@ -13,7 +13,9 @@ function csvEscape(val) {
 export default function EthernetExtractor() {
   const [files, setFiles] = useState([]);
   const [vesselId, setVesselId] = useState('');
+  const [systemsInScopeCsv, setSystemsInScopeCsv] = useState('');
   const [strictEthernet, setStrictEthernet] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(''); // "uploading" | "extracting"
   const [error, setError] = useState(null);
@@ -90,10 +92,11 @@ export default function EthernetExtractor() {
         body: JSON.stringify({
           storagePaths,
           vesselId: vesselId || 'default',
+          systemsInScopeCsv: systemsInScopeCsv.trim() || undefined,
           strictEthernet,
           minConfidence: 0,
           systemLevelOnly: false,
-          aiEnabled: false,
+          aiEnabled,
           fileNames
         })
       });
@@ -282,6 +285,117 @@ export default function EthernetExtractor() {
     downloadDebugFile('summary_debug.json', JSON.stringify(debug.summaryDebug || {}, null, 2), 'application/json');
   };
 
+  const downloadPageInventoryCsv = () => {
+    if (!debug || !Array.isArray(debug.pageInventory)) return;
+    const headers = [
+      'fileName',
+      'page',
+      'pageType',
+      'skipReason',
+      'pageTitle',
+      'pageCode',
+      'ethernetKeywordHits',
+      'uniqueCableIds',
+      'ethernetCableIds',
+      'duplicateTextHits'
+    ];
+    const rows = debug.pageInventory.map((p) => [
+      p.fileName,
+      p.page,
+      p.pageType,
+      p.skipReason || '',
+      p.pageTitle || '',
+      p.pageCode || '',
+      p.ethernetKeywordHits ?? 0,
+      Array.isArray(p.uniqueCableIds) ? p.uniqueCableIds.join('; ') : '',
+      Array.isArray(p.ethernetCableIds) ? p.ethernetCableIds.join('; ') : '',
+      p.duplicateTextHits ?? 0
+    ]);
+    const csv = [headers.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    downloadDebugFile('page_inventory.csv', csv, 'text/csv');
+  };
+
+  const downloadCableStatsCsv = () => {
+    if (!debug) return;
+    const pairingLog = debug.pairingLog || [];
+    const occs = debug.cableOccurrencesForDebug || [];
+    const ethernetByCable = {};
+    occs.forEach((o) => {
+      const id = o.cableIdNormalized || o.cableIdRaw;
+      if (!id) return;
+      if (!ethernetByCable[id]) ethernetByCable[id] = { ethernet: 0, total: 0 };
+      ethernetByCable[id].total += 1;
+      if (o.ethernetHintFound) ethernetByCable[id].ethernet += 1;
+    });
+    const headers = [
+      'cableIdRaw',
+      'cableIdNormalized',
+      'occurrenceCount',
+      'classification',
+      'status',
+      'rejectReason',
+      'topEndpointCandidates'
+    ];
+    const rows = pairingLog.map((p) => {
+      const idNorm = p.cableIdNormalized || p.cableIdRaw;
+      const stats = idNorm ? ethernetByCable[idNorm] : null;
+      let classification = 'unknown';
+      if (stats && stats.ethernet > 0) classification = 'ethernet';
+      const topEndpoints = Array.isArray(p.occurrences)
+        ? p.occurrences
+            .slice(0, 3)
+            .map((o) => o.endpointLabelPicked || '')
+            .filter(Boolean)
+            .join('; ')
+        : '';
+      return [
+        p.cableIdRaw || '',
+        p.cableIdNormalized || '',
+        p.occurrenceCount ?? '',
+        classification,
+        p.status || p.type || '',
+        p.reason || '',
+        topEndpoints
+      ];
+    });
+    const csv = [headers.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    downloadDebugFile('cable_stats.csv', csv, 'text/csv');
+  };
+
+  const downloadFalsePositives = () => {
+    if (!debug) return;
+    const occs = debug.cableOccurrencesForDebug || [];
+    const samples = occs
+      .filter((o) => o.filteredOut && o.filterReason)
+      .slice(0, 200)
+      .map((o) => ({
+        cableIdRaw: o.cableIdRaw,
+        cableIdNormalized: o.cableIdNormalized,
+        fileName: o.fileName,
+        page: o.page,
+        filterReason: o.filterReason,
+        nearbyTextSample: o.nearbyTextSample
+      }));
+    downloadDebugFile('false_positive_samples.json', JSON.stringify(samples, null, 2), 'application/json');
+  };
+
+  const downloadEdgeProvenance = () => {
+    if (!result) return;
+    const edges = result.edges || [];
+    const provenance = edges.map((e) => ({
+      cableIdRaw: e.cableIdRaw,
+      cableIdNormalized: e.cableIdNormalized,
+      fromLabel: edgeFrom(e),
+      toLabel: edgeTo(e),
+      media: e.media,
+      confidence: e.confidence ?? 0,
+      pageRefs: e.pageRefs || [],
+      sheetRefs: e.sheetRefs || [],
+      occurrences: e.occurrences || [],
+      evidence: e.evidence || []
+    }));
+    downloadDebugFile('edge_provenance.json', JSON.stringify(provenance, null, 2), 'application/json');
+  };
   const downloadDebugBundleZip = async () => {
     if (!debug) return;
     const zip = new JSZip();
@@ -319,6 +433,87 @@ export default function EthernetExtractor() {
     zip.file('cable_occurrences.csv', occCsv);
     zip.file('pairing_log.json', JSON.stringify(debug.pairingLog || [], null, 2));
     zip.file('summary_debug.json', JSON.stringify(debug.summaryDebug || {}, null, 2));
+    if (Array.isArray(debug.pageInventory)) {
+      const piHeaders = ['fileName', 'page', 'pageType', 'skipReason', 'pageTitle', 'pageCode', 'ethernetKeywordHits', 'uniqueCableIds', 'ethernetCableIds', 'duplicateTextHits'];
+      const piRows = debug.pageInventory.map((p) => [
+        p.fileName,
+        p.page,
+        p.pageType,
+        p.skipReason || '',
+        p.pageTitle || '',
+        p.pageCode || '',
+        p.ethernetKeywordHits ?? 0,
+        Array.isArray(p.uniqueCableIds) ? p.uniqueCableIds.join('; ') : '',
+        Array.isArray(p.ethernetCableIds) ? p.ethernetCableIds.join('; ') : '',
+        p.duplicateTextHits ?? 0
+      ]);
+      const piCsv = [piHeaders.map(csvEscape).join(','), ...piRows.map((r) => r.map(csvEscape).join(','))].join('\n');
+      zip.file('page_inventory.csv', piCsv);
+    }
+    const pairingLog = debug.pairingLog || [];
+    const occs = debug.cableOccurrencesForDebug || [];
+    const ethernetByCable = {};
+    occs.forEach((o) => {
+      const id = o.cableIdNormalized || o.cableIdRaw;
+      if (!id) return;
+      if (!ethernetByCable[id]) ethernetByCable[id] = { ethernet: 0, total: 0 };
+      ethernetByCable[id].total += 1;
+      if (o.ethernetHintFound) ethernetByCable[id].ethernet += 1;
+    });
+    const csHeaders = ['cableIdRaw', 'cableIdNormalized', 'occurrenceCount', 'classification', 'status', 'rejectReason', 'topEndpointCandidates'];
+    const csRows = pairingLog.map((p) => {
+      const idNorm = p.cableIdNormalized || p.cableIdRaw;
+      const stats = idNorm ? ethernetByCable[idNorm] : null;
+      let classification = 'unknown';
+      if (stats && stats.ethernet > 0) classification = 'ethernet';
+      const topEndpoints = Array.isArray(p.occurrences)
+        ? p.occurrences
+            .slice(0, 3)
+            .map((o) => o.endpointLabelPicked || '')
+            .filter(Boolean)
+            .join('; ')
+        : '';
+      return [
+        p.cableIdRaw || '',
+        p.cableIdNormalized || '',
+        p.occurrenceCount ?? '',
+        classification,
+        p.status || p.type || '',
+        p.reason || '',
+        topEndpoints
+      ];
+    });
+    const csCsv = [csHeaders.map(csvEscape).join(','), ...csRows.map((r) => r.map(csvEscape).join(','))].join('\n');
+    zip.file('cable_stats.csv', csCsv);
+
+    const fpSamples = occs
+      .filter((o) => o.filteredOut && o.filterReason)
+      .slice(0, 200)
+      .map((o) => ({
+        cableIdRaw: o.cableIdRaw,
+        cableIdNormalized: o.cableIdNormalized,
+        fileName: o.fileName,
+        page: o.page,
+        filterReason: o.filterReason,
+        nearbyTextSample: o.nearbyTextSample
+      }));
+    zip.file('false_positive_samples.json', JSON.stringify(fpSamples, null, 2));
+
+    const edges = result?.edges || [];
+    const provenance = edges.map((e) => ({
+      cableIdRaw: e.cableIdRaw,
+      cableIdNormalized: e.cableIdNormalized,
+      fromLabel: edgeFrom(e),
+      toLabel: edgeTo(e),
+      media: e.media,
+      confidence: e.confidence ?? 0,
+      pageRefs: e.pageRefs || [],
+      sheetRefs: e.sheetRefs || [],
+      occurrences: e.occurrences || [],
+      evidence: e.evidence || []
+    }));
+    zip.file('edge_provenance.json', JSON.stringify(provenance, null, 2));
+
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -339,6 +534,18 @@ export default function EthernetExtractor() {
           value={vesselId}
           onChange={e => setVesselId(e.target.value)}
         />
+        <label className="ethernet-label">Systems in scope (CSV)</label>
+        <textarea
+          className="ethernet-scope-csv"
+          placeholder="system_name, vendor, tags&#10;IAS&#10;VDR&#10;Main Engine&#10;VSAT,CCTV"
+          value={systemsInScopeCsv}
+          onChange={e => setSystemsInScopeCsv(e.target.value)}
+          rows={4}
+          aria-describedby="scope-csv-hint"
+        />
+        <p id="scope-csv-hint" className="ethernet-hint">
+          Optional: one system per line or CSV with columns system_name, vendor, tags. Enables simplified system-only topology.
+        </p>
         <div className="ethernet-option">
           <input
             type="checkbox"
@@ -347,6 +554,15 @@ export default function EthernetExtractor() {
             onChange={e => setStrictEthernet(e.target.checked)}
           />
           <label htmlFor="strict-ether">Strict Ethernet only (exclude cables without CAT6/RJ45/etc hints)</label>
+        </div>
+        <div className="ethernet-option">
+          <input
+            type="checkbox"
+            id="ai-enabled"
+            checked={aiEnabled}
+            onChange={e => setAiEnabled(e.target.checked)}
+          />
+          <label htmlFor="ai-enabled">AI refinement (critic) for edges (uses OpenAI)</label>
         </div>
         <div
           className="ethernet-dropzone"
@@ -441,6 +657,12 @@ export default function EthernetExtractor() {
             {result.summary.ai && (
               <span> • AI: {result.summary.ai.used ? 'on' : 'off'} (passes: {result.summary.ai.passesRun})</span>
             )}
+            {result.scopeResult && (
+              <span className="ethernet-scope-summary">
+                • Scope: {result.scopeResult.systems?.length ?? 0} systems, {result.scopeResult.summary?.pagesMapped ?? 0} pages mapped, {result.scopeResult.summary?.pagesUnknown ?? 0} unknown, {result.scopeResult.edges_system?.length ?? 0} system-level edges
+                {result.scopeResult.summary?.mapping_conflicts > 0 && `, ${result.scopeResult.summary.mapping_conflicts} conflict(s)`}
+              </span>
+            )}
           </div>
           {result.summary.extractionNote && (
             <div className="ethernet-extraction-note" role="alert">
@@ -481,6 +703,15 @@ export default function EthernetExtractor() {
             >
               Diagram
             </button>
+            {result.scopeResult && (
+              <button
+                type="button"
+                className={activeTab === 'scope' ? 'active' : ''}
+                onClick={() => setActiveTab('scope')}
+              >
+                Scope / Page map
+              </button>
+            )}
             {hasDebug && (
               <button
                 type="button"
@@ -492,7 +723,66 @@ export default function EthernetExtractor() {
             )}
           </div>
           {activeTab === 'diagram' && (
-            <EthernetDiagram result={result} />
+            <EthernetDiagram result={result} scopeResult={result.scopeResult} />
+          )}
+          {activeTab === 'scope' && result.scopeResult && (
+            <div className="ethernet-scope-panel">
+              <h4>Systems in scope</h4>
+              <ul className="ethernet-scope-systems">
+                {(result.scopeResult.systems || []).map((s, i) => (
+                  <li key={i}><strong>{s.systemId}</strong> {s.aliases?.length ? `(${s.aliases.slice(0, 3).join(', ')})` : ''} {s.codePatterns?.length ? ` [codes: ${s.codePatterns.slice(0, 3).join(', ')}]` : ''}</li>
+                ))}
+              </ul>
+              <h4>Page → system mapping</h4>
+              <p className="ethernet-hint">ruleUsed: codePattern (pageCode) → titleStrong → titleWeak → unknown. Below-threshold pages map to unknown_system and are excluded from system edges unless allowed.</p>
+              <div className="ethernet-scope-table-wrap">
+                <table className="ethernet-scope-table">
+                  <thead>
+                    <tr><th>File</th><th>Page</th><th>Page code</th><th>Page title</th><th>System</th><th>Rule</th><th>Confidence</th><th>Matched</th><th>Evidence</th></tr>
+                  </thead>
+                  <tbody>
+                    {(result.scopeResult.page_system_map || []).map((row, i) => (
+                      <tr key={i} className={row.out_of_scope ? 'out-of-scope' : (row.systemId === result.scopeResult.unknown_system ? 'unknown-system' : '')}>
+                        <td>{row.fileName}</td>
+                        <td>{row.page}</td>
+                        <td><code>{row.pageCode || '—'}</code></td>
+                        <td>{row.pageTitle || '—'}</td>
+                        <td>{row.systemId || '—'}</td>
+                        <td>{row.ruleUsed || '—'}</td>
+                        <td>{(row.mappingConfidence * 100).toFixed(0)}%</td>
+                        <td>{(row.matchedTokens || []).length ? row.matchedTokens.join(', ') : '—'}</td>
+                        <td><span className="ethernet-scope-evidence">{row.evidence || '—'}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {(result.scopeResult.mapping_conflicts && result.scopeResult.mapping_conflicts.length > 0) && (
+                <>
+                  <h4>Mapping conflicts</h4>
+                  <p className="ethernet-hint">Pages where codePattern suggests one system but title suggests another.</p>
+                  <div className="ethernet-scope-table-wrap">
+                    <table className="ethernet-scope-table">
+                      <thead>
+                        <tr><th>File</th><th>Page</th><th>Page code</th><th>Code → system</th><th>Title → system</th><th>Confidence</th></tr>
+                      </thead>
+                      <tbody>
+                        {result.scopeResult.mapping_conflicts.map((c, i) => (
+                          <tr key={i} className="mapping-conflict">
+                            <td>{c.fileName}</td>
+                            <td>{c.page}</td>
+                            <td><code>{c.pageCode || '—'}</code></td>
+                            <td>{c.codeSuggestedSystem}</td>
+                            <td>{c.titleSuggestedSystem}</td>
+                            <td>{(c.mappingConfidence * 100).toFixed(0)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           {activeTab === 'debug' && hasDebug && (
             <div className="ethernet-debug-panel">
@@ -509,6 +799,19 @@ export default function EthernetExtractor() {
                 </ul>
                 <p className="ethernet-debug-note">Overlay images (PNG per page) are not generated; use file+page in the CSVs to correlate with the PDFs.</p>
               </div>
+              {debug.summaryDebug?.pageTitleIssues && debug.summaryDebug.pageTitleIssues.length > 0 && (
+                <div className="ethernet-debug-files">
+                  <strong>Pages without clear system title</strong>
+                  <ul>
+                    {debug.summaryDebug.pageTitleIssues.map((p, i) => (
+                      <li key={i}>
+                        {p.fileName} p.{p.page} — title: {p.pageTitle || '—'} (conf {(p.confidence * 100).toFixed(0)}%)<br />
+                        <span className="ethernet-debug-header-snippet">{p.headerSnippet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="ethernet-debug-actions">
                 <button type="button" className="btn-primary" onClick={downloadDebugBundleZip}>
                   Download debug bundle (ZIP)
@@ -519,6 +822,10 @@ export default function EthernetExtractor() {
                   <button type="button" className="btn-secondary" onClick={downloadCableOccurrencesCsv}>cable_occurrences.csv</button>
                   <button type="button" className="btn-secondary" onClick={downloadPairingLog}>pairing_log.json</button>
                   <button type="button" className="btn-secondary" onClick={downloadSummaryDebug}>summary_debug.json</button>
+                  <button type="button" className="btn-secondary" onClick={downloadPageInventoryCsv}>page_inventory.csv</button>
+                  <button type="button" className="btn-secondary" onClick={downloadCableStatsCsv}>cable_stats.csv</button>
+                  <button type="button" className="btn-secondary" onClick={downloadFalsePositives}>false_positive_samples.json</button>
+                  <button type="button" className="btn-secondary" onClick={downloadEdgeProvenance}>edge_provenance.json</button>
                 </div>
               </div>
             </div>

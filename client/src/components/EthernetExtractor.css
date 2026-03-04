@@ -35,6 +35,32 @@
   box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
+.ethernet-scope-csv {
+  width: 100%;
+  max-width: 480px;
+  min-height: 80px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.ethernet-scope-csv:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ethernet-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0.5rem 0;
+  max-width: 480px;
+}
+
 .ethernet-option {
   display: flex;
   align-items: center;
@@ -456,6 +482,85 @@
   background: var(--bg-surface);
   padding: 0.1rem 0.3rem;
   border-radius: 2px;
+}
+
+.ethernet-debug-header-snippet {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ethernet-scope-summary {
+  display: inline-block;
+  margin-left: 0.25rem;
+  color: var(--accent);
+}
+
+.ethernet-scope-panel {
+  padding: 0.75rem 0;
+}
+
+.ethernet-scope-panel h4 {
+  margin: 1rem 0 0.5rem 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.ethernet-scope-panel h4:first-child {
+  margin-top: 0;
+}
+
+.ethernet-scope-systems {
+  margin: 0 0 1rem 0;
+  padding-left: 1.25rem;
+}
+
+.ethernet-scope-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.ethernet-scope-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ethernet-scope-table th,
+.ethernet-scope-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+
+.ethernet-scope-table th {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ethernet-scope-table tr.out-of-scope td {
+  color: var(--text-muted);
+}
+
+.ethernet-scope-table tr.unknown-system td {
+  background: var(--bg-muted, rgba(255,255,255,0.05));
+  color: var(--text-muted);
+}
+
+.ethernet-scope-table tr.mapping-conflict td {
+  background: rgba(200, 150, 0, 0.12);
+}
+
+.ethernet-scope-evidence {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 200px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ethernet-debug-actions {

@@ -95,6 +95,62 @@ function getLayoutedNodesEdges(nodes, edges, direction = 'LR') {
   return { nodes: layoutedNodes, edges };
 }
 
+/**
+ * Build graph from scope-first result: nodes = systems, edges = edges_system (simplified topology).
+ */
+function buildSystemTopologyGraph(scopeResult) {
+  if (!scopeResult || !scopeResult.systems || !scopeResult.edges_system) {
+    return { nodes: [], edges: [] };
+  }
+  const systems = scopeResult.systems || [];
+  const byId = new Map();
+  systems.forEach((s) => {
+    const id = s.systemId || s.systemName;
+    if (!id) return;
+    byId.set(id, s);
+  });
+
+  const systemIds = new Set();
+  scopeResult.edges_system.forEach((e) => {
+    systemIds.add(e.fromSystemId);
+    systemIds.add(e.toSystemId);
+  });
+
+  const nodes = [];
+  systemIds.forEach((id) => {
+    const sys = byId.get(id);
+    const likelyNetworked = sys ? !!sys.likelyNetworked : true;
+    if (!likelyNetworked && !sys) return;
+    const label = sys?.displayLabel || id;
+    nodes.push({
+      id,
+      type: 'default',
+      data: {
+        label,
+        isSystemNode: true,
+        systemTag: sys?.systemTag,
+        likelyNetworked,
+        systemId: id
+      },
+      position: { x: 0, y: 0 }
+    });
+  });
+  const flowEdges = scopeResult.edges_system.map((e, i) => {
+    const cableLabel = Array.isArray(e.cableIds) ? e.cableIds.slice(0, 3).join(', ') : (e.cableIds || e.cableIds?.[0] || '');
+    const mediaStr = Array.isArray(e.mediaTypes) ? e.mediaTypes.join(', ') : (e.media || '');
+    const countStr = e.edgeCount != null ? ` (${e.edgeCount})` : '';
+    const label = cableLabel ? `${cableLabel}${(e.cableIds?.length > 3 ? '…' : '')} ${mediaStr}${countStr}`.trim() : (mediaStr + countStr) || `${e.fromSystemId}–${e.toSystemId}`;
+    return {
+      id: `scope-${i}-${e.fromSystemId}-${e.toSystemId}`,
+      source: e.fromSystemId,
+      target: e.toSystemId,
+      label: label || `${e.fromSystemId}–${e.toSystemId}`,
+      data: { systemEdgePayload: e, edgePayload: e.edgeDetail }
+    };
+  });
+  return getLayoutedNodesEdges(nodes, flowEdges);
+}
+
 function buildTopologyGraph(result, filters, sheetFilter = null) {
   const edges = applyFilters(result.edges || [], filters, sheetFilter);
   const nodeIds = new Set();
@@ -230,8 +286,9 @@ function SingleDiagram({ initialNodes, initialEdges, onSelectNode, onSelectEdge 
   );
 }
 
-function DiagramInner({ result, onSelectNode, onSelectEdge }) {
-  const [mode, setMode] = useState('topology');
+function DiagramInner({ result, scopeResult, onSelectNode, onSelectEdge }) {
+  const hasScope = scopeResult && scopeResult.systems && scopeResult.edges_system?.length >= 0;
+  const [mode, setMode] = useState(hasScope ? 'system' : 'topology');
   // Default to higher confidence to avoid spaghetti graphs
   const [minConfidence, setMinConfidence] = useState(60);
   const [showInternal, setShowInternal] = useState(false);
@@ -240,19 +297,21 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
   const [search, setSearch] = useState('');
   // Group by sheet by default to keep each diagram small and readable
   const [groupBySheet, setGroupBySheet] = useState(true);
+  const [showDrillDown, setShowDrillDown] = useState(false);
   const filters = useMemo(
     () => ({ minConfidence, showInternal, includeUnknown, search }),
     [minConfidence, showInternal, includeUnknown, search]
   );
 
   const sheets = useMemo(() => result?.sheets ?? [], [result?.sheets]);
-  const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0;
+  const groupBySheetEnabled = groupBySheet && mode === 'topology' && sheets.length > 0 && !hasScope;
 
   const singleGraph = useMemo(() => {
     if (!result) return { nodes: [], edges: [] };
+    if (mode === 'system' && hasScope) return buildSystemTopologyGraph(scopeResult);
     if (mode === 'cable') return buildCableCentricGraph(result, filters);
     return buildTopologyGraph(result, filters, null);
-  }, [result, mode, filters]);
+  }, [result, scopeResult, mode, filters, hasScope]);
 
   const sheetsGraphs = useMemo(() => {
     if (!groupBySheetEnabled || !result) return [];
@@ -271,10 +330,19 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
         <label>
           Mode:
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="topology">Topology (system-level)</option>
+            {hasScope && (
+              <option value="system">System topology (scope)</option>
+            )}
+            <option value="topology">Topology (device-level)</option>
             <option value="cable">Cable-centric</option>
           </select>
         </label>
+        {hasScope && mode === 'system' && (
+          <label>
+            <input type="checkbox" checked={showDrillDown} onChange={(e) => setShowDrillDown(e.target.checked)} />
+            Drill-down (device-level edges)
+          </label>
+        )}
         <label className="ethernet-diagram-slider-label">
           Min confidence: {minConfidence}%
           <input
@@ -332,20 +400,72 @@ function DiagramInner({ result, onSelectNode, onSelectEdge }) {
           ))}
         </div>
       ) : (
-        <SingleDiagram
-          initialNodes={singleGraph.nodes}
-          initialEdges={singleGraph.edges}
-          onSelectNode={onSelectNode}
-          onSelectEdge={onSelectEdge}
-        />
+        <>
+          <SingleDiagram
+            initialNodes={singleGraph.nodes}
+            initialEdges={singleGraph.edges}
+            onSelectNode={onSelectNode}
+            onSelectEdge={onSelectEdge}
+          />
+          {hasScope && mode === 'system' && showDrillDown && scopeResult?.edges_detail?.length > 0 && (
+            <div className="ethernet-diagram-drilldown">
+              <h4>Device-level edges (drill-down)</h4>
+              <p className="ethernet-diagram-drilldown-hint">Internal wiring; only boundary-to-boundary across systems appear in the graph above.</p>
+              <ul className="ethernet-diagram-drilldown-list">
+                {scopeResult.edges_detail.slice(0, 50).map((e, i) => (
+                  <li key={i}>
+                    {e.fromSystemId || '?'} → {e.toSystemId || '?'}: {getCableId(e)} {e.from?.labelRaw || e.from} → {e.to?.labelRaw || e.to}
+                    {e.fromBoundary && e.toBoundary ? ' [boundary↔boundary]' : ' [internal]'}
+                  </li>
+                ))}
+                {scopeResult.edges_detail.length > 50 && (
+                  <li>… and {scopeResult.edges_detail.length - 50} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function SidePanel({ selection, result, onClose }) {
+function SidePanel({ selection, result, scopeResult, onClose }) {
   if (!selection || !result) return null;
   const { type, id, data } = selection;
+
+  if (type === 'edge' && data?.systemEdgePayload) {
+    const e = data.systemEdgePayload;
+    const edgeCount = e.edgeCount ?? (e.cableIds?.length ?? 0);
+    const mediaTypes = e.mediaTypes ?? (e.media ? [e.media] : []);
+    return (
+      <div className="ethernet-diagram-panel">
+        <div className="ethernet-diagram-panel-header">
+          <h3>System link: {e.fromSystemId} ↔ {e.toSystemId}</h3>
+          <button type="button" className="ethernet-diagram-panel-close" onClick={onClose}>×</button>
+        </div>
+        <div className="ethernet-diagram-panel-section">
+          {edgeCount > 0 && <p><strong>Aggregated:</strong> {edgeCount} device edge(s), media: {Array.isArray(mediaTypes) ? mediaTypes.join(', ') : e.media}</p>}
+          <strong>Cable IDs</strong>
+          <ul>{((e.cableIds && e.cableIds.length) ? e.cableIds : []).map((c, i) => (
+            <li key={i}>{c}{e.cableIdCounts && e.cableIdCounts[c] != null ? ` (×${e.cableIdCounts[c]})` : ''}</li>
+          ))}</ul>
+          <strong>Page refs</strong>
+          <ul className="ethernet-diagram-evidence">
+            {(e.pageRefs || []).slice(0, 10).map((r, i) => (
+              <li key={i}>{r.fileName} p.{r.page}</li>
+            ))}
+          </ul>
+          <strong>Evidence</strong>
+          <ul className="ethernet-diagram-evidence">
+            {(e.evidence || []).slice(0, 10).map((ev, i) => (
+              <li key={i}>{typeof ev === 'object' && ev.text != null ? `${ev.fileName || ''} p.${ev.page ?? ''}: ${ev.text}` : String(ev)}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   if (type === 'node') {
     const edges = (result.edges || []).filter((e) => {
@@ -532,19 +652,20 @@ function ExportButtons({ flowRef }) {
   );
 }
 
-function DiagramContent({ result, selection, onSelectNode, onSelectEdge, onClosePanel }) {
+function DiagramContent({ result, scopeResult, selection, onSelectNode, onSelectEdge, onClosePanel }) {
   return (
     <div className="ethernet-diagram-root">
       <ReactFlowProvider>
         <DiagramInner
           result={result}
+          scopeResult={scopeResult}
           onSelectNode={onSelectNode}
           onSelectEdge={onSelectEdge}
         />
         <ExportButtons />
         {selection && (
           <div className="ethernet-diagram-panel-wrap">
-            <SidePanel selection={selection} result={result} onClose={onClosePanel} />
+            <SidePanel selection={selection} result={result} scopeResult={scopeResult} onClose={onClosePanel} />
           </div>
         )}
       </ReactFlowProvider>
@@ -552,7 +673,7 @@ function DiagramContent({ result, selection, onSelectNode, onSelectEdge, onClose
   );
 }
 
-export default function EthernetDiagram({ result }) {
+export default function EthernetDiagram({ result, scopeResult }) {
   const [selection, setSelection] = useState(null);
 
   const onSelectNode = useCallback((id, data) => {
@@ -570,6 +691,7 @@ export default function EthernetDiagram({ result }) {
   return (
     <DiagramContent
       result={result}
+      scopeResult={scopeResult}
       selection={selection}
       onSelectNode={onSelectNode}
       onSelectEdge={onSelectEdge}
