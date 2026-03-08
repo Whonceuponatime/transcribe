@@ -39,6 +39,11 @@ function getCableId(edge) {
   return edge.cableIdNormalized ?? edge.cableId ?? '—';
 }
 
+function normalizeNodeId(label) {
+  if (!label) return '';
+  return String(label).trim();
+}
+
 /**
  * (Removed) System topology graph builder – replaced by Zone & Conduit.
  */
