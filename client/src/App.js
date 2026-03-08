@@ -17,6 +17,7 @@ import MarkdownCSVConverter from './components/MarkdownCSVConverter';
 import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
+import FinancialCalculator from './components/FinancialCalculator';
 
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
@@ -142,6 +143,8 @@ function App() {
           <EthernetExtractor />
         ) : activeTab === 'markdown-csv' ? (
           <MarkdownCSVConverter />
+        ) : activeTab === 'financial-calc' ? (
+          <FinancialCalculator />
         ) : (
           <ImageConverter />
         )}

@@ -1,0 +1,263 @@
+/* Forex → Crypto Financial Calculator */
+
+.fincalc {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* ── Header ───────────────────────────────────── */
+.fincalc__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fincalc__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-family: var(--font-brand);
+  color: var(--text);
+}
+
+.fincalc__subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Body ─────────────────────────────────────── */
+.fincalc__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Sections ─────────────────────────────────── */
+.fincalc__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fincalc__section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Grid ─────────────────────────────────────── */
+.fincalc__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 540px) {
+  .fincalc__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .fincalc__grid--fees {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Field ────────────────────────────────────── */
+.fincalc__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fincalc__label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fincalc__hint {
+  font-size: 0.72rem;
+  color: var(--text-hint);
+  line-height: 1.4;
+}
+
+/* ── Input Wrapper ────────────────────────────── */
+.fincalc__input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.fincalc__input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.fincalc__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.55rem 0.65rem;
+  min-width: 0;
+  -moz-appearance: textfield;
+}
+
+.fincalc__input::-webkit-outer-spin-button,
+.fincalc__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fincalc__input::placeholder {
+  color: var(--text-hint);
+  font-weight: 400;
+}
+
+.fincalc__adornment {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-hint);
+  padding: 0 0.6rem;
+  background: var(--bg-elevated);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  border-color: var(--border);
+}
+
+.fincalc__adornment--left {
+  border-right: 1px solid var(--border);
+}
+
+.fincalc__adornment--right {
+  border-left: 1px solid var(--border);
+}
+
+.fincalc__input--left-adorn {
+  padding-left: 0.5rem;
+}
+
+.fincalc__input--right-adorn {
+  padding-right: 0.5rem;
+}
+
+/* ── Results Table ────────────────────────────── */
+.fincalc__results {
+  background: var(--bg-elevated);
+}
+
+.fincalc__table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fincalc__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.5rem 0;
+}
+
+.fincalc__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+}
+
+.fincalc__row-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.fincalc__row-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-family: var(--font-brand);
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fincalc__pct {
+  font-size: 0.8em;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* Row modifiers */
+.fincalc__row--fee .fincalc__row-label {
+  font-size: 0.82rem;
+  color: var(--text-hint);
+}
+
+.fincalc__row--sub .fincalc__row-label,
+.fincalc__row--sub .fincalc__row-value {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.fincalc__row--profit .fincalc__row-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fincalc__row--final {
+  padding-top: 0.65rem;
+}
+
+.fincalc__row--final .fincalc__row-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Value colours */
+.fincalc__row-value--pos {
+  color: var(--accent);
+}
+
+.fincalc__row-value--neg {
+  color: #f87171;
+}
+
+.fincalc__row-value--highlight {
+  font-size: 1.3rem;
+  color: var(--accent);
+}
+
+/* ── Notice ───────────────────────────────────── */
+.fincalc__notice {
+  font-size: 0.85rem;
+  color: var(--text-hint);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.fincalc__notice--loss {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.07);
+  color: #f87171;
+}

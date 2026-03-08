@@ -31,6 +31,7 @@ const CATEGORIES = {
       { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
+      { id: 'financial-calc', label: 'Financial Calculator', icon: '💱' },
     ],
   },
 };
