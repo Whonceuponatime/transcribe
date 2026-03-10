@@ -2118,6 +2118,104 @@ app.get('/api/download-pdf/:filename(*)', (req, res) => {
   }
 });
 
+// ─── FX Advisor (FRED-only KRW→USD) ───────────────────────────────────────
+const { runSync } = require('./lib/fxSync');
+const { portfolioFromConversions, unrealizedKrwValue } = require('./lib/fxPortfolio');
+
+function getFxSupabase() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return require('@supabase/supabase-js').createClient(supabaseUrl, supabaseServiceKey);
+}
+
+app.get('/api/fx-advice/today', async (req, res) => {
+  try {
+    const supabase = getFxSupabase();
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured', hint: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY' });
+    }
+    const [snapRes, adviceRes, convRes] = await Promise.all([
+      supabase.from('fx_market_snapshots').select('*').order('snapshot_date', { ascending: false }).limit(1).single(),
+      supabase.from('fx_advice_runs').select('*').order('snapshot_date', { ascending: false }).limit(1).single(),
+      supabase.from('fx_conversions').select('krw_amount, usd_amount, fx_rate').order('executed_at', { ascending: false }),
+    ]);
+    const snapshot = snapRes.data;
+    const advice = adviceRes.data;
+    const conversions = convRes.data || [];
+    const portfolio = portfolioFromConversions(conversions);
+    const unrealizedKrw = snapshot?.usdkrw_spot
+      ? unrealizedKrwValue(portfolio.totalUsdAcquired, snapshot.usdkrw_spot)
+      : 0;
+    res.json({
+      snapshot: snapshot || null,
+      advice: advice || null,
+      portfolio: { ...portfolio, unrealizedKrwValue: unrealizedKrw },
+    });
+  } catch (err) {
+    console.error('fx-advice/today', err);
+    res.status(500).json({ error: 'Failed to load FX advice', details: err.message });
+  }
+});
+
+app.post('/api/fx-sync', async (req, res) => {
+  try {
+    const supabase = getFxSupabase();
+    const fredKey = process.env.FRED_API_KEY;
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    if (!fredKey) {
+      return res.status(503).json({ error: 'FRED not configured', hint: 'Set FRED_API_KEY' });
+    }
+    const userCashKrw = req.body?.user_cash_krw != null ? Number(req.body.user_cash_krw) : undefined;
+    const result = await runSync(supabase, fredKey, { backfill: true, user_cash_krw: userCashKrw });
+    res.json(result);
+  } catch (err) {
+    console.error('fx-sync', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/fx-dashboard', async (req, res) => {
+  try {
+    const supabase = getFxSupabase();
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    const days = Math.min(365, parseInt(req.query.days, 10) || 365);
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const startStr = start.toISOString().slice(0, 10);
+    const { data: rows, error } = await supabase
+      .from('fx_market_snapshots')
+      .select('snapshot_date, usdkrw_spot, usdkrw_ma20, usdkrw_ma60, usdkrw_percentile_252, usd_broad_index_proxy, nasdaq100, korea_equity_proxy, vix, source_dates')
+      .gte('snapshot_date', startStr)
+      .order('snapshot_date', { ascending: true });
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    const { data: adviceRows } = await supabase
+      .from('fx_advice_runs')
+      .select('snapshot_date, decision')
+      .gte('snapshot_date', startStr)
+      .order('snapshot_date', { ascending: true });
+    const { data: convRows } = await supabase
+      .from('fx_conversions')
+      .select('executed_at, krw_amount, usd_amount, fx_rate')
+      .order('executed_at', { ascending: true });
+    const buyDates = new Set((adviceRows || []).filter((a) => a.decision === 'BUY_NOW').map((a) => a.snapshot_date));
+    res.json({
+      series: rows || [],
+      buyMarkers: [...buyDates],
+      conversions: convRows || [],
+    });
+  } catch (err) {
+    console.error('fx-dashboard', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Handle undefined routes - must be AFTER all API routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {

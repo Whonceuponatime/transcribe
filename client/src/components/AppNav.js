@@ -32,6 +32,7 @@ const CATEGORIES = {
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
       { id: 'financial-calc', label: 'Financial Calculator', icon: '💱' },
+      { id: 'fx-advisor', label: 'FX Advisor (KRW→USD)', icon: '💱' },
     ],
   },
 };

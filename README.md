@@ -131,6 +131,51 @@ The app icon on the home screen comes from the PWA manifest. For it to show corr
 
 Icon files used: `client/public/icons/icon-192.png` and `client/public/icons/icon-512.png`. They are committed so the build includes them.
 
+## FX Advisor (KRW→USD)
+
+FRED-only automated advisor for when to convert KRW to USD. Valuation-driven; broad USD and risk filters.
+
+### Environment variables
+
+- **FRED_API_KEY** – Required for sync. Get a free key at [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html).
+- **SUPABASE_URL** – Supabase project URL.
+- **SUPABASE_SERVICE_ROLE_KEY** – Service role key (server-side only; never expose in the client).
+
+### FRED series IDs (code uses these only; no DXY/KOSPI naming)
+
+| Series ID           | Use in app                |
+|---------------------|---------------------------|
+| DEXKOUS             | usdkrw_spot               |
+| DTWEXBGS            | usd_broad_index_proxy     |
+| NASDAQ100           | nasdaq100                 |
+| VIXCLS              | vix                       |
+| DGS2                | us2y                      |
+| NASDAQNQDXKR        | korea_equity_proxy        |
+| IR3TIB01KRM156N     | kr_rate_proxy (monthly)   |
+
+### How to run a backfill
+
+Backfill loads ~500 observations per series from FRED and writes `fx_market_snapshots` and today’s `fx_advice_runs`.
+
+- **From the UI:** Open **FX Advisor (KRW→USD)** and click **Run sync (FRED + advice)**.
+- **From the API:** `POST /api/fx-sync` with optional body `{ "user_cash_krw": 1000000 }`.
+- **From the command line:** Use curl: `curl -X POST http://localhost:3000/api/fx-sync -H "Content-Type: application/json" -d "{}"`.
+
+### How to trigger a daily sync
+
+- **Cron (e.g. Vercel):** Schedule a request to `POST https://your-domain.com/api/fx-sync` once per day (e.g. after US market close).
+- **Manual:** Same as backfill (UI button or `POST /api/fx-sync`).
+
+### API endpoints
+
+- **GET /api/fx-advice/today** – Latest snapshot, latest advice, portfolio summary (from `fx_conversions`).
+- **POST /api/fx-sync** – Fetch FRED, compute indicators, upsert snapshots, run advisor, upsert advice.
+- **GET /api/fx-dashboard?days=365** – Chart-ready time series for the dashboard.
+
+### Database
+
+Run the Supabase migration `supabase/migrations/004_fx_advisor.sql` to create `fx_market_snapshots`, `fx_advice_runs`, `fx_conversions`, and `fx_manual_flags`. Use Supabase dashboard or `supabase db push` (if using Supabase CLI).
+
 ## Security Notes
 
 ⚠️ **IMPORTANT**: Never commit your API keys to version control!

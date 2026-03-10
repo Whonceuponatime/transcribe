@@ -18,6 +18,7 @@ import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
 import FinancialCalculator from './components/FinancialCalculator';
+import FxAdvisorDashboard from './components/FxAdvisorDashboard';
 import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
@@ -147,6 +148,8 @@ function App() {
           <MarkdownCSVConverter />
         ) : activeTab === 'financial-calc' ? (
           <FinancialCalculator />
+        ) : activeTab === 'fx-advisor' ? (
+          <FxAdvisorDashboard />
         ) : (
           <ImageConverter />
         )}
