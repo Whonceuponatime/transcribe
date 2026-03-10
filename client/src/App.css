@@ -86,6 +86,50 @@ body {
   color: var(--text-muted);
 }
 
+/* PWA install banner (Add to Home Screen / Install app) */
+.install-app-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.install-app-banner__text {
+  color: var(--text-muted);
+}
+.install-app-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.install-app-banner__install {
+  padding: 0.4rem 0.9rem;
+  background: var(--accent);
+  color: #0a0a0a;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.install-app-banner__install:hover {
+  background: var(--accent-hover);
+}
+.install-app-banner__dismiss {
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.install-app-banner__dismiss:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 .App-header {
   background-color: var(--bg-card);
   border-bottom: 1px solid var(--border);

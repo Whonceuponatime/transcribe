@@ -18,6 +18,7 @@ import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
 import FinancialCalculator from './components/FinancialCalculator';
+import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
@@ -85,6 +86,7 @@ function App() {
 
   return (
     <div className="App">
+      <InstallAppBanner />
       <header className="App-header">
         <div className="App-header__brand">
           <h1>🃏 Jack of clubs</h1>
