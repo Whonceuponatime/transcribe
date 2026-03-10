@@ -25,9 +25,11 @@ Goal: smooth business English with correct grammar, clear flow, and easy-to-unde
 The draft may be note-like or out of order. First understand the message, then rearrange sentences and paragraphs into a logical flow (e.g. context first, then key points, then requests or next steps, then closing). Use smooth transitions so the reader can follow easily.
 
 Style constraints:
-- Keep the same level of formality the user wrote, unless "Professional" is selected.
-- Avoid overly fancy vocabulary. Aim for simple, precise, and professional wording.
-- Preserve any polite opening/closing style already present.
+- Keep the same level of formality the user wrote, unless "Professional", "Very formal", or "Informal / Friendly" is selected.
+- If Formality = Informal / Friendly: use a warm, approachable tone; slightly more casual wording and contractions where natural; still clear and respectful. Avoid stiff or distant phrasing.
+- If Formality = Professional or Very formal: use polished, business-appropriate tone as above.
+- Avoid overly fancy vocabulary. Aim for simple, precise wording that matches the chosen formality.
+- Preserve any polite opening/closing style already present (or adapt to the chosen formality).
 
 Channel formatting:
 - If Channel = Email: greeting, then short paragraphs in logical order, and a clear closing line.
@@ -46,7 +48,8 @@ Goal: 자연스러운 비즈니스 한국어로 문장을 매끄럽게 다듬고
 Style constraints:
 - 어색한 직역투/번역체 표현을 피하고, 자연스러운 업무 이메일 문장으로 정리.
 - 맞춤법/띄어쓰기/조사/존댓말 높임을 일관되게 정리.
-- "~드립니다/~바랍니다/~부탁드립니다" 등 공손 표현은 과하지 않게, 상황에 맞게 조절.
+- Formality = Informal / Friendly일 때: 친근하고 부담 없는 말투로, 과한 격식은 줄이고 자연스러운 반말·존댓말 혼용 또는 가벼운 존댓말로 정리. 의미와 예의는 유지.
+- "~드립니다/~바랍니다/~부탁드립니다" 등 공손 표현은 선택된 격식에 맞게 조절 (Informal이면 덜 격식적으로).
 - 원문 정보(인명, 직함, 날짜, 숫자, 첨부물, 장비명/규격)는 절대 변경하지 말 것.
 
 Channel formatting:

@@ -15,6 +15,7 @@ const FORMALITY = [
   { value: 'neutral', label: 'Neutral' },
   { value: 'professional', label: 'Professional' },
   { value: 'very formal', label: 'Very formal' },
+  { value: 'informal', label: 'Informal / Friendly' },
 ];
 
 const STRENGTH = [
