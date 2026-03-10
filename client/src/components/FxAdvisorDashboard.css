@@ -75,6 +75,65 @@
   margin-bottom: 1.5rem;
 }
 
+/* Current rates at top */
+.fx-advisor__rates {
+  margin-bottom: 1.5rem;
+}
+
+.fx-advisor__rates-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.fx-advisor__rates-date {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.fx-advisor__rates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.fx-advisor__rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fx-advisor__rate--main {
+  grid-column: 1 / -1;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.fx-advisor__rate-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.fx-advisor__rate-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fx-advisor__rate--main .fx-advisor__rate-value {
+  font-size: 1.75rem;
+  color: var(--accent);
+}
+
+.fx-advisor__rates-note {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-hint);
+}
+
 .fx-advisor__card h3 {
   font-size: 1rem;
   margin-bottom: 0.75rem;

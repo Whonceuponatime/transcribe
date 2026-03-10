@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { runSync } = require('../lib/fxSync');
 
@@ -21,8 +22,11 @@ module.exports = async function handler(req, res) {
       res.status(503).json({ error: 'Supabase not configured' });
       return;
     }
-    if (!fredKey) {
-      res.status(503).json({ error: 'FRED not configured', hint: 'Set FRED_API_KEY' });
+    if (!fredKey || !String(fredKey).trim()) {
+      res.status(503).json({
+        error: 'FRED not configured',
+        hint: process.env.VERCEL ? 'Add FRED_API_KEY in Vercel → Project → Settings → Environment Variables, then redeploy.' : 'Set FRED_API_KEY in .env (project root) and restart the server.',
+      });
       return;
     }
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});

@@ -167,6 +167,66 @@ export default function FxAdvisorDashboard() {
         </div>
       )}
 
+      {/* Current rates – latest snapshot at top */}
+      {snapshot && (
+        <section className="fx-advisor__card card fx-advisor__rates">
+          <div className="fx-advisor__rates-header">
+            <h3>Current rates &amp; prices</h3>
+            <span className="fx-advisor__rates-date">
+              As of {snapshot.snapshot_date}
+              {isStale && ' (run sync to update)'}
+            </span>
+          </div>
+          <div className="fx-advisor__rates-grid">
+            <div className="fx-advisor__rate fx-advisor__rate--main">
+              <span className="fx-advisor__rate-label">USD/KRW</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.usdkrw_spot != null ? fmt(snapshot.usdkrw_spot, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">Broad USD index (FRED proxy)</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.usd_broad_index_proxy != null ? fmt(snapshot.usd_broad_index_proxy, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">Nasdaq 100</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.nasdaq100 != null ? fmt(snapshot.nasdaq100, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">VIX</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.vix != null ? fmt(snapshot.vix, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">US 2Y yield (%)</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.us2y != null ? fmt(snapshot.us2y, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">Korea rate proxy (%)</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.kr_rate_proxy != null ? fmt(snapshot.kr_rate_proxy, 2) : '—'}
+              </span>
+            </div>
+            <div className="fx-advisor__rate">
+              <span className="fx-advisor__rate-label">Korea equity (FRED proxy)</span>
+              <span className="fx-advisor__rate-value">
+                {snapshot.korea_equity_proxy != null ? fmt(snapshot.korea_equity_proxy, 2) : '—'}
+              </span>
+            </div>
+          </div>
+          <p className="fx-advisor__rates-note">
+            Values from FRED (not live ticker). Click Refresh to reload; run sync to pull new data from FRED.
+          </p>
+        </section>
+      )}
+
       {/* Decision card */}
       <section className="fx-advisor__card card">
         <h3>Today’s advice</h3>
