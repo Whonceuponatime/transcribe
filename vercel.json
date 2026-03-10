@@ -3,5 +3,7 @@
   "outputDirectory": "client/build",
   "framework": null,
   "installCommand": "npm install",
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/((?!api/)(?!icons/)(?!manifest\\.json)(?!sw\\.js)(?!favicon\\.ico).*)", "destination": "/index.html" }
+  ]
 }

@@ -97,6 +97,40 @@ npm start
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
+## Install as app (PWA) & deployment
+
+You can use the site as an installable app (e.g. on Android: “Add to Home screen”) and optionally use a custom domain.
+
+### Do I need a custom domain?
+
+**No.** You can use the URL Vercel gives you (e.g. `https://your-project.vercel.app`). “Add to Home screen” and the app icon work the same with or without a custom domain.
+
+**Optional:** To use a domain like `app.example.com`:
+1. In the [Vercel dashboard](https://vercel.com/dashboard), open your project.
+2. Go to **Settings → Domains**, add `app.example.com`.
+3. In your DNS provider, add the CNAME record Vercel shows (e.g. `cname.vercel-dns.com`).
+
+### How to set the app up (Vercel)
+
+1. Push your code to GitHub and import the repo in [Vercel](https://vercel.com).
+2. Add environment variables in **Project → Settings → Environment Variables** (e.g. `OPENAI_API_KEY`, Supabase keys).
+3. Deploy. Vercel will build the client and serve it.
+
+### Home screen icon not showing
+
+The app icon on the home screen comes from the PWA manifest. For it to show correctly:
+
+1. **Redeploy after the latest changes**  
+   The project was updated so `/icons/` and `manifest.json` are no longer rewritten to the SPA; the real icon files are served. Redeploy so the new `vercel.json` and `client/public/icons/` are live.
+
+2. **Use HTTPS**  
+   Install and icons work only over HTTPS (Vercel provides this).
+
+3. **Remove and re-add to home screen**  
+   If you added to home screen before the fix, remove the shortcut and add again so the browser fetches the new manifest and icons.
+
+Icon files used: `client/public/icons/icon-192.png` and `client/public/icons/icon-512.png`. They are committed so the build includes them.
+
 ## Security Notes
 
 ⚠️ **IMPORTANT**: Never commit your API keys to version control!
