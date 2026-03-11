@@ -2216,6 +2216,437 @@ app.get('/api/fx-dashboard', async (req, res) => {
   }
 });
 
+// ─── Analyzer-only KRW→USD (no execution, manual trading) ───────────────
+const analyzer = require('./lib/analyzer');
+
+app.get('/api/analyzer/quote/latest', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const quote = await analyzer.getLatestQuote(supabase);
+    res.json({ quote });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analyzer/signal/latest', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const signal = await analyzer.getLatestSignal(supabase);
+    const quote = await analyzer.getLatestQuote(supabase);
+    const out = signal ? {
+      decision: signal.decision,
+      allocation_pct: signal.allocation_pct,
+      confidence: signal.confidence,
+      score: signal.score,
+      valuation_label: signal.valuation_label,
+      live_provider: signal.live_provider,
+      quote_timestamp: signal.quote_timestamp,
+      is_stale: signal.is_stale,
+      summary: signal.summary,
+      why: signal.why,
+      red_flags: signal.red_flags,
+      next_trigger_to_watch: signal.next_trigger_to_watch,
+      levels: signal.levels || {},
+    } : null;
+    res.json({ signal: out, quote });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analyzer/dashboard', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const quote = await analyzer.getLatestQuote(supabase);
+    const signal = await analyzer.getLatestSignal(supabase);
+    const bars = await analyzer.getBarsForSnapshot(supabase, 500);
+    const days = Math.min(365, parseInt(req.query.days, 10) || 90);
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    const { data: snapshots } = await supabase.from('fx_analyzer_snapshots').select('*').gte('snapshot_ts', from.toISOString()).order('snapshot_ts', { ascending: true });
+    const { data: signals } = await supabase.from('fx_signal_runs').select('signal_ts, decision').gte('signal_ts', from.toISOString()).order('signal_ts', { ascending: true });
+    const { data: trades } = await supabase.from('fx_manual_trades').select('*').order('trade_ts', { ascending: false }).limit(50);
+    const { data: health } = await supabase.from('provider_health').select('*').order('checked_at', { ascending: false }).limit(20);
+    res.json({ quote, signal, bars: bars || [], snapshots: snapshots || [], signals: signals || [], trades: trades || [], provider_health: health || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analyzer/history', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const range = req.query.range || '30d';
+    const days = range === '1y' ? 365 : range === '90d' ? 90 : 30;
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    const { data: snapshots } = await supabase.from('fx_analyzer_snapshots').select('*').gte('snapshot_ts', from.toISOString()).order('snapshot_ts', { ascending: true });
+    const { data: signals } = await supabase.from('fx_signal_runs').select('*').gte('signal_ts', from.toISOString()).order('signal_ts', { ascending: true });
+    res.json({ snapshots: snapshots || [], signals: signals || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/analyzer/sync/live', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const result = await analyzer.runLiveSync(supabase);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/analyzer/sync/macro', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    const apiKey = process.env.FRED_API_KEY;
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    if (!apiKey) return res.status(503).json({ error: 'FRED_API_KEY not set' });
+    const macro = await analyzer.syncMacro(apiKey);
+
+    // Persist macro history as daily snapshots (historical context, not just \"latest\").
+    const usdkrw = macro.usdkrw?.observations || [];
+    const broad = macro.usd_broad_index_proxy?.observations || [];
+    const nasdaq = macro.nasdaq100?.observations || [];
+    const vix = macro.vix?.observations || [];
+    const us2y = macro.us2y?.observations || [];
+
+    const toMap = (arr) => {
+      const m = new Map();
+      (arr || []).forEach((o) => m.set(o.date, o.value));
+      return m;
+    };
+    const mUsd = toMap(usdkrw);
+    const mBroad = toMap(broad);
+    const mNas = toMap(nasdaq);
+    const mVix = toMap(vix);
+    const mUs2y = toMap(us2y);
+
+    const dates = Array.from(
+      new Set([...(mUsd.keys()), ...(mBroad.keys()), ...(mNas.keys()), ...(mVix.keys()), ...(mUs2y.keys())])
+    ).sort();
+
+    // Precompute rolling features on daily series (macro only).
+    const broadSeries = dates.map((d) => ({ date: d, v: mBroad.get(d) ?? null })).filter((x) => x.v != null);
+    const nasSeries = dates.map((d) => ({ date: d, v: mNas.get(d) ?? null })).filter((x) => x.v != null);
+    const vixSeries = dates.map((d) => ({ date: d, v: mVix.get(d) ?? null })).filter((x) => x.v != null);
+
+    const ma20ByDate = new Map();
+    for (let i = 0; i < broadSeries.length; i++) {
+      if (i >= 19) {
+        const slice = broadSeries.slice(i - 19, i + 1);
+        ma20ByDate.set(broadSeries[i].date, slice.reduce((s, x) => s + x.v, 0) / 20);
+      }
+    }
+    const return20NasByDate = new Map();
+    for (let i = 0; i < nasSeries.length; i++) {
+      if (i >= 20) {
+        const prev = nasSeries[i - 20].v;
+        const cur = nasSeries[i].v;
+        if (prev && cur) return20NasByDate.set(nasSeries[i].date, cur / prev - 1);
+      }
+    }
+    const vixChange5ByDate = new Map();
+    for (let i = 0; i < vixSeries.length; i++) {
+      if (i >= 5) {
+        const prev = vixSeries[i - 5].v;
+        const cur = vixSeries[i].v;
+        if (prev && cur) vixChange5ByDate.set(vixSeries[i].date, cur / prev - 1);
+      }
+    }
+
+    const rows = dates.map((date) => {
+      const snapshot_ts = `${date}T00:00:00.000Z`;
+      return {
+        snapshot_ts,
+        symbol: 'USDKRW',
+        live_provider: 'fred',
+        spot: mUsd.get(date) ?? null,
+        usd_broad_index_proxy: mBroad.get(date) ?? null,
+        usd_broad_index_proxy_ma20: ma20ByDate.get(date) ?? null,
+        nasdaq100: mNas.get(date) ?? null,
+        nasdaq100_return_20d: return20NasByDate.get(date) ?? null,
+        vix: mVix.get(date) ?? null,
+        vix_change_5d: vixChange5ByDate.get(date) ?? null,
+        macro_payload: null,
+        source_dates: {
+          usdkrw: usdkrw.length ? usdkrw[usdkrw.length - 1].date : null,
+          usd_broad_index_proxy: broad.length ? broad[broad.length - 1].date : null,
+          nasdaq100: nasdaq.length ? nasdaq[nasdaq.length - 1].date : null,
+          vix: vix.length ? vix[vix.length - 1].date : null,
+          us2y: us2y.length ? us2y[us2y.length - 1].date : null,
+        },
+        // Optional: could store us2y later in schema if desired (currently not in fx_analyzer_snapshots columns list).
+      };
+    });
+
+    // Forward-fill spot to satisfy NOT NULL constraint (skip leading nulls).
+    let lastSpot = null;
+    const filledRows = [];
+    for (const r of rows) {
+      if (typeof r.spot !== 'number' || Number.isNaN(r.spot) || !Number.isFinite(r.spot)) r.spot = null;
+      if (r.spot != null) lastSpot = r.spot;
+      if (r.spot == null) r.spot = lastSpot;
+      if (r.spot == null) continue; // still no spot (leading gaps)
+      filledRows.push(r);
+    }
+
+    // Upsert in chunks to avoid request payload limits.
+    const chunkSize = 200;
+    let upserted = 0;
+    for (let i = 0; i < filledRows.length; i += chunkSize) {
+      const chunk = filledRows.slice(i, i + chunkSize);
+      const { error } = await supabase.from('fx_analyzer_snapshots').upsert(chunk, { onConflict: 'snapshot_ts' });
+      if (error) throw new Error(error.message);
+      upserted += chunk.length;
+    }
+
+    const lastDate = dates.length ? dates[dates.length - 1] : null;
+    res.json({
+      ok: true,
+      upserted_days: upserted,
+      latest: lastDate
+        ? {
+            date: lastDate,
+            usd_broad_index_proxy: mBroad.get(lastDate) ?? null,
+            nasdaq100: mNas.get(lastDate) ?? null,
+            vix: mVix.get(lastDate) ?? null,
+          }
+        : null,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/analyzer/trades/manual', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const result = await analyzer.recordTrade(supabase, req.body || {});
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/analyzer/provider-health', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const { data } = await supabase.from('provider_health').select('*').order('checked_at', { ascending: false }).limit(50);
+    const byProvider = {};
+    (data || []).forEach((r) => {
+      if (!byProvider[r.provider] || new Date(r.checked_at) > new Date(byProvider[r.provider].checked_at)) {
+        byProvider[r.provider] = r;
+      }
+    });
+    res.json({ health: byProvider, raw: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Live Trading (KRW→USD) ─────────────────────────────────────────────
+const liveTrading = require('./lib/liveTrading');
+
+app.get('/api/live/quote', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const quote = await liveTrading.getLatestQuote(supabase);
+    const adapter = liveTrading.getQuoteAdapter();
+    const health = adapter.getHealth();
+    res.json({ quote, health, lastQuote: adapter.getLastQuote ? adapter.getLastQuote('USDKRW') : null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/live/signal', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const signal = await liveTrading.getLatestSignal(supabase);
+    const mode = await liveTrading.getTradingMode(supabase);
+    const killOn = await liveTrading.isKillSwitchOn(supabase);
+    res.json({ signal, mode, killSwitch: killOn });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/live/portfolio', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const mode = await liveTrading.getTradingMode(supabase);
+    const broker = liveTrading.getBrokerAdapter(mode);
+    const cash = await broker.getCash();
+    const positions = await broker.getPositions();
+    const { data: latest } = await supabase.from('portfolio_snapshots').select('*').order('snapshot_ts', { ascending: false }).limit(1).single();
+    res.json({ cash, positions, snapshot: latest, mode });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/live/orders', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const limit = Math.min(100, parseInt(req.query.limit, 10) || 50);
+    const { data } = await supabase.from('order_requests').select('*').order('created_at', { ascending: false }).limit(limit);
+    res.json({ orders: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/live/sync', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const adapter = liveTrading.getQuoteAdapter();
+    let last = adapter.getLastQuote ? adapter.getLastQuote('USDKRW') : null;
+    if (!last && typeof adapter.fetchOnce === 'function') {
+      last = await adapter.fetchOnce();
+    }
+    if (last) {
+      await supabase.from('market_ticks').insert({
+        provider: adapter.name,
+        symbol: 'USDKRW',
+        bid: last.bid,
+        ask: last.ask,
+        mid: last.mid,
+        spread: last.spread,
+        event_ts: last.eventTs ? new Date(last.eventTs).toISOString() : new Date().toISOString(),
+        received_ts: new Date().toISOString(),
+        raw_payload: last.raw || {},
+      });
+    }
+    const quote = await liveTrading.getLatestQuote(supabase);
+    const barsAdapter = liveTrading.createDbHistoricalBarsAdapter(supabase);
+    const toTs = Date.now();
+    const from1m = toTs - 120 * 60 * 1000;
+    const from1d = toTs - 365 * 24 * 60 * 60 * 1000;
+    const bars1m = await barsAdapter.getBars('USDKRW', '1m', from1m, toTs);
+    const bars1d = await barsAdapter.getBars('USDKRW', '1d', from1d, toTs);
+    const mode = await liveTrading.getTradingMode(supabase);
+    const killOn = await liveTrading.isKillSwitchOn(supabase);
+    const result = liveTrading.runSignal(quote, bars1m, bars1d, killOn);
+    await supabase.from('signal_runs').insert({
+      symbol: 'USDKRW',
+      mode: mode || 'paper',
+      score: result.score,
+      decision: result.decision,
+      allocation_pct: result.allocation_pct,
+      confidence: result.confidence,
+      reasons: result.reasons || [],
+      safeguards: result.safeguards || [],
+      snapshot: result.snapshot || {},
+    });
+    res.json({ ok: true, quote, signal: result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/live/kill-switch', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const enabled = req.body?.enabled !== false && (req.body?.enabled === true || req.body?.enable === true);
+    await liveTrading.setKillSwitch(supabase, enabled);
+    res.json({ ok: true, killSwitch: enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/live/mode', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const mode = (req.body?.mode || 'paper').toLowerCase() === 'live' ? 'live' : 'paper';
+    const set = await liveTrading.setTradingMode(supabase, mode);
+    res.json({ ok: true, mode: set });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/live/order/test', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const mode = await liveTrading.getTradingMode(supabase);
+    const broker = liveTrading.getBrokerAdapter(mode);
+    const safety = await liveTrading.checkSafety(supabase, {
+      notionalKrw: 100000,
+      quoteStaleSeconds: 10,
+      spreadBps: 20,
+      circuitFailureCount: 0,
+    });
+    if (!safety.allowed) return res.status(400).json({ ok: false, reason: safety.reason, detail: safety.detail });
+    const idempotencyKey = `test-${Date.now()}`;
+    const result = await liveTrading.placeOrder(supabase, broker, {
+      clientOrderId: `test-${Date.now()}`,
+      symbol: 'USDKRW',
+      side: 'buy',
+      orderType: 'MKTABLE_LMT',
+      quantity: 10,
+      notionalKrw: 13500,
+      limitPrice: 1355,
+      idempotencyKey,
+      mode,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/live/backfill', async (req, res) => {
+  try {
+    const supabase = liveTrading.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const adapter = liveTrading.getQuoteAdapter();
+    await adapter.validatePair('USDKRW');
+    const hours = Math.min(168, parseInt(req.body?.hours, 10) || 24);
+    const now = Date.now();
+    const step = 60 * 1000;
+    let inserted = 0;
+    for (let t = now - hours * 60 * 60 * 1000; t < now; t += step) {
+      const q = adapter.getLastQuote ? adapter.getLastQuote('USDKRW') : null;
+      if (q) {
+        await supabase.from('market_ticks').insert({
+          provider: adapter.name,
+          symbol: 'USDKRW',
+          bid: q.bid,
+          ask: q.ask,
+          mid: q.mid,
+          spread: q.spread,
+          event_ts: new Date(t).toISOString(),
+          received_ts: new Date().toISOString(),
+        });
+        inserted++;
+      }
+    }
+    res.json({ ok: true, inserted, hours });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Handle undefined routes - must be AFTER all API routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {

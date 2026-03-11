@@ -1,0 +1,271 @@
+.analyzer {
+  padding: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.analyzer__header {
+  margin-bottom: 1rem;
+}
+
+.analyzer__title {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.analyzer__subtitle {
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.analyzer__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.analyzer__btn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border, #444);
+  background: var(--surface, #1a1a1a);
+  color: var(--text, #eee);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.analyzer__btn:hover:not(:disabled) {
+  background: var(--surface-hover, #252525);
+}
+
+.analyzer__btn--primary {
+  background: var(--accent, #22c55e);
+  color: #000;
+  border-color: var(--accent, #22c55e);
+}
+
+.analyzer__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.analyzer__error {
+  color: #ef4444;
+  margin-bottom: 0.5rem;
+}
+
+.analyzer__success {
+  color: #22c55e;
+  margin-bottom: 0.5rem;
+}
+
+.analyzer__loading {
+  padding: 2rem;
+  text-align: center;
+}
+
+.analyzer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.analyzer__card {
+  padding: 1rem;
+}
+
+.analyzer__card h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+}
+
+.analyzer__decision-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.analyzer__decision {
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.analyzer__decision--buy_now {
+  background: #22c55e;
+  color: #000;
+}
+
+.analyzer__decision--scale_in {
+  background: #eab308;
+  color: #000;
+}
+
+.analyzer__decision--wait {
+  background: #6b7280;
+  color: #fff;
+}
+
+.analyzer__allocation,
+.analyzer__confidence {
+  font-size: 0.9rem;
+  color: var(--text-muted, #888);
+}
+
+.analyzer__valuation {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.analyzer__summary {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.analyzer__meta {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin: 0.25rem 0;
+}
+
+.analyzer__stale {
+  color: #eab308;
+}
+
+.analyzer__why,
+.analyzer__red-flags {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.analyzer__red-flags {
+  color: #f97316;
+}
+
+.analyzer__no-data {
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.analyzer__quote {
+  margin: 0;
+}
+
+.analyzer__quote-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.analyzer__quote-mid {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.analyzer__quote-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin-top: 0.25rem;
+}
+
+.analyzer__chart-wrap {
+  grid-column: 1 / -1;
+}
+
+.analyzer__chart {
+  min-height: 220px;
+}
+
+.analyzer__chart-note {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin: 0 0 0.5rem 0;
+}
+
+.analyzer__health {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.analyzer__health-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.analyzer__health-row--up {
+  color: #22c55e;
+}
+
+.analyzer__health-row--degraded {
+  color: #eab308;
+}
+
+.analyzer__health-row--down {
+  color: #ef4444;
+}
+
+.analyzer__hint {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin: 0 0 0.5rem 0;
+}
+
+.analyzer__journal-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.analyzer__trade-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.analyzer__trade-form select,
+.analyzer__trade-form input {
+  padding: 0.35rem 0.5rem;
+  background: var(--surface, #1a1a1a);
+  border: 1px solid var(--border, #444);
+  color: var(--text, #eee);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.analyzer__trade-form input[type="number"] {
+  width: 100px;
+}
+
+.analyzer__trade-form input[type="text"] {
+  min-width: 120px;
+}
+
+.analyzer__trades-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.analyzer__trade-row {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border, #333);
+}
+
+.analyzer__trade-row span {
+  min-width: 80px;
+}

@@ -19,6 +19,8 @@ import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
 import FinancialCalculator from './components/FinancialCalculator';
 import FxAdvisorDashboard from './components/FxAdvisorDashboard';
+import AnalyzerDashboard from './components/AnalyzerDashboard';
+import LiveTradingDashboard from './components/LiveTradingDashboard';
 import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
@@ -150,6 +152,10 @@ function App() {
           <FinancialCalculator />
         ) : activeTab === 'fx-advisor' ? (
           <FxAdvisorDashboard />
+        ) : activeTab === 'analyzer' ? (
+          <AnalyzerDashboard />
+        ) : activeTab === 'live-trading' ? (
+          <LiveTradingDashboard />
         ) : (
           <ImageConverter />
         )}

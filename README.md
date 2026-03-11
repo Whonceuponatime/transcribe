@@ -176,6 +176,126 @@ Backfill loads ~500 observations per series from FRED and writes `fx_market_snap
 
 Run the Supabase migration `supabase/migrations/004_fx_advisor.sql` to create `fx_market_snapshots`, `fx_advice_runs`, `fx_conversions`, and `fx_manual_flags`. Use Supabase dashboard or `supabase db push` (if using Supabase CLI).
 
+## FX Analyzer (KRW→USD) — analysis only, no execution
+
+**This app does not place orders or connect to a broker.** It fetches market data, analyzes conditions, stores history, generates signals (BUY_NOW / SCALE_IN / WAIT), and visualizes trends. You trade manually.
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MASSIVE_API_KEY` | Primary live forex (USD/KRW) — e.g. Polygon-style API key if using Polygon |
+| `MASSIVE_API_BASE_URL` | Optional; default `https://api.polygon.io` |
+| `FINNHUB_API_KEY` | Fallback live/quote provider when Massive is unavailable or stale |
+| `FRED_API_KEY` | Macro context only (Broad Dollar Proxy, VIX, Nasdaq, etc.) — not used as live feed |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase key |
+
+### Provider roles
+
+- **Massive:** Primary live forex. First choice for live USD/KRW quote and short-term bars. Used for live quote display and near-real-time indicators.
+- **Finnhub:** Fallback. Used when Massive fails, is stale, or lacks the pair. Provider in use is stored and shown in the UI.
+- **FRED:** Macro and historical overlay only. Do not treat as live. Use for broad dollar proxy (labeled “Broad Dollar Proxy”, not DXY), VIX, Nasdaq, yields, and long-term charts.
+
+### How live provider failover works
+
+1. **Sync live** tries Massive first for the current USD/KRW quote.
+2. If Massive returns no valid quote or errors, the app falls back to Finnhub (forex/candle as quote proxy).
+3. The active provider is saved with each quote and signal; the UI shows which provider is in use and stale-data warnings when the quote is old.
+
+### How to run live analyzer sync
+
+- **From the UI:** Open **FX Analyzer (no execution)** and click **Sync live**. This ingests the latest quote (Massive or Finnhub), aggregates 1m bars, runs the signal engine, and persists the signal and snapshot.
+- **From the API:** `POST /api/analyzer/sync/live` with body `{}`.
+
+### How to run macro sync
+
+- **From the UI:** Click **Sync macro (FRED)** to pull FRED series (DEXKOUS, DTWEXBGS, NASDAQ100, VIXCLS, DGS2) and store normalized macro values for context.
+- **From the API:** `POST /api/analyzer/sync/macro`.
+
+### How to log a manual trade
+
+- **From the UI:** In the **Trade journal (manual)** panel, choose BUY_USD or SELL_USD, enter KRW amount, USD amount, FX rate, optional note, and click **Log trade**.
+- **From the API:** `POST /api/analyzer/trades/manual` with body `{ "action": "BUY_USD", "krw_amount": 1000000, "usd_amount": 750, "fx_rate": 1333.33, "note": "optional" }`.
+
+### Backfill
+
+- Run **Sync live** repeatedly over time to build 1m bar history from quotes, or call `POST /api/analyzer/sync/live` on a schedule.
+- Run **Sync macro** once (or daily) to backfill FRED macro context into `fx_analyzer_snapshots`.
+
+### API routes (analyzer)
+
+- `GET /api/analyzer/quote/latest` – Latest stored quote
+- `GET /api/analyzer/signal/latest` – Latest signal (decision, allocation, confidence, levels, why, red_flags)
+- `GET /api/analyzer/dashboard` – Full dashboard payload (quote, signal, bars, snapshots, signals, trades, provider_health)
+- `GET /api/analyzer/history?range=30d|90d|1y` – Snapshots and signals over the range
+- `POST /api/analyzer/sync/live` – Ingest quote, aggregate bars, run signal, persist
+- `POST /api/analyzer/sync/macro` – Fetch FRED and store macro context
+- `POST /api/analyzer/trades/manual` – Log a manual trade
+- `GET /api/analyzer/provider-health` – Latest health per provider
+
+### Database (analyzer)
+
+Run `supabase/migrations/006_analyzer.sql` to create: `fx_live_quotes`, `fx_bars_1m`, `fx_analyzer_snapshots`, `fx_signal_runs`, `fx_manual_trades`, and (if not already present) `provider_health`. No broker or execution tables.
+
+## Live Trading (KRW→USD)
+
+Trading-grade conversion app with **PAPER mode default** and **LIVE** only when explicitly enabled.
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase key |
+| `LIVE_TRADING_ENABLED` | Set to `true` or `1` to allow LIVE mode (default: off) |
+| `TRADING_MODE` | `paper` or `live` (stored in DB; PAPER is default) |
+| `BROKER_PROVIDER` | `paper` or `ibkr` |
+| `MARKET_DATA_PROVIDER` | `polling` (default) or other adapter name |
+| `EXCHANGERATE_API_KEY` | Optional; for polling USD/KRW (free tier has KRW) |
+| `IBKR_GATEWAY_URL` | e.g. `https://localhost:5000` when using IBKR |
+| `IBKR_ACCOUNT_ID` | IBKR account for live orders |
+| `IBKR_USDKRW_CONID` | Contract ID for USD/KRW in IBKR (verify in gateway) |
+
+### How to run paper mode
+
+1. Apply migration `supabase/migrations/005_live_trading.sql`.
+2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Do **not** set `LIVE_TRADING_ENABLED`.
+3. Open **Live Trading** in the app. Badge shows **PAPER**.
+4. Click **Sync** to pull a quote (polling adapter) and run the signal engine; click **Test order** to place a simulated order.
+
+### How to enable live mode
+
+1. Set `LIVE_TRADING_ENABLED=true` (or `1`) in your environment.
+2. Configure IBKR: run IB Gateway or TWS, log in, and set `IBKR_GATEWAY_URL` (e.g. `https://localhost:5000`). Set `IBKR_ACCOUNT_ID` and optionally `IBKR_USDKRW_CONID`.
+3. In the app, click **Switch to LIVE** (only visible when env allows). The badge will show **LIVE**. All order placement then goes through the IBKR adapter.
+
+### How to start a backfill
+
+- **API:** `POST /api/live/backfill` with body `{ "hours": 24 }` (max 168). This uses the current quote adapter to seed `market_ticks`; for real historical bars you’d wire a historical data provider to `market_bars_1m`.
+- **UI:** No backfill button yet; use the API or a script.
+
+### Where to verify USD/KRW availability
+
+- **Polling adapter:** Before using live data, call `GET /api/live/quote` or run a **Sync**. If the provider doesn’t return USD/KRW, the sync or quote call will fail; fix `EXCHANGERATE_API_KEY` or provider config.
+- **IBKR:** Use the IBKR adapter’s `validatePair('USDKRW')` (or the Client Portal API `secdef/search?symbol=USDKRW`). The app uses this in the broker adapter; ensure the pair is tradeable in your account and `IBKR_USDKRW_CONID` is set if required.
+
+### Database (live trading)
+
+Run `supabase/migrations/005_live_trading.sql` to create: `market_ticks`, `market_bars_1m`, `signal_runs`, `order_requests`, `order_events`, `fills`, `portfolio_snapshots`, `risk_events`, `app_settings`, `provider_health`. Seed rows in `app_settings` set kill switch OFF, mode PAPER, and default caps/cooldowns.
+
+### API routes (live)
+
+- `GET /api/live/quote` – Latest quote and feed health
+- `GET /api/live/signal` – Latest signal run and kill-switch/mode
+- `GET /api/live/portfolio` – Cash and positions from broker adapter
+- `GET /api/live/orders` – Recent order requests
+- `POST /api/live/sync` – Ingest latest quote, run signal, persist signal run
+- `POST /api/live/kill-switch` – Turn kill switch on/off
+- `POST /api/live/mode` – Set mode to `paper` or `live`
+- `POST /api/live/order/test` – Place one test (paper or live) order
+- `POST /api/live/backfill` – Backfill `market_ticks` (body: `{ "hours": N }`)
+
 ## Security Notes
 
 ⚠️ **IMPORTANT**: Never commit your API keys to version control!
