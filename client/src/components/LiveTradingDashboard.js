@@ -1,14 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 import './LiveTradingDashboard.css';
 
 const API = '';

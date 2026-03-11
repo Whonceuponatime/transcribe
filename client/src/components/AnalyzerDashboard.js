@@ -62,7 +62,6 @@ export default function AnalyzerDashboard() {
     signal,
     bars,
     snapshots,
-    signals,
     trades,
     provider_health,
     loading,
