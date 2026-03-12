@@ -146,7 +146,7 @@ export default function FinancialCalculator() {
     if (!supabase || !user) return;
     setHistoryLoading(true);
     const { data, error } = await supabase
-      .from('forex_snapshots')
+      .from('fx_market_snapshots')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true });
@@ -159,7 +159,7 @@ export default function FinancialCalculator() {
   const handleSave = async () => {
     if (!result || !supabase || !user) return;
     setSaving(true); setSaveMsg(null);
-    const { error } = await supabase.from('forex_snapshots').insert({
+    const { error } = await supabase.from('fx_market_snapshots').insert({
       user_id:        user.id,
       usd_amount:     parseFloat(usdAmount),
       buy_rate:       parseFloat(buyRate),
@@ -189,7 +189,7 @@ export default function FinancialCalculator() {
 
   const handleDelete = async (id) => {
     if (!supabase) return;
-    await supabase.from('forex_snapshots').delete().eq('id', id);
+    await supabase.from('fx_market_snapshots').delete().eq('id', id);
     setSnapshots(prev => prev.filter(s => s.id !== id));
   };
 
