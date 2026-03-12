@@ -26,7 +26,7 @@ export default function AnalyzerDashboard() {
   const [quote, setQuote] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [trades, setTrades] = useState([]);
-  const [health, setHealth] = useState([]);
+  const [, setHealth] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [macroSyncing, setMacroSyncing] = useState(false);
