@@ -2216,46 +2216,8 @@ app.get('/api/fx-dashboard', async (req, res) => {
   }
 });
 
-// ─── Analyzer-only KRW→USD (no execution, manual trading) ───────────────
+// ─── Buy USD Advisor (analysis only, no execution) ──────────────────────
 const analyzer = require('./lib/analyzer');
-
-app.get('/api/analyzer/quote/latest', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const quote = await analyzer.getLatestQuote(supabase);
-    res.json({ quote });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/analyzer/signal/latest', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const signal = await analyzer.getLatestSignal(supabase);
-    const quote = await analyzer.getLatestQuote(supabase);
-    const out = signal ? {
-      decision: signal.decision,
-      allocation_pct: signal.allocation_pct,
-      confidence: signal.confidence,
-      score: signal.score,
-      valuation_label: signal.valuation_label,
-      live_provider: signal.live_provider,
-      quote_timestamp: signal.quote_timestamp,
-      is_stale: signal.is_stale,
-      summary: signal.summary,
-      why: signal.why,
-      red_flags: signal.red_flags,
-      next_trigger_to_watch: signal.next_trigger_to_watch,
-      levels: signal.levels || {},
-    } : null;
-    res.json({ signal: out, quote });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 app.get('/api/analyzer/dashboard', async (req, res) => {
   try {
@@ -2263,31 +2225,13 @@ app.get('/api/analyzer/dashboard', async (req, res) => {
     if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
     const quote = await analyzer.getLatestQuote(supabase);
     const signal = await analyzer.getLatestSignal(supabase);
-    const bars = await analyzer.getBarsForSnapshot(supabase, 500);
     const days = Math.min(365, parseInt(req.query.days, 10) || 90);
     const from = new Date();
     from.setDate(from.getDate() - days);
     const { data: snapshots } = await supabase.from('fx_analyzer_snapshots').select('*').gte('snapshot_ts', from.toISOString()).order('snapshot_ts', { ascending: true });
-    const { data: signals } = await supabase.from('fx_signal_runs').select('signal_ts, decision').gte('signal_ts', from.toISOString()).order('signal_ts', { ascending: true });
     const { data: trades } = await supabase.from('fx_manual_trades').select('*').order('trade_ts', { ascending: false }).limit(50);
     const { data: health } = await supabase.from('provider_health').select('*').order('checked_at', { ascending: false }).limit(20);
-    res.json({ quote, signal, bars: bars || [], snapshots: snapshots || [], signals: signals || [], trades: trades || [], provider_health: health || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/analyzer/history', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const range = req.query.range || '30d';
-    const days = range === '1y' ? 365 : range === '90d' ? 90 : 30;
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    const { data: snapshots } = await supabase.from('fx_analyzer_snapshots').select('*').gte('snapshot_ts', from.toISOString()).order('snapshot_ts', { ascending: true });
-    const { data: signals } = await supabase.from('fx_signal_runs').select('*').gte('signal_ts', from.toISOString()).order('signal_ts', { ascending: true });
-    res.json({ snapshots: snapshots || [], signals: signals || [] });
+    res.json({ quote, signal, snapshots: snapshots || [], trades: trades || [], provider_health: health || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2307,121 +2251,9 @@ app.post('/api/analyzer/sync/live', async (req, res) => {
 app.post('/api/analyzer/sync/macro', async (req, res) => {
   try {
     const supabase = analyzer.getSupabase();
-    const apiKey = process.env.FRED_API_KEY;
     if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    if (!apiKey) return res.status(503).json({ error: 'FRED_API_KEY not set' });
-    const macro = await analyzer.syncMacro(apiKey);
-
-    // Persist macro history as daily snapshots (historical context, not just \"latest\").
-    const usdkrw = macro.usdkrw?.observations || [];
-    const broad = macro.usd_broad_index_proxy?.observations || [];
-    const nasdaq = macro.nasdaq100?.observations || [];
-    const vix = macro.vix?.observations || [];
-    const us2y = macro.us2y?.observations || [];
-
-    const toMap = (arr) => {
-      const m = new Map();
-      (arr || []).forEach((o) => m.set(o.date, o.value));
-      return m;
-    };
-    const mUsd = toMap(usdkrw);
-    const mBroad = toMap(broad);
-    const mNas = toMap(nasdaq);
-    const mVix = toMap(vix);
-    const mUs2y = toMap(us2y);
-
-    const dates = Array.from(
-      new Set([...(mUsd.keys()), ...(mBroad.keys()), ...(mNas.keys()), ...(mVix.keys()), ...(mUs2y.keys())])
-    ).sort();
-
-    // Precompute rolling features on daily series (macro only).
-    const broadSeries = dates.map((d) => ({ date: d, v: mBroad.get(d) ?? null })).filter((x) => x.v != null);
-    const nasSeries = dates.map((d) => ({ date: d, v: mNas.get(d) ?? null })).filter((x) => x.v != null);
-    const vixSeries = dates.map((d) => ({ date: d, v: mVix.get(d) ?? null })).filter((x) => x.v != null);
-
-    const ma20ByDate = new Map();
-    for (let i = 0; i < broadSeries.length; i++) {
-      if (i >= 19) {
-        const slice = broadSeries.slice(i - 19, i + 1);
-        ma20ByDate.set(broadSeries[i].date, slice.reduce((s, x) => s + x.v, 0) / 20);
-      }
-    }
-    const return20NasByDate = new Map();
-    for (let i = 0; i < nasSeries.length; i++) {
-      if (i >= 20) {
-        const prev = nasSeries[i - 20].v;
-        const cur = nasSeries[i].v;
-        if (prev && cur) return20NasByDate.set(nasSeries[i].date, cur / prev - 1);
-      }
-    }
-    const vixChange5ByDate = new Map();
-    for (let i = 0; i < vixSeries.length; i++) {
-      if (i >= 5) {
-        const prev = vixSeries[i - 5].v;
-        const cur = vixSeries[i].v;
-        if (prev && cur) vixChange5ByDate.set(vixSeries[i].date, cur / prev - 1);
-      }
-    }
-
-    const rows = dates.map((date) => {
-      const snapshot_ts = `${date}T00:00:00.000Z`;
-      return {
-        snapshot_ts,
-        symbol: 'USDKRW',
-        live_provider: 'fred',
-        spot: mUsd.get(date) ?? null,
-        usd_broad_index_proxy: mBroad.get(date) ?? null,
-        usd_broad_index_proxy_ma20: ma20ByDate.get(date) ?? null,
-        nasdaq100: mNas.get(date) ?? null,
-        nasdaq100_return_20d: return20NasByDate.get(date) ?? null,
-        vix: mVix.get(date) ?? null,
-        vix_change_5d: vixChange5ByDate.get(date) ?? null,
-        macro_payload: null,
-        source_dates: {
-          usdkrw: usdkrw.length ? usdkrw[usdkrw.length - 1].date : null,
-          usd_broad_index_proxy: broad.length ? broad[broad.length - 1].date : null,
-          nasdaq100: nasdaq.length ? nasdaq[nasdaq.length - 1].date : null,
-          vix: vix.length ? vix[vix.length - 1].date : null,
-          us2y: us2y.length ? us2y[us2y.length - 1].date : null,
-        },
-        // Optional: could store us2y later in schema if desired (currently not in fx_analyzer_snapshots columns list).
-      };
-    });
-
-    // Forward-fill spot to satisfy NOT NULL constraint (skip leading nulls).
-    let lastSpot = null;
-    const filledRows = [];
-    for (const r of rows) {
-      if (typeof r.spot !== 'number' || Number.isNaN(r.spot) || !Number.isFinite(r.spot)) r.spot = null;
-      if (r.spot != null) lastSpot = r.spot;
-      if (r.spot == null) r.spot = lastSpot;
-      if (r.spot == null) continue; // still no spot (leading gaps)
-      filledRows.push(r);
-    }
-
-    // Upsert in chunks to avoid request payload limits.
-    const chunkSize = 200;
-    let upserted = 0;
-    for (let i = 0; i < filledRows.length; i += chunkSize) {
-      const chunk = filledRows.slice(i, i + chunkSize);
-      const { error } = await supabase.from('fx_analyzer_snapshots').upsert(chunk, { onConflict: 'snapshot_ts' });
-      if (error) throw new Error(error.message);
-      upserted += chunk.length;
-    }
-
-    const lastDate = dates.length ? dates[dates.length - 1] : null;
-    res.json({
-      ok: true,
-      upserted_days: upserted,
-      latest: lastDate
-        ? {
-            date: lastDate,
-            usd_broad_index_proxy: mBroad.get(lastDate) ?? null,
-            nasdaq100: mNas.get(lastDate) ?? null,
-            vix: mVix.get(lastDate) ?? null,
-          }
-        : null,
-    });
+    const result = await analyzer.runMacroSync(supabase);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -2435,23 +2267,6 @@ app.post('/api/analyzer/trades/manual', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get('/api/analyzer/provider-health', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const { data } = await supabase.from('provider_health').select('*').order('checked_at', { ascending: false }).limit(50);
-    const byProvider = {};
-    (data || []).forEach((r) => {
-      if (!byProvider[r.provider] || new Date(r.checked_at) > new Date(byProvider[r.provider].checked_at)) {
-        byProvider[r.provider] = r;
-      }
-    });
-    res.json({ health: byProvider, raw: data || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
