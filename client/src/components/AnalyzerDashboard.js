@@ -280,6 +280,11 @@ export default function AnalyzerDashboard() {
                 {signal.macro_snapshot?.dollar_index && <span>Dollar: {fmt(signal.macro_snapshot.dollar_index, 1)}</span>}
                 {signal.macro_snapshot?.us10y && <span>10Y: {fmt(signal.macro_snapshot.us10y, 2)}%</span>}
                 {signal.macro_snapshot?.vix && <span>VIX: {fmt(signal.macro_snapshot.vix, 1)}</span>}
+                {signal.macro_snapshot?.oil && <span>Oil: ${fmt(signal.macro_snapshot.oil, 0)}</span>}
+                {signal.macro_snapshot?.gold && <span>Gold: ${fmt(signal.macro_snapshot.gold, 0)}</span>}
+                {signal.macro_snapshot?.fed_rate && <span>Fed: {fmt(signal.macro_snapshot.fed_rate, 2)}%</span>}
+                {signal.macro_snapshot?.bok_rate && <span>BOK: {fmt(signal.macro_snapshot.bok_rate, 2)}%</span>}
+                {signal.macro_snapshot?.yuan && <span>CNY: {fmt(signal.macro_snapshot.yuan, 2)}</span>}
               </div>
             </div>
           )}
