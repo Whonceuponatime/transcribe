@@ -9,6 +9,52 @@ const fmt = (n, d = 2) => (n != null ? Number(n).toLocaleString('en-US', { maxim
 const pct = (n) => (n != null ? `${Number(n).toFixed(1)}%` : '—');
 const decColor = (d) => (d === 'BUY_NOW' ? '#22c55e' : '#eab308');
 
+function AnalysisDetails({ signal, levels }) {
+  const [open, setOpen] = useState(false);
+  const sections = signal.why || signal.analysis || [];
+  return (
+    <section className="analyzer__card card">
+      <button type="button" className="analyzer__toggle" onClick={() => setOpen(!open)}>
+        {open ? '▾ Hide analysis' : '▸ Show full analysis (why this recommendation)'}
+      </button>
+      {open && (
+        <div className="analyzer__analysis-body">
+          {sections.map((section, si) => {
+            if (typeof section === 'string') return <p key={si}>{section}</p>;
+            if (!section.title) return null;
+            return (
+              <div key={si} className="analyzer__analysis-section">
+                <h4>{section.title}</h4>
+                <ul>{(section.points || []).map((p, pi) => <li key={pi}>{p}</li>)}</ul>
+              </div>
+            );
+          })}
+          {(signal.red_flags || []).length > 0 && (
+            <div className="analyzer__analysis-section analyzer__analysis-section--warn">
+              <h4>Risks</h4>
+              <ul>{signal.red_flags.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            </div>
+          )}
+          {(signal.next_trigger_to_watch || []).length > 0 && (
+            <div className="analyzer__analysis-section analyzer__analysis-section--trigger">
+              <h4>Watch for</h4>
+              <ul>{signal.next_trigger_to_watch.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            </div>
+          )}
+          <div className="analyzer__levels">
+            <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
+            <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
+            <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
+            {signal.macro_snapshot?.dollar_index && <span>Dollar Index: {fmt(signal.macro_snapshot.dollar_index, 1)}</span>}
+            {signal.macro_snapshot?.us10y && <span>US 10Y: {fmt(signal.macro_snapshot.us10y, 2)}%</span>}
+            {signal.macro_snapshot?.vix && <span>VIX: {fmt(signal.macro_snapshot.vix, 1)}</span>}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function AnalyzerDashboard() {
   const [signal, setSignal] = useState(null);
   const [quote, setQuote] = useState(null);
@@ -19,6 +65,8 @@ export default function AnalyzerDashboard() {
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
 
+  // Capital input
+  const [capital, setCapital] = useState(() => localStorage.getItem('advisor_capital') || '');
   // Trade form
   const [tf, setTf] = useState({ krw: '', usd: '', rate: '', note: '' });
   // Crypto form
@@ -103,71 +151,74 @@ export default function AnalyzerDashboard() {
       {error && <div className="analyzer__error">{error}</div>}
       {msg && <div className="analyzer__success">{msg}</div>}
 
-      {/* ── SIGNAL ── */}
-      <section className="analyzer__card card" style={{ borderLeft: signal ? `4px solid ${decColor(signal.decision)}` : undefined }}>
-        <div className="analyzer__rate-row">
-          <span className="analyzer__rate-big">₩{fmt(quote?.mid || levels.spot, 0)}</span>
-          <span className="analyzer__rate-label">per $1 USD</span>
-          {quote?.quote_ts && <span className="analyzer__rate-time">{new Date(quote.quote_ts).toLocaleString()}</span>}
-        </div>
-        {signal ? (
-          <>
-            <div className="analyzer__signal-row">
-              <span className="analyzer__badge" style={{ background: decColor(signal.decision) }}>
-                {signal.decision === 'BUY_NOW' ? 'BUY NOW' : 'SCALE IN'}
-              </span>
-              <span>{signal.allocation_pct}%</span>
-              <span className="analyzer__muted">{signal.valuation_label}</span>
+      {/* ── CAPITAL + ACTION PLAN ── */}
+      {(() => {
+        const rate = quote?.mid || levels.spot || 0;
+        const cap = Number(capital) || 0;
+        const allocPct = signal?.allocation_pct || 0;
+        const convertKrw = cap > 0 ? Math.round(cap * allocPct / 100) : 0;
+        const keepKrw = cap > 0 ? cap - convertKrw : 0;
+        const getUsd = rate > 0 ? convertKrw / rate : 0;
+
+        return (
+          <section className="analyzer__card card analyzer__action-card" style={{ borderLeft: signal ? `4px solid ${decColor(signal.decision)}` : '4px solid #444' }}>
+            <div className="analyzer__rate-row">
+              <span className="analyzer__rate-big">₩{fmt(rate, 0)}</span>
+              <span className="analyzer__rate-label">per $1 USD</span>
+              {quote?.quote_ts && <span className="analyzer__rate-time">{new Date(quote.quote_ts).toLocaleString()}</span>}
             </div>
-            <p className="analyzer__summary">{signal.summary}</p>
 
-            {/* Structured analysis sections */}
-            {(signal.why || signal.analysis || []).map((section, si) => {
-              if (typeof section === 'string') return <p key={si} className="analyzer__reason-text">{section}</p>;
-              if (!section.title) return null;
-              return (
-                <div key={si} className="analyzer__analysis-section">
-                  <h4>{section.title}</h4>
-                  <ul>{(section.points || []).map((p, pi) => <li key={pi}>{p}</li>)}</ul>
+            <div className="analyzer__capital-input">
+              <label>Your available KRW</label>
+              <input
+                type="number"
+                placeholder="e.g. 5000000"
+                value={capital}
+                onChange={(e) => { setCapital(e.target.value); localStorage.setItem('advisor_capital', e.target.value); }}
+              />
+            </div>
+
+            {signal ? (
+              <>
+                <div className="analyzer__signal-row">
+                  <span className="analyzer__badge" style={{ background: decColor(signal.decision) }}>
+                    {signal.decision === 'BUY_NOW' ? 'BUY NOW' : 'SCALE IN'}
+                  </span>
+                  <span className="analyzer__alloc-label">{allocPct}% of capital</span>
+                  <span className="analyzer__muted">{signal.valuation_label}</span>
                 </div>
-              );
-            })}
 
-            {(signal.red_flags || []).length > 0 && (
-              <div className="analyzer__analysis-section analyzer__analysis-section--warn">
-                <h4>Risks</h4>
-                <ul>{signal.red_flags.map((w, i) => <li key={i}>{w}</li>)}</ul>
-              </div>
-            )}
-            {(signal.next_trigger_to_watch || []).length > 0 && (
-              <div className="analyzer__analysis-section analyzer__analysis-section--trigger">
-                <h4>Watch for</h4>
-                <ul>{signal.next_trigger_to_watch.map((w, i) => <li key={i}>{w}</li>)}</ul>
-              </div>
-            )}
+                {cap > 0 && rate > 0 ? (
+                  <div className="analyzer__action-plan">
+                    <div className="analyzer__action-main">
+                      <div className="analyzer__action-convert">
+                        <span className="analyzer__action-label">Convert now</span>
+                        <span className="analyzer__action-amount">₩{fmt(convertKrw, 0)} → ${fmt(getUsd, 2)}</span>
+                      </div>
+                      <div className="analyzer__action-keep">
+                        <span className="analyzer__action-label">Keep for later</span>
+                        <span className="analyzer__action-amount">₩{fmt(keepKrw, 0)}</span>
+                      </div>
+                    </div>
+                    <p className="analyzer__action-rate">at ₩{fmt(rate, 2)} per USD</p>
+                  </div>
+                ) : (
+                  <p className="analyzer__muted">Enter your KRW capital above to see exact amounts</p>
+                )}
 
-            {signal.macro_snapshot && (
-              <div className="analyzer__levels">
-                <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
-                <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
-                <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
-                {signal.macro_snapshot.dollar_index && <span>Dollar Index: {fmt(signal.macro_snapshot.dollar_index, 1)}</span>}
-                {signal.macro_snapshot.us10y && <span>US 10Y: {fmt(signal.macro_snapshot.us10y, 2)}%</span>}
-                {signal.macro_snapshot.vix && <span>VIX: {fmt(signal.macro_snapshot.vix, 1)}</span>}
-              </div>
+                <p className="analyzer__summary">{signal.summary}</p>
+              </>
+            ) : (
+              <p className="analyzer__muted">Click &quot;Check now&quot; to get your recommendation</p>
             )}
-            {!signal.macro_snapshot && (
-              <div className="analyzer__levels">
-                <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
-                <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
-                <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="analyzer__muted">Click &quot;Check now&quot; for your first signal</p>
-        )}
-      </section>
+          </section>
+        );
+      })()}
+
+      {/* ── ANALYSIS (collapsible) ── */}
+      {signal && (
+        <AnalysisDetails signal={signal} levels={levels} />
+      )}
 
       {/* ── USD/KRW CHART ── */}
       {chartData.length > 5 && (

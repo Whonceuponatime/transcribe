@@ -270,6 +270,96 @@
   min-width: 80px;
 }
 
+.analyzer__capital-input {
+  margin: 0.75rem 0;
+}
+
+.analyzer__capital-input label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 0.3rem;
+}
+
+.analyzer__capital-input input {
+  padding: 0.5rem 0.75rem;
+  background: var(--surface, #1a1a1a);
+  border: 1px solid var(--border, #444);
+  color: var(--text, #eee);
+  border-radius: 6px;
+  font-size: 1.1rem;
+  width: 200px;
+}
+
+.analyzer__action-plan {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 8px;
+}
+
+.analyzer__action-main {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.analyzer__action-convert,
+.analyzer__action-keep {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.analyzer__action-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analyzer__action-amount {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.analyzer__action-convert .analyzer__action-amount {
+  color: #22c55e;
+}
+
+.analyzer__action-keep .analyzer__action-amount {
+  color: var(--text-muted, #888);
+}
+
+.analyzer__action-rate {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin: 0.4rem 0 0 0;
+}
+
+.analyzer__alloc-label {
+  font-size: 0.9rem;
+}
+
+.analyzer__toggle {
+  background: none;
+  border: none;
+  color: var(--accent, #22c55e);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  text-align: left;
+}
+
+.analyzer__toggle:hover {
+  text-decoration: underline;
+}
+
+.analyzer__analysis-body {
+  margin-top: 0.75rem;
+}
+
 .analyzer__analysis-section {
   margin: 0.75rem 0;
   padding: 0.5rem 0.75rem;
