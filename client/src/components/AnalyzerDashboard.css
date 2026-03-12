@@ -269,3 +269,40 @@
 .analyzer__trade-row span {
   min-width: 80px;
 }
+
+.analyzer__analysis-section {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--border, #444);
+  background: var(--surface, #1a1a1a);
+  border-radius: 0 6px 6px 0;
+}
+
+.analyzer__analysis-section h4 {
+  margin: 0 0 0.4rem 0;
+  font-size: 0.9rem;
+  color: var(--accent, #22c55e);
+}
+
+.analyzer__analysis-section ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.analyzer__analysis-section--warn {
+  border-left-color: #eab308;
+}
+
+.analyzer__analysis-section--warn h4 {
+  color: #eab308;
+}
+
+.analyzer__analysis-section--trigger {
+  border-left-color: #3b82f6;
+}
+
+.analyzer__analysis-section--trigger h4 {
+  color: #3b82f6;
+}

@@ -120,23 +120,49 @@ export default function AnalyzerDashboard() {
               <span className="analyzer__muted">{signal.valuation_label}</span>
             </div>
             <p className="analyzer__summary">{signal.summary}</p>
-            {(signal.why || []).length > 0 && (
-              <ul className="analyzer__reasons">{signal.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
-            )}
+
+            {/* Structured analysis sections */}
+            {(signal.why || signal.analysis || []).map((section, si) => {
+              if (typeof section === 'string') return <p key={si} className="analyzer__reason-text">{section}</p>;
+              if (!section.title) return null;
+              return (
+                <div key={si} className="analyzer__analysis-section">
+                  <h4>{section.title}</h4>
+                  <ul>{(section.points || []).map((p, pi) => <li key={pi}>{p}</li>)}</ul>
+                </div>
+              );
+            })}
+
             {(signal.red_flags || []).length > 0 && (
-              <ul className="analyzer__warnings">{signal.red_flags.map((w, i) => <li key={i}>{w}</li>)}</ul>
+              <div className="analyzer__analysis-section analyzer__analysis-section--warn">
+                <h4>Risks</h4>
+                <ul>{signal.red_flags.map((w, i) => <li key={i}>{w}</li>)}</ul>
+              </div>
             )}
             {(signal.next_trigger_to_watch || []).length > 0 && (
-              <div className="analyzer__triggers">
-                <strong>Watch for:</strong>
+              <div className="analyzer__analysis-section analyzer__analysis-section--trigger">
+                <h4>Watch for</h4>
                 <ul>{signal.next_trigger_to_watch.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </div>
             )}
-            <div className="analyzer__levels">
-              <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
-              <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
-              <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
-            </div>
+
+            {signal.macro_snapshot && (
+              <div className="analyzer__levels">
+                <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
+                <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
+                <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
+                {signal.macro_snapshot.dollar_index && <span>Dollar Index: {fmt(signal.macro_snapshot.dollar_index, 1)}</span>}
+                {signal.macro_snapshot.us10y && <span>US 10Y: {fmt(signal.macro_snapshot.us10y, 2)}%</span>}
+                {signal.macro_snapshot.vix && <span>VIX: {fmt(signal.macro_snapshot.vix, 1)}</span>}
+              </div>
+            )}
+            {!signal.macro_snapshot && (
+              <div className="analyzer__levels">
+                <span>MA20: ₩{fmt(levels.ma20, 0)}</span>
+                <span>MA60: ₩{fmt(levels.ma60, 0)}</span>
+                <span>MA120: ₩{fmt(levels.ma120, 0)}</span>
+              </div>
+            )}
           </>
         ) : (
           <p className="analyzer__muted">Click &quot;Check now&quot; for your first signal</p>
