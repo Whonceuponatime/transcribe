@@ -2270,6 +2270,28 @@ app.post('/api/analyzer/trades/manual', async (req, res) => {
   }
 });
 
+app.post('/api/analyzer/crypto', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const result = await analyzer.recordCrypto(supabase, req.body || {});
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/analyzer/portfolio', async (req, res) => {
+  try {
+    const supabase = analyzer.getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const result = await analyzer.getPortfolio(supabase);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Live Trading (KRW→USD) ─────────────────────────────────────────────
 const liveTrading = require('./lib/liveTrading');
 

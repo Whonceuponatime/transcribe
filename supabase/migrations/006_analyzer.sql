@@ -113,6 +113,20 @@ CREATE TABLE IF NOT EXISTS provider_health (
 );
 CREATE INDEX IF NOT EXISTS idx_provider_health_provider_checked ON provider_health(provider, checked_at DESC);
 
+-- 7. crypto_purchases (log crypto buys made with USD)
+CREATE TABLE IF NOT EXISTS crypto_purchases (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bought_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  coin        TEXT NOT NULL,
+  usd_spent   NUMERIC NOT NULL,
+  coin_amount NUMERIC NOT NULL,
+  price_usd   NUMERIC NOT NULL,
+  note        TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_crypto_purchases_bought_at ON crypto_purchases(bought_at DESC);
+CREATE INDEX IF NOT EXISTS idx_crypto_purchases_coin ON crypto_purchases(coin);
+
 ALTER TABLE fx_live_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fx_bars_1m ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fx_analyzer_snapshots ENABLE ROW LEVEL SECURITY;
@@ -126,3 +140,6 @@ CREATE POLICY "Allow all for service" ON fx_analyzer_snapshots FOR ALL USING (tr
 CREATE POLICY "Allow all for service" ON fx_signal_runs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for service" ON fx_manual_trades FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for service" ON provider_health FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE crypto_purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for service" ON crypto_purchases FOR ALL USING (true) WITH CHECK (true);
