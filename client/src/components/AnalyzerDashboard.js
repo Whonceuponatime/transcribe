@@ -28,8 +28,8 @@ export default function AnalyzerDashboard() {
     setLoading(true); setError(null);
     try {
       const [dashRes, portRes] = await Promise.all([
-        fetch(`${API}/api/analyzer/dashboard?days=365`),
-        fetch(`${API}/api/analyzer/portfolio`),
+        fetch(`${API}/api/analyzer?action=dashboard&days=365`),
+        fetch(`${API}/api/analyzer?action=portfolio`),
       ]);
       if (dashRes.ok) {
         const d = await dashRes.json();
@@ -47,7 +47,7 @@ export default function AnalyzerDashboard() {
   const syncLive = useCallback(async () => {
     setSyncing(true); setError(null); setMsg(null);
     try {
-      const res = await fetch(`${API}/api/analyzer/sync/live`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const res = await fetch(`${API}/api/analyzer?action=sync-live`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const j = await res.json();
       if (!j.ok) setError(j.error); else { setMsg('Updated'); refresh(); }
     } catch (e) { setError(e.message); }
@@ -58,7 +58,7 @@ export default function AnalyzerDashboard() {
     setMsg(null);
     const body = { action: 'BUY_USD', krw_amount: Number(tf.krw) || null, usd_amount: Number(tf.usd) || null, fx_rate: Number(tf.rate) || null, note: tf.note || null };
     try {
-      const res = await fetch(`${API}/api/analyzer/trades/manual`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(`${API}/api/analyzer?action=trade`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await res.json();
       if (j.ok) { setMsg('USD purchase logged'); setTf({ krw: '', usd: '', rate: '', note: '' }); refresh(); }
       else setError(j.error);
@@ -69,7 +69,7 @@ export default function AnalyzerDashboard() {
     setMsg(null);
     const body = { coin: cf.coin || 'BTC', usd_spent: Number(cf.usd) || 0, coin_amount: Number(cf.amount) || 0, price_usd: Number(cf.price) || 0, note: cf.note || null };
     try {
-      const res = await fetch(`${API}/api/analyzer/crypto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(`${API}/api/analyzer?action=crypto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await res.json();
       if (j.ok) { setMsg('Crypto purchase logged'); setCf({ coin: 'BTC', usd: '', amount: '', price: '', note: '' }); refresh(); }
       else setError(j.error);

@@ -2216,81 +2216,10 @@ app.get('/api/fx-dashboard', async (req, res) => {
   }
 });
 
-// ─── Buy USD Advisor (analysis only, no execution) ──────────────────────
+// ─── Buy USD Advisor (single handler, ?action= routing) ─────────────────
 const analyzer = require('./lib/analyzer');
-
-app.get('/api/analyzer/dashboard', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const quote = await analyzer.getLatestQuote(supabase);
-    const signal = await analyzer.getLatestSignal(supabase);
-    const days = Math.min(365, parseInt(req.query.days, 10) || 90);
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    const { data: snapshots } = await supabase.from('fx_analyzer_snapshots').select('*').gte('snapshot_ts', from.toISOString()).order('snapshot_ts', { ascending: true });
-    const { data: trades } = await supabase.from('fx_manual_trades').select('*').order('trade_ts', { ascending: false }).limit(50);
-    const { data: health } = await supabase.from('provider_health').select('*').order('checked_at', { ascending: false }).limit(20);
-    res.json({ quote, signal, snapshots: snapshots || [], trades: trades || [], provider_health: health || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/analyzer/sync/live', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const result = await analyzer.runLiveSync(supabase);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.post('/api/analyzer/sync/macro', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const result = await analyzer.runMacroSync(supabase);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.post('/api/analyzer/trades/manual', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const result = await analyzer.recordTrade(supabase, req.body || {});
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.post('/api/analyzer/crypto', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const result = await analyzer.recordCrypto(supabase, req.body || {});
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get('/api/analyzer/portfolio', async (req, res) => {
-  try {
-    const supabase = analyzer.getSupabase();
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const result = await analyzer.getPortfolio(supabase);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+const analyzerHandler = require('./api/analyzer');
+app.all('/api/analyzer', (req, res) => analyzerHandler(req, res));
 
 // ─── Live Trading (KRW→USD) ─────────────────────────────────────────────
 const liveTrading = require('./lib/liveTrading');
