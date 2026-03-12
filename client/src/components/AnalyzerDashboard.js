@@ -37,13 +37,15 @@ export default function AnalyzerDashboard() {
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
-  const syncLive = useCallback(async () => {
+  const syncAndRefresh = useCallback(async () => {
     setSyncing(true); setError(null); setMsg(null);
     try {
       const res = await fetch(`${API}/api/analyzer?action=sync-live`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const j = await res.json();
-      if (!j.ok) setError(j.error); else { setMsg('Updated'); refresh(); }
-    } catch (e) { setError(e.message); } finally { setSyncing(false); }
+      if (!j.ok) setError(j.error);
+    } catch (e) { setError(e.message); }
+    await refresh();
+    setSyncing(false);
   }, [refresh]);
 
   const logUsdBuy = useCallback(async () => {
@@ -86,8 +88,7 @@ export default function AnalyzerDashboard() {
       <header className="analyzer__header">
         <h2 className="analyzer__title">Buy USD Advisor</h2>
         <div className="analyzer__actions">
-          <button type="button" className="analyzer__btn analyzer__btn--primary" onClick={syncLive} disabled={syncing}>{syncing ? 'Checking…' : 'Check now'}</button>
-          <button type="button" className="analyzer__btn" onClick={refresh} disabled={loading}>Refresh</button>
+          <button type="button" className="analyzer__btn analyzer__btn--primary" onClick={syncAndRefresh} disabled={syncing}>{syncing ? 'Updating…' : 'Update'}</button>
         </div>
       </header>
       {error && <div className="analyzer__error">{error}</div>}
