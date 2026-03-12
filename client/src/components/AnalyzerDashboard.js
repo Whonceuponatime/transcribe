@@ -151,7 +151,7 @@ export default function AnalyzerDashboard() {
         <section className="analyzer__card card analyzer__signal-card" style={{ borderLeft: `4px solid ${decisionColor(signal.decision)}` }}>
           <div className="analyzer__signal-top">
             <span className="analyzer__decision" style={{ background: decisionColor(signal.decision) }}>
-              {signal.decision === 'BUY_NOW' ? 'BUY NOW' : signal.decision === 'SCALE_IN' ? 'SCALE IN' : 'WAIT'}
+              {signal.decision === 'BUY_NOW' ? 'BUY NOW' : 'SCALE IN'}
             </span>
             <span className="analyzer__alloc">{signal.allocation_pct}% suggested</span>
             <span className="analyzer__conf">Confidence: {signal.confidence}%</span>

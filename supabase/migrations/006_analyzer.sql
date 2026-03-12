@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS fx_signal_runs (
   allocation_pct       NUMERIC NOT NULL,
   confidence           NUMERIC NOT NULL,
   score                NUMERIC NOT NULL,
-  valuation_label      TEXT NOT NULL CHECK (valuation_label IN ('CHEAP', 'FAIR', 'EXPENSIVE')),
+  valuation_label      TEXT NOT NULL,
   live_provider        TEXT NOT NULL,
   quote_timestamp      TIMESTAMPTZ,
   is_stale             BOOLEAN NOT NULL DEFAULT FALSE,
