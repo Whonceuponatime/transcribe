@@ -169,18 +169,15 @@ export default function AnalyzerDashboard() {
               <p className="analyzer__muted">Enter your available KRW above</p>
             )}
 
-            <p className="analyzer__action-summary">{signal.summary}</p>
-
-            {(signal.next_trigger_to_watch || []).length > 0 && (
-              <div className="analyzer__action-next">
-                <strong>Next moves:</strong>
-                <ul>{signal.next_trigger_to_watch.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            {(signal.situation || []).length > 0 && (
+              <div className="analyzer__situation">
+                {signal.situation.map((s, i) => <p key={i}>{s}</p>)}
               </div>
             )}
 
             {(signal.red_flags || []).length > 0 && (
               <div className="analyzer__action-risks">
-                <strong>Risks to watch:</strong>
+                <strong>Caution:</strong>
                 <ul>{signal.red_flags.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </div>
             )}
