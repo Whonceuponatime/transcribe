@@ -81,6 +81,50 @@ export default function AnalyzerDashboard() {
   const profitColor = (v) => (v >= 0 ? '#22c55e' : '#ef4444');
   const chartData = snapshots.map((s) => ({ date: s.snapshot_ts?.slice(0, 10), rate: s.spot }));
 
+  // Buy planner
+  const premium20 = levels.ma20 ? (rate / levels.ma20 - 1) * 100 : null;
+  const premium60 = levels.ma60 ? (rate / levels.ma60 - 1) * 100 : null;
+  const percentileNum = levels.percentile252 != null ? levels.percentile252 * 100 : null;
+  const zscore = levels.zscore20;
+  const plannerVix = signal?.macro_snapshot?.vix;
+
+  const plannerChecks = [
+    {
+      label: 'Rate vs 20d avg',
+      value: premium20 != null ? `${premium20 > 0 ? '+' : ''}${premium20.toFixed(1)}%` : '—',
+      note: premium20 == null ? '' : premium20 < -0.5 ? 'Cheap — good to buy more' : premium20 < 1.0 ? 'Fair value' : 'Expensive — buy small',
+      status: premium20 == null ? 'neutral' : premium20 < -0.5 ? 'good' : premium20 < 1.0 ? 'ok' : 'warn',
+    },
+    {
+      label: 'Z-score (20d)',
+      value: zscore != null ? zscore.toFixed(2) : '—',
+      note: zscore == null ? '' : zscore < 0 ? 'Below avg — historically cheap' : zscore < 1 ? 'Normal zone' : zscore < 2 ? 'Above avg — elevated' : 'Very high — consider waiting for pullback',
+      status: zscore == null ? 'neutral' : zscore < 0 ? 'good' : zscore < 1 ? 'ok' : zscore < 2 ? 'warn' : 'bad',
+    },
+    {
+      label: 'VIX (fear)',
+      value: plannerVix != null ? fmt(plannerVix, 1) : '—',
+      note: plannerVix == null ? '' : plannerVix < 20 ? 'Calm markets — stable conditions' : plannerVix < 30 ? 'Moderate volatility — normal' : 'High fear — USD tends to strengthen, watch closely',
+      status: plannerVix == null ? 'neutral' : plannerVix < 20 ? 'good' : plannerVix < 30 ? 'ok' : 'warn',
+    },
+  ];
+
+  const plannerTargets = [
+    { label: '20d avg', rate: levels.ma20, pct: 40 },
+    { label: '60d avg', rate: levels.ma60, pct: 35 },
+    { label: '120d avg', rate: levels.ma120, pct: 25 },
+  ].filter((tgt) => tgt.rate && tgt.rate < rate).map((tgt) => {
+    const changePct = (tgt.rate - rate) / rate * 100;
+    const deployKrw = keepKrw > 0 ? Math.round(keepKrw * tgt.pct / 100) : 0;
+    const addUsd = tgt.rate > 0 && deployKrw > 0 ? deployKrw / tgt.rate : 0;
+    const existingKrw = u.totalKrwSpent || 0;
+    const existingUsd = u.totalUsdBought || 0;
+    const newAvg = existingKrw + deployKrw > 0 && existingUsd + addUsd > 0
+      ? (existingKrw + deployKrw) / (existingUsd + addUsd)
+      : null;
+    return { ...tgt, changePct, deployKrw, addUsd, newAvg };
+  });
+
   if (loading && !signal && !portfolio) return <div className="analyzer"><div className="analyzer__loading">Loading…</div></div>;
 
   return (
@@ -188,14 +232,115 @@ export default function AnalyzerDashboard() {
         )}
       </section>
 
+      {/* ═══════════ 2.5 BUY PLANNER ═══════════ */}
+      {signal && levels.ma20 && (
+        <section className="planner card">
+          <h3 className="planner__title">Buy planner</h3>
+
+          {/* 3-item checklist */}
+          <div className="planner__checklist">
+            {plannerChecks.map((chk, i) => (
+              <div key={i} className={`planner__check planner__check--${chk.status}`}>
+                <span className="planner__check-icon">
+                  {chk.status === 'good' ? '✓' : chk.status === 'bad' ? '✗' : chk.status === 'warn' ? '!' : '●'}
+                </span>
+                <div className="planner__check-body">
+                  <span className="planner__check-label">{chk.label}</span>
+                  <span className="planner__check-value">{chk.value}</span>
+                  {chk.note && <span className="planner__check-note">{chk.note}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Stats row */}
+          <div className="planner__stats">
+            {premium20 != null && (
+              <div className="planner__stat">
+                <span className="planner__stat-label">vs 20d avg</span>
+                <span className="planner__stat-value" style={{ color: premium20 > 0 ? '#eab308' : '#22c55e' }}>
+                  {premium20 > 0 ? '+' : ''}{premium20.toFixed(2)}%
+                </span>
+              </div>
+            )}
+            {premium60 != null && (
+              <div className="planner__stat">
+                <span className="planner__stat-label">vs 60d avg</span>
+                <span className="planner__stat-value" style={{ color: premium60 > 0 ? '#eab308' : '#22c55e' }}>
+                  {premium60 > 0 ? '+' : ''}{premium60.toFixed(2)}%
+                </span>
+              </div>
+            )}
+            {percentileNum != null && (
+              <div className="planner__stat">
+                <span className="planner__stat-label">252d percentile</span>
+                <span className="planner__stat-value" style={{ color: percentileNum > 80 ? '#ef4444' : percentileNum > 50 ? '#eab308' : '#22c55e' }}>
+                  {percentileNum.toFixed(0)}th
+                </span>
+              </div>
+            )}
+            {zscore != null && (
+              <div className="planner__stat">
+                <span className="planner__stat-label">Z-score</span>
+                <span className="planner__stat-value" style={{ color: Math.abs(zscore) > 1.5 ? '#eab308' : '#22c55e' }}>
+                  {zscore.toFixed(2)}
+                </span>
+              </div>
+            )}
+            {u.avgBuyRate > 0 && (
+              <div className="planner__stat">
+                <span className="planner__stat-label">Your avg buy</span>
+                <span className="planner__stat-value" style={{ color: rate < u.avgBuyRate ? '#22c55e' : '#ef4444' }}>
+                  ₩{fmt(u.avgBuyRate, 0)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Buy targets */}
+          {plannerTargets.length > 0 ? (
+            <>
+              <h4 className="planner__targets-title">If rate dips — where to buy more</h4>
+              <div className="planner__target-list">
+                {plannerTargets.map((tgt, i) => (
+                  <div key={i} className="planner__target-row">
+                    <div className="planner__target-left">
+                      <span className="planner__target-label">{tgt.label}</span>
+                      <span className="planner__target-rate">₩{fmt(tgt.rate, 0)}</span>
+                      <span className="planner__target-change">{tgt.changePct.toFixed(1)}%</span>
+                    </div>
+                    <div className="planner__target-right">
+                      {cap > 0 && keepKrw > 0 ? (
+                        <>
+                          <span className="planner__target-deploy">Deploy ₩{fmt(tgt.deployKrw, 0)}</span>
+                          <span className="planner__target-usd">→ +${fmt(tgt.addUsd, 2)}</span>
+                        </>
+                      ) : (
+                        <span className="planner__target-hint">Enter capital above to see amounts</span>
+                      )}
+                      {tgt.newAvg != null && cap > 0 && keepKrw > 0 && (
+                        <span className="planner__target-newavg">New avg ₩{fmt(tgt.newAvg, 0)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="analyzer__muted" style={{ marginTop: '0.75rem' }}>
+              Rate is at or below all moving averages — this is a good buy zone.
+            </p>
+          )}
+        </section>
+      )}
+
       {/* ═══════════ 3. WHAT TO DO WITH YOUR USD ═══════════ */}
       {signal && (
         <section className="analyzer__card card analyzer__deploy">
           <h3>What to do with your USD</h3>
           <p className="analyzer__deploy-intro">
-            Once you have USD, don't leave it idle. Here's how to deploy it based on current conditions:
+            Once you have USD, don&apos;t leave it idle. Here&apos;s how to deploy it based on current conditions:
           </p>
-
           {(signal.usd_deploy || [
             { category: 'Keep as USD cash', pct: 40, reason: 'Liquid emergency reserve. Park in SGOV ETF (~5% yield).', action: 'Open USD account at Wise or Interactive Brokers.' },
             { category: 'US Index ETFs', pct: 40, reason: 'S&P 500 returns ~10%/year — beats KRW depreciation long-term.', action: 'Buy VOO or QQQ via Interactive Brokers or Kiwoom.' },
@@ -210,17 +355,16 @@ export default function AnalyzerDashboard() {
               <p className="analyzer__deploy-action">→ {d.action}</p>
             </div>
           ))}
-
           {(signal.next_trigger_to_watch || []).length > 0 && (
             <div className="analyzer__triggers">
-              <strong>Watch for these signals to buy more KRW→USD:</strong>
-              <ul>{signal.next_trigger_to_watch.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              <strong>Watch for — signals to buy more KRW→USD:</strong>
+              <ul>{signal.next_trigger_to_watch.map((trig, i) => <li key={i}>{trig}</li>)}</ul>
             </div>
           )}
         </section>
       )}
 
-      {/* ═══════════ 5. LOG TRADES ═══════════ */}
+      {/* ═══════════ 4. LOG TRADES ═══════════ */}
       <div className="analyzer__log-grid">
         <section className="analyzer__card card">
           <h3>Log USD purchase</h3>
@@ -246,7 +390,7 @@ export default function AnalyzerDashboard() {
         </section>
       </div>
 
-      {/* ═══════════ 6. RECENT ACTIVITY ═══════════ */}
+      {/* ═══════════ 4. RECENT ACTIVITY ═══════════ */}
       {portfolio && ((portfolio.trades || []).length > 0 || (portfolio.cryptoPurchases || []).length > 0) && (
         <section className="analyzer__card card">
           <h3>Recent activity</h3>
@@ -269,7 +413,7 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 7. CHART ═══════════ */}
+      {/* ═══════════ 5. CHART ═══════════ */}
       {chartData.length > 5 && (
         <section className="analyzer__card card">
           <h3>USD/KRW history</h3>
@@ -287,7 +431,7 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 8. FULL ANALYSIS (bottom, expandable) ═══════════ */}
+      {/* ═══════════ 6. FULL ANALYSIS (bottom, expandable) ═══════════ */}
       {signal && (
         <section className="analyzer__card card">
           <button type="button" className="analyzer__toggle" onClick={() => setShowAnalysis(!showAnalysis)}>
