@@ -188,7 +188,39 @@ export default function AnalyzerDashboard() {
         )}
       </section>
 
-      {/* ═══════════ 3. LOG TRADES ═══════════ */}
+      {/* ═══════════ 3. WHAT TO DO WITH YOUR USD ═══════════ */}
+      {signal && (
+        <section className="analyzer__card card analyzer__deploy">
+          <h3>What to do with your USD</h3>
+          <p className="analyzer__deploy-intro">
+            Once you have USD, don't leave it idle. Here's how to deploy it based on current conditions:
+          </p>
+
+          {(signal.usd_deploy || [
+            { category: 'Keep as USD cash', pct: 40, reason: 'Liquid emergency reserve. Park in SGOV ETF (~5% yield).', action: 'Open USD account at Wise or Interactive Brokers.' },
+            { category: 'US Index ETFs', pct: 40, reason: 'S&P 500 returns ~10%/year — beats KRW depreciation long-term.', action: 'Buy VOO or QQQ via Interactive Brokers or Kiwoom.' },
+            { category: 'Bitcoin / Crypto', pct: 20, reason: 'Small speculative allocation for higher upside.', action: 'Buy BTC or ETH via Binance, Coinbase, or Upbit.' },
+          ]).map((d, i) => (
+            <div key={i} className="analyzer__deploy-row">
+              <div className="analyzer__deploy-header">
+                <span className="analyzer__deploy-cat">{d.category}</span>
+                <span className="analyzer__deploy-pct">{d.pct}%</span>
+              </div>
+              <p className="analyzer__deploy-reason">{d.reason}</p>
+              <p className="analyzer__deploy-action">→ {d.action}</p>
+            </div>
+          ))}
+
+          {(signal.next_trigger_to_watch || []).length > 0 && (
+            <div className="analyzer__triggers">
+              <strong>Watch for these signals to buy more KRW→USD:</strong>
+              <ul>{signal.next_trigger_to_watch.map((t, i) => <li key={i}>{t}</li>)}</ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ═══════════ 5. LOG TRADES ═══════════ */}
       <div className="analyzer__log-grid">
         <section className="analyzer__card card">
           <h3>Log USD purchase</h3>
@@ -214,7 +246,7 @@ export default function AnalyzerDashboard() {
         </section>
       </div>
 
-      {/* ═══════════ 4. RECENT ACTIVITY ═══════════ */}
+      {/* ═══════════ 6. RECENT ACTIVITY ═══════════ */}
       {portfolio && ((portfolio.trades || []).length > 0 || (portfolio.cryptoPurchases || []).length > 0) && (
         <section className="analyzer__card card">
           <h3>Recent activity</h3>
@@ -237,7 +269,7 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 5. CHART ═══════════ */}
+      {/* ═══════════ 7. CHART ═══════════ */}
       {chartData.length > 5 && (
         <section className="analyzer__card card">
           <h3>USD/KRW history</h3>
@@ -255,7 +287,7 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 6. FULL ANALYSIS (bottom, expandable) ═══════════ */}
+      {/* ═══════════ 8. FULL ANALYSIS (bottom, expandable) ═══════════ */}
       {signal && (
         <section className="analyzer__card card">
           <button type="button" className="analyzer__toggle" onClick={() => setShowAnalysis(!showAnalysis)}>
