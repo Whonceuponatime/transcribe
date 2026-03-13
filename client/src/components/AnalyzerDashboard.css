@@ -1,6 +1,7 @@
 .analyzer { padding: 1rem; max-width: 900px; margin: 0 auto; }
 .analyzer__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.analyzer__title { font-size: 1.4rem; margin: 0; }
+.analyzer__title { font-size: 1.2rem; margin: 0 0 0.15rem 0; }
+.analyzer__subtitle { margin: 0; font-size: 0.78rem; color: #888; }
 .analyzer__actions { display: flex; gap: 0.5rem; }
 .analyzer__btn { padding: 0.4rem 0.75rem; border: 1px solid var(--border, #444); background: var(--surface, #1a1a1a); color: var(--text, #eee); border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
 .analyzer__btn:hover:not(:disabled) { background: var(--surface-hover, #252525); }
@@ -188,3 +189,14 @@
 .analyzer__triggers { margin-top: 0.75rem; font-size: 0.85rem; }
 .analyzer__triggers strong { color: #eab308; display: block; margin-bottom: 0.3rem; }
 .analyzer__triggers ul { margin: 0; padding-left: 1.1rem; line-height: 1.8; color: #bbb; }
+.analyzer__deploy-reserve {
+  margin-top: 0.6rem; padding: 0.5rem 0.8rem;
+  background: #0a0a0a; border-radius: 6px; font-size: 0.82rem; color: #eee;
+  border: 1px dashed #333;
+}
+.analyzer__empty-state {
+  padding: 1.25rem; text-align: center; background: #0d0d0d; border-radius: 8px;
+  border: 1px dashed #444;
+}
+.analyzer__empty-state p { margin: 0 0 0.4rem 0; font-size: 0.9rem; }
+.analyzer__empty-state strong { color: #22c55e; }

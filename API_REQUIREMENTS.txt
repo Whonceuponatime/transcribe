@@ -1,0 +1,136 @@
+═══════════════════════════════════════════════════════════════
+ API KEYS REQUIRED — KRW→USD→Crypto Advisor
+ (Jack of Clubs / joclubs project)
+═══════════════════════════════════════════════════════════════
+
+This file lists every external API the app uses, whether a key
+is required, where to get it, and what the free limits are.
+
+───────────────────────────────────────────────────────────────
+1. FRED API  (Federal Reserve Economic Data)
+───────────────────────────────────────────────────────────────
+  Purpose   : Historical USD/KRW exchange rate, Dollar Index,
+              VIX, NASDAQ, 10-year yield, Fed rate, CPI,
+              oil price, gold price, S&P 500, BOK rate,
+              KOSPI proxy, CNY/USD, Korea trade balance.
+              These are the 15 macro series that drive the
+              BUY/SCALE_IN signal.
+
+  Key?      : YES — free, no credit card needed
+  Get it at : https://fred.stlouisfed.org/docs/api/api_key.html
+              (Register at research.stlouisfed.org → Account → API Keys)
+
+  Free tier : Unlimited requests for non-commercial use.
+              Rate limit: 120 requests/min.
+
+  Env var   : FRED_API_KEY
+
+  IMPORTANT : Without this key the app still works but:
+              - Moving averages (MA20/60/120) will be empty
+              - The buy/sell signal will have no historical context
+              - The Buy Planner dip targets will not show
+              You will only get the live rate + a score of 0
+              (SCALE_IN 10% allocation).
+
+───────────────────────────────────────────────────────────────
+2. Supabase
+───────────────────────────────────────────────────────────────
+  Purpose   : Database for storing signals, live quotes,
+              manual USD trades, crypto purchases, portfolio.
+              Also used for user authentication.
+
+  Key?      : YES — free tier available
+  Get it at : https://supabase.com (create a project, free tier
+              gives 500 MB database + 2 GB bandwidth)
+
+  Env vars  : SUPABASE_URL                (project URL)
+              SUPABASE_SERVICE_ROLE_KEY   (server-side, secret)
+              REACT_APP_SUPABASE_URL      (client-side)
+              REACT_APP_SUPABASE_ANON_KEY (client-side, public)
+
+  IMPORTANT : Without Supabase the entire app fails to load
+              (authentication + data storage both require it).
+
+  Migrations: Run all files in supabase/migrations/ in order
+              (001 through 006) in the Supabase SQL editor.
+
+───────────────────────────────────────────────────────────────
+3. Yahoo Finance (live USD/KRW rate — PRIMARY)
+───────────────────────────────────────────────────────────────
+  Purpose   : Real-time USD/KRW exchange rate (during market
+              hours). This is the rate shown in "What to do now"
+              and used for the signal calculation.
+
+  Key?      : NO — completely free, no registration needed
+  Endpoint  : https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X
+  Limits    : Unofficial API, no documented rate limit.
+              Works well for infrequent polling (once per sync).
+
+  Fallback 1: ExchangeRate-API (https://api.exchangerate-api.com/v4/latest/USD)
+              Also free, no key, but updates only once per 24h.
+
+  Fallback 2: Frankfurter (https://api.frankfurter.dev)
+              Free, no key, ECB data (updates daily).
+
+  Note      : The app tries Yahoo → ExchangeRate-API →
+              Frankfurter in order. If all fail, sync-live
+              returns an error.
+
+───────────────────────────────────────────────────────────────
+4. CoinGecko (crypto prices — for portfolio P&L)
+───────────────────────────────────────────────────────────────
+  Purpose   : Live USD prices for BTC, ETH, SOL, etc.
+              Used to calculate the current value of your
+              crypto holdings and P&L in KRW.
+
+  Key?      : NO — free public API, no key needed
+  Endpoint  : https://api.coingecko.com/api/v3/simple/price
+  Free tier : 30 calls/minute, 10,000 calls/month
+
+  Note      : If CoinGecko rate-limits the request, crypto
+              portfolio values will show as $0. This does NOT
+              affect the KRW→USD signal at all.
+
+───────────────────────────────────────────────────────────────
+5. OpenAI  (Email Rewriter + Image-to-Text features)
+───────────────────────────────────────────────────────────────
+  Purpose   : Powers the "Email Rewriter" and "Image to Text"
+              tools in the app. NOT used by the Buy USD advisor.
+
+  Key?      : YES — paid API (no free tier beyond trial credits)
+  Get it at : https://platform.openai.com/api-keys
+
+  Env var   : OPENAI_API_KEY
+
+  Note      : Only needed if you use the Rewriter/ImageToText
+              features. The Buy USD / Crypto advisor works
+              completely without this key.
+
+───────────────────────────────────────────────────────────────
+ SETUP SUMMARY — what you MUST set for the advisor to work
+───────────────────────────────────────────────────────────────
+
+  On Vercel (Environment Variables → Production):
+
+    FRED_API_KEY              = <your FRED key>
+    SUPABASE_URL              = https://xxx.supabase.co
+    SUPABASE_SERVICE_ROLE_KEY = <service role key from Supabase>
+    REACT_APP_SUPABASE_URL    = https://xxx.supabase.co
+    REACT_APP_SUPABASE_ANON_KEY = <anon key from Supabase>
+
+  Optional (only for Rewriter/ImageToText):
+    OPENAI_API_KEY            = sk-...
+
+───────────────────────────────────────────────────────────────
+ WHAT YOU GET WITHOUT ANY PAID APIS
+───────────────────────────────────────────────────────────────
+  Free tier only (FRED free + Supabase free):
+  - Real-time USD/KRW rate via Yahoo Finance
+  - Full 2-year historical data for all 15 macro series
+  - Complete buy signal with MA, Z-score, VIX, CPI, etc.
+  - Portfolio tracking for USD and crypto
+  - Live crypto P&L via CoinGecko
+
+  Total cost to run the advisor: $0/month
+
+═══════════════════════════════════════════════════════════════

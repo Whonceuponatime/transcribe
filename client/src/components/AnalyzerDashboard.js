@@ -130,9 +130,14 @@ export default function AnalyzerDashboard() {
   return (
     <div className="analyzer">
       <header className="analyzer__header">
-        <h2 className="analyzer__title">Buy USD Advisor</h2>
+        <div>
+          <h2 className="analyzer__title">KRW → USD → Crypto</h2>
+          <p className="analyzer__subtitle">Time your KRW→USD conversion, then deploy USD into crypto</p>
+        </div>
         <div className="analyzer__actions">
-          <button type="button" className="analyzer__btn analyzer__btn--primary" onClick={syncAndRefresh} disabled={syncing}>{syncing ? 'Updating…' : 'Update'}</button>
+          <button type="button" className="analyzer__btn analyzer__btn--primary" onClick={syncAndRefresh} disabled={syncing}>
+            {syncing ? 'Checking…' : signal ? 'Refresh' : 'Check Now'}
+          </button>
         </div>
       </header>
       {error && <div className="analyzer__error">{error}</div>}
@@ -228,7 +233,10 @@ export default function AnalyzerDashboard() {
             )}
           </div>
         ) : (
-          <p className="analyzer__muted">Click &quot;Check now&quot; for your recommendation</p>
+          <div className="analyzer__empty-state">
+            <p>Press <strong>Check Now</strong> to get a live recommendation.</p>
+            <p className="analyzer__muted">Fetches real-time USD/KRW rate + macro data and tells you exactly how much KRW to convert today.</p>
+          </div>
         )}
       </section>
 
@@ -337,27 +345,56 @@ export default function AnalyzerDashboard() {
       {/* ═══════════ 3. WHAT TO DO WITH YOUR USD ═══════════ */}
       {signal && (
         <section className="analyzer__card card analyzer__deploy">
-          <h3>What to do with your USD</h3>
+          <h3>Deploy your USD into crypto</h3>
           <p className="analyzer__deploy-intro">
-            Once you have USD, don&apos;t leave it idle. Here&apos;s how to deploy it based on current conditions:
+            You converted KRW → USD to protect against KRW depreciation. Now put that USD to work in crypto:
           </p>
-          {(signal.usd_deploy || [
-            { category: 'Keep as USD cash', pct: 40, reason: 'Liquid emergency reserve. Park in SGOV ETF (~5% yield).', action: 'Open USD account at Wise or Interactive Brokers.' },
-            { category: 'US Index ETFs', pct: 40, reason: 'S&P 500 returns ~10%/year — beats KRW depreciation long-term.', action: 'Buy VOO or QQQ via Interactive Brokers or Kiwoom.' },
-            { category: 'Bitcoin / Crypto', pct: 20, reason: 'Small speculative allocation for higher upside.', action: 'Buy BTC or ETH via Binance, Coinbase, or Upbit.' },
-          ]).map((d, i) => (
-            <div key={i} className="analyzer__deploy-row">
-              <div className="analyzer__deploy-header">
-                <span className="analyzer__deploy-cat">{d.category}</span>
-                <span className="analyzer__deploy-pct">{d.pct}%</span>
-              </div>
-              <p className="analyzer__deploy-reason">{d.reason}</p>
-              <p className="analyzer__deploy-action">→ {d.action}</p>
+
+          <div className="analyzer__deploy-row">
+            <div className="analyzer__deploy-header">
+              <span className="analyzer__deploy-cat">Bitcoin (BTC)</span>
+              <span className="analyzer__deploy-pct" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }}>50%</span>
             </div>
-          ))}
+            <p className="analyzer__deploy-reason">
+              {signal.macro_snapshot?.vix != null && signal.macro_snapshot.vix > 25
+                ? `VIX is elevated (${signal.macro_snapshot.vix.toFixed(0)}) — fear in markets. BTC often dips then recovers strongly. Good accumulation window.`
+                : 'BTC is the safest crypto bet — highest liquidity, most institutional adoption. Core position.'}
+            </p>
+            <p className="analyzer__deploy-action">→ Buy on Binance, Coinbase, or Upbit. Dollar-cost-average in 2–3 buys.</p>
+          </div>
+
+          <div className="analyzer__deploy-row">
+            <div className="analyzer__deploy-header">
+              <span className="analyzer__deploy-cat">Ethereum (ETH)</span>
+              <span className="analyzer__deploy-pct" style={{ color: '#8b5cf6', background: 'rgba(139,92,246,0.12)' }}>30%</span>
+            </div>
+            <p className="analyzer__deploy-reason">
+              ETH is the smart contract layer powering DeFi, NFTs, and most new protocols. Historically outperforms BTC in bull markets.
+            </p>
+            <p className="analyzer__deploy-action">→ Buy on same exchange as BTC. Keep as long-term position.</p>
+          </div>
+
+          <div className="analyzer__deploy-row">
+            <div className="analyzer__deploy-header">
+              <span className="analyzer__deploy-cat">High-upside altcoin (SOL / ARB / other)</span>
+              <span className="analyzer__deploy-pct" style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)' }}>20%</span>
+            </div>
+            <p className="analyzer__deploy-reason">
+              {signal.macro_snapshot?.nasdaq_20d_change != null && signal.macro_snapshot.nasdaq_20d_change > 3
+                ? `NASDAQ is up ${signal.macro_snapshot.nasdaq_20d_change.toFixed(1)}% over 20 days — risk appetite is high. Good time for a small altcoin bet.`
+                : 'Small high-risk/high-reward allocation. Only use money you can lose 80%+ of.'}
+            </p>
+            <p className="analyzer__deploy-action">→ Research before buying. SOL, ARB, or NEAR have strong developer activity.</p>
+          </div>
+
+          <div className="analyzer__deploy-reserve">
+            <span>Keep 10–20% as USD cash reserve</span>
+            <span className="analyzer__muted"> — for dip-buying opportunities</span>
+          </div>
+
           {(signal.next_trigger_to_watch || []).length > 0 && (
             <div className="analyzer__triggers">
-              <strong>Watch for — signals to buy more KRW→USD:</strong>
+              <strong>Watch for these to buy more KRW→USD:</strong>
               <ul>{signal.next_trigger_to_watch.map((trig, i) => <li key={i}>{trig}</li>)}</ul>
             </div>
           )}
