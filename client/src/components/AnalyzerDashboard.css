@@ -200,3 +200,45 @@
 }
 .analyzer__empty-state p { margin: 0 0 0.4rem 0; font-size: 0.9rem; }
 .analyzer__empty-state strong { color: #22c55e; }
+
+/* ═══ PROFIT-TAKE STAIRCASE ═══ */
+.analyzer__profit-take {
+  display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.4rem;
+}
+.analyzer__profit-take-step {
+  font-size: 0.72rem; padding: 0.15rem 0.35rem; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ═══ DCA SCHEDULE ═══ */
+.analyzer__dca {
+  margin-top: 0.75rem; padding: 0.75rem; background: #0d0d0d;
+  border-radius: 8px; border: 1px solid #333;
+}
+.analyzer__dca-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.25rem 0; border-bottom: 1px solid #1a1a1a; font-size: 0.83rem;
+}
+.analyzer__dca-row:last-child { border-bottom: none; }
+.analyzer__dca-week { font-weight: 600; min-width: 70px; }
+.analyzer__dca-date { color: var(--text-muted, #888); flex: 1; text-align: center; }
+.analyzer__dca-amount { font-weight: 700; color: #22c55e; }
+
+/* ═══ EXTERNAL SIGNALS PANEL ═══ */
+.analyzer__external-signals h3 { margin-bottom: 0; }
+.analyzer__ext-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.6rem;
+}
+.analyzer__ext-card {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.6rem 0.75rem; background: #0d0d0d;
+  border: 1px solid #2a2a2a; border-radius: 8px;
+  text-decoration: none; color: inherit; transition: border-color 0.15s;
+}
+.analyzer__ext-card:hover { border-color: #22c55e44; background: #111; }
+.analyzer__ext-icon { font-size: 1.3rem; flex-shrink: 0; }
+.analyzer__ext-body { flex: 1; min-width: 0; }
+.analyzer__ext-label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text, #eee); }
+.analyzer__ext-desc { display: block; font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 0.1rem; }
+.analyzer__ext-arrow { font-size: 0.85rem; color: #444; flex-shrink: 0; }

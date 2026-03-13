@@ -32,6 +32,7 @@ const CATEGORIES = {
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
       { id: 'buy-usd', label: 'Buy USD → Crypto', icon: '💸' },
+      { id: 'live-trading', label: 'Live Trading', icon: '📡' },
     ],
   },
 };

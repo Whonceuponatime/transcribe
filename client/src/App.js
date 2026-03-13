@@ -18,6 +18,7 @@ import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
 import AnalyzerDashboard from './components/AnalyzerDashboard';
+import LiveTradingDashboard from './components/LiveTradingDashboard';
 import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
@@ -147,6 +148,8 @@ function App() {
           <MarkdownCSVConverter />
         ) : activeTab === 'buy-usd' ? (
           <AnalyzerDashboard />
+        ) : activeTab === 'live-trading' ? (
+          <LiveTradingDashboard />
         ) : (
           <ImageConverter />
         )}

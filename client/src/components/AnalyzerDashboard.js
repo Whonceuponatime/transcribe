@@ -8,6 +8,24 @@ const API = '';
 const fmt = (n, d = 2) => (n != null ? Number(n).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: 0 }) : '—');
 const pct = (n) => (n != null ? `${Number(n).toFixed(1)}%` : '—');
 
+// Staircase profit-take levels per strategy doc
+const PROFIT_TAKE_LEVELS = [
+  { mult: 1.5, label: '+50%', sell: '20%' },
+  { mult: 2.0, label: '+100% (2×)', sell: '20%' },
+  { mult: 3.0, label: '+200% (3×)', sell: '20%' },
+];
+
+// Category colors for deploy section
+const DEPLOY_COLORS = {
+  'Keep as USD cash': { text: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
+  'US Index ETFs': { text: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
+  'Bitcoin / Crypto': { text: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+};
+
+function getDeployColor(category) {
+  return DEPLOY_COLORS[category] || { text: '#22c55e', bg: 'rgba(34,197,94,0.10)' };
+}
+
 export default function AnalyzerDashboard() {
   const [signal, setSignal] = useState(null);
   const [quote, setQuote] = useState(null);
@@ -18,6 +36,13 @@ export default function AnalyzerDashboard() {
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
+
+  // Fear & Greed Index
+  const [fng, setFng] = useState(null);
+
+  // DCA schedule display
+  const [showDca, setShowDca] = useState(false);
+  const [lastCryptoBuy, setLastCryptoBuy] = useState(null);
 
   const [capital, setCapital] = useState(() => localStorage.getItem('advisor_capital') || '');
   const [tf, setTf] = useState({ krw: '', usd: '', rate: '', note: '' });
@@ -35,7 +60,28 @@ export default function AnalyzerDashboard() {
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { refresh(); }, [refresh]);
+
+  // Fetch Fear & Greed index on mount
+  const fetchFng = useCallback(async () => {
+    try {
+      const res = await fetch('https://api.alternative.me/fng/?limit=1');
+      if (res.ok) {
+        const d = await res.json();
+        const entry = d?.data?.[0];
+        if (entry) {
+          setFng({
+            value: Number(entry.value),
+            label: entry.value_classification,
+            timestamp: entry.timestamp,
+          });
+        }
+      }
+    } catch {
+      // F&G is optional, non-critical
+    }
+  }, []);
+
+  useEffect(() => { refresh(); fetchFng(); }, [refresh, fetchFng]);
 
   const syncAndRefresh = useCallback(async () => {
     setSyncing(true); setError(null); setMsg(null);
@@ -45,8 +91,9 @@ export default function AnalyzerDashboard() {
       if (!j.ok) setError(j.error);
     } catch (e) { setError(e.message); }
     await refresh();
+    await fetchFng();
     setSyncing(false);
-  }, [refresh]);
+  }, [refresh, fetchFng]);
 
   const logUsdBuy = useCallback(async () => {
     setMsg(null);
@@ -61,10 +108,21 @@ export default function AnalyzerDashboard() {
   const logCrypto = useCallback(async () => {
     setMsg(null);
     try {
+      const usdSpent = Number(cf.usd) || 0;
       const res = await fetch(`${API}/api/analyzer?action=crypto`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coin: cf.coin || 'BTC', usd_spent: Number(cf.usd) || 0, coin_amount: Number(cf.amount) || 0, price_usd: Number(cf.price) || 0, note: cf.note || null }) });
+        body: JSON.stringify({ coin: cf.coin || 'BTC', usd_spent: usdSpent, coin_amount: Number(cf.amount) || 0, price_usd: Number(cf.price) || 0, note: cf.note || null }) });
       const j = await res.json();
-      if (j.ok) { setMsg('Crypto purchase logged'); setCf({ coin: 'BTC', usd: '', amount: '', price: '', note: '' }); refresh(); } else setError(j.error);
+      if (j.ok) {
+        setMsg('Crypto purchase logged');
+        if (usdSpent > 0) {
+          setLastCryptoBuy({ coin: cf.coin, usdSpent, date: new Date() });
+          setShowDca(true);
+        }
+        setCf({ coin: 'BTC', usd: '', amount: '', price: '', note: '' });
+        refresh();
+      } else {
+        setError(j.error);
+      }
     } catch (e) { setError(e.message); }
   }, [cf, refresh]);
 
@@ -88,6 +146,16 @@ export default function AnalyzerDashboard() {
   const zscore = levels.zscore20;
   const plannerVix = signal?.macro_snapshot?.vix;
 
+  // F&G status helper
+  const fngStatus = fng ? (fng.value <= 25 ? 'good' : fng.value <= 50 ? 'ok' : fng.value <= 75 ? 'warn' : 'bad') : 'neutral';
+  const fngNote = fng ? (
+    fng.value <= 25 ? 'Extreme Fear — historically a strong crypto buy signal'
+    : fng.value <= 45 ? 'Fear — good crypto entry zone'
+    : fng.value <= 55 ? 'Neutral — no strong signal'
+    : fng.value <= 75 ? 'Greed — caution, reduce new entries'
+    : 'Extreme Greed — wait for pullback before buying crypto'
+  ) : '';
+
   const plannerChecks = [
     {
       label: 'Rate vs 20d avg',
@@ -107,6 +175,12 @@ export default function AnalyzerDashboard() {
       note: plannerVix == null ? '' : plannerVix < 20 ? 'Calm markets — stable conditions' : plannerVix < 30 ? 'Moderate volatility — normal' : 'High fear — USD tends to strengthen, watch closely',
       status: plannerVix == null ? 'neutral' : plannerVix < 20 ? 'good' : plannerVix < 30 ? 'ok' : 'warn',
     },
+    {
+      label: 'Fear & Greed (crypto)',
+      value: fng ? `${fng.value} — ${fng.label}` : '—',
+      note: fngNote,
+      status: fngStatus,
+    },
   ];
 
   const plannerTargets = [
@@ -124,6 +198,21 @@ export default function AnalyzerDashboard() {
       : null;
     return { ...tgt, changePct, deployKrw, addUsd, newAvg };
   });
+
+  // DCA schedule: 4 equal weekly tranches from last crypto buy
+  function buildDcaPlan(usdSpent, coin, startDate) {
+    const tranche = usdSpent / 4;
+    return Array.from({ length: 4 }, (_, i) => {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i * 7);
+      return {
+        week: i + 1,
+        amount: tranche,
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        done: i === 0,
+      };
+    });
+  }
 
   if (loading && !signal && !portfolio) return <div className="analyzer"><div className="analyzer__loading">Loading…</div></div>;
 
@@ -164,16 +253,40 @@ export default function AnalyzerDashboard() {
             </span>
           </div>
 
-          {(c.positions || []).map((p) => (
-            <div key={p.coin} className="analyzer__port-card">
-              <span className="analyzer__port-card-title">{p.coin}</span>
-              <span className="analyzer__port-card-value">${fmt(p.currentValueUsd, 2)}</span>
-              <span className="analyzer__port-card-sub">{fmt(p.amount, 6)} @ ${fmt(p.currentPrice, 2)}</span>
-              <span className="analyzer__port-card-sub" style={{ color: profitColor(p.profitUsd || 0) }}>
-                {(p.profitUsd || 0) >= 0 ? '+' : ''}${fmt(p.profitUsd, 2)} ({pct(p.profitPct)})
-              </span>
-            </div>
-          ))}
+          {(c.positions || []).map((p) => {
+            const avgBuy = p.avgPriceUsd || 0;
+            return (
+              <div key={p.coin} className="analyzer__port-card">
+                <span className="analyzer__port-card-title">{p.coin}</span>
+                <span className="analyzer__port-card-value">${fmt(p.currentValueUsd, 2)}</span>
+                <span className="analyzer__port-card-sub">{fmt(p.amount, 6)} @ ${fmt(p.currentPrice, 2)}</span>
+                <span className="analyzer__port-card-sub" style={{ color: profitColor(p.profitUsd || 0) }}>
+                  {(p.profitUsd || 0) >= 0 ? '+' : ''}${fmt(p.profitUsd, 2)} ({pct(p.profitPct)})
+                </span>
+                {/* Profit-take staircase */}
+                {avgBuy > 0 && p.currentPrice > 0 && (
+                  <div className="analyzer__profit-take">
+                    {PROFIT_TAKE_LEVELS.map((lvl) => {
+                      const targetPrice = avgBuy * lvl.mult;
+                      const reached = p.currentPrice >= targetPrice;
+                      return (
+                        <span
+                          key={lvl.label}
+                          className="analyzer__profit-take-step"
+                          style={{
+                            color: reached ? '#22c55e' : 'var(--text-muted)',
+                            background: reached ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+                          }}
+                        >
+                          {reached ? '✓' : '○'} {lvl.label} → sell {lvl.sell} @ ${fmt(targetPrice, 0)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -245,7 +358,7 @@ export default function AnalyzerDashboard() {
         <section className="planner card">
           <h3 className="planner__title">Buy planner</h3>
 
-          {/* 3-item checklist */}
+          {/* 4-item checklist (now includes Fear & Greed) */}
           <div className="planner__checklist">
             {plannerChecks.map((chk, i) => (
               <div key={i} className={`planner__check planner__check--${chk.status}`}>
@@ -342,50 +455,74 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 3. WHAT TO DO WITH YOUR USD ═══════════ */}
+      {/* ═══════════ 3. DEPLOY USD INTO CRYPTO (dynamic from signal.usd_deploy) ═══════════ */}
       {signal && (
         <section className="analyzer__card card analyzer__deploy">
           <h3>Deploy your USD into crypto</h3>
           <p className="analyzer__deploy-intro">
-            You converted KRW → USD to protect against KRW depreciation. Now put that USD to work in crypto:
+            You converted KRW → USD to protect against KRW depreciation. Now put that USD to work:
           </p>
 
-          <div className="analyzer__deploy-row">
-            <div className="analyzer__deploy-header">
-              <span className="analyzer__deploy-cat">Bitcoin (BTC)</span>
-              <span className="analyzer__deploy-pct" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }}>50%</span>
+          {/* Fear & Greed banner */}
+          {fng && (
+            <div className="analyzer__fng-banner" style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              padding: '0.6rem 0.9rem', borderRadius: '6px', marginBottom: '1rem',
+              background: fng.value <= 45 ? 'rgba(34,197,94,0.10)' : fng.value <= 55 ? 'rgba(148,163,184,0.10)' : 'rgba(239,68,68,0.10)',
+              border: `1px solid ${fng.value <= 45 ? '#22c55e' : fng.value <= 55 ? 'var(--border)' : '#ef4444'}`,
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>{fng.value <= 25 ? '😱' : fng.value <= 45 ? '😨' : fng.value <= 55 ? '😐' : fng.value <= 75 ? '😏' : '🤑'}</span>
+              <div>
+                <strong style={{ color: 'var(--text)' }}>Fear &amp; Greed: {fng.value} — {fng.label}</strong>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{fngNote}</p>
+              </div>
             </div>
-            <p className="analyzer__deploy-reason">
-              {signal.macro_snapshot?.vix != null && signal.macro_snapshot.vix > 25
-                ? `VIX is elevated (${signal.macro_snapshot.vix.toFixed(0)}) — fear in markets. BTC often dips then recovers strongly. Good accumulation window.`
-                : 'BTC is the safest crypto bet — highest liquidity, most institutional adoption. Core position.'}
-            </p>
-            <p className="analyzer__deploy-action">→ Buy on Binance, Coinbase, or Upbit. Dollar-cost-average in 2–3 buys.</p>
-          </div>
+          )}
 
-          <div className="analyzer__deploy-row">
-            <div className="analyzer__deploy-header">
-              <span className="analyzer__deploy-cat">Ethereum (ETH)</span>
-              <span className="analyzer__deploy-pct" style={{ color: '#8b5cf6', background: 'rgba(139,92,246,0.12)' }}>30%</span>
-            </div>
-            <p className="analyzer__deploy-reason">
-              ETH is the smart contract layer powering DeFi, NFTs, and most new protocols. Historically outperforms BTC in bull markets.
-            </p>
-            <p className="analyzer__deploy-action">→ Buy on same exchange as BTC. Keep as long-term position.</p>
-          </div>
-
-          <div className="analyzer__deploy-row">
-            <div className="analyzer__deploy-header">
-              <span className="analyzer__deploy-cat">High-upside altcoin (SOL / ARB / other)</span>
-              <span className="analyzer__deploy-pct" style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)' }}>20%</span>
-            </div>
-            <p className="analyzer__deploy-reason">
-              {signal.macro_snapshot?.nasdaq_20d_change != null && signal.macro_snapshot.nasdaq_20d_change > 3
-                ? `NASDAQ is up ${signal.macro_snapshot.nasdaq_20d_change.toFixed(1)}% over 20 days — risk appetite is high. Good time for a small altcoin bet.`
-                : 'Small high-risk/high-reward allocation. Only use money you can lose 80%+ of.'}
-            </p>
-            <p className="analyzer__deploy-action">→ Research before buying. SOL, ARB, or NEAR have strong developer activity.</p>
-          </div>
+          {/* Dynamic deploy rows from signal.usd_deploy */}
+          {(signal.usd_deploy && signal.usd_deploy.length > 0) ? (
+            signal.usd_deploy.map((item, i) => {
+              const col = getDeployColor(item.category);
+              return (
+                <div key={i} className="analyzer__deploy-row">
+                  <div className="analyzer__deploy-header">
+                    <span className="analyzer__deploy-cat">{item.category}</span>
+                    <span className="analyzer__deploy-pct" style={{ color: col.text, background: col.bg }}>{item.pct}%</span>
+                  </div>
+                  <p className="analyzer__deploy-reason">{item.reason}</p>
+                  <p className="analyzer__deploy-action">→ {item.action}</p>
+                </div>
+              );
+            })
+          ) : (
+            /* Fallback if no usd_deploy yet */
+            <>
+              <div className="analyzer__deploy-row">
+                <div className="analyzer__deploy-header">
+                  <span className="analyzer__deploy-cat">Keep as USD cash</span>
+                  <span className="analyzer__deploy-pct" style={{ color: '#94a3b8', background: 'rgba(148,163,184,0.12)' }}>40%</span>
+                </div>
+                <p className="analyzer__deploy-reason">Liquid emergency reserve in USD. Earns ~5% in US money market funds (e.g. SGOV ETF).</p>
+                <p className="analyzer__deploy-action">→ Park in a USD account at Wise or Interactive Brokers.</p>
+              </div>
+              <div className="analyzer__deploy-row">
+                <div className="analyzer__deploy-header">
+                  <span className="analyzer__deploy-cat">US Index ETFs</span>
+                  <span className="analyzer__deploy-pct" style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.12)' }}>40%</span>
+                </div>
+                <p className="analyzer__deploy-reason">Long-term S&amp;P 500 returns ~10%/year. Holding KRW earns far less after depreciation.</p>
+                <p className="analyzer__deploy-action">→ Buy VOO or QQQ via Interactive Brokers or Korean broker with US access.</p>
+              </div>
+              <div className="analyzer__deploy-row">
+                <div className="analyzer__deploy-header">
+                  <span className="analyzer__deploy-cat">Bitcoin / Crypto</span>
+                  <span className="analyzer__deploy-pct" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }}>20%</span>
+                </div>
+                <p className="analyzer__deploy-reason">Small crypto allocation (10–20%) can amplify returns. Keep as a speculative bet only.</p>
+                <p className="analyzer__deploy-action">→ Buy BTC or ETH on Binance, Coinbase, or Upbit. DCA — don't buy all at once.</p>
+              </div>
+            </>
+          )}
 
           <div className="analyzer__deploy-reserve">
             <span>Keep 10–20% as USD cash reserve</span>
@@ -424,10 +561,32 @@ export default function AnalyzerDashboard() {
             <input type="number" placeholder="Price ($)" value={cf.price} onChange={(e) => setCf((f) => ({ ...f, price: e.target.value }))} />
             <button type="button" className="analyzer__btn" onClick={logCrypto}>Log</button>
           </div>
+
+          {/* DCA schedule — shown after logging a crypto buy */}
+          {showDca && lastCryptoBuy && (
+            <div className="analyzer__dca">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <strong style={{ color: 'var(--text)' }}>DCA Schedule — {lastCryptoBuy.coin}</strong>
+                <button type="button" className="analyzer__btn" style={{ padding: '0.15rem 0.5rem', fontSize: '0.8rem' }} onClick={() => setShowDca(false)}>✕</button>
+              </div>
+              <p className="analyzer__muted" style={{ marginBottom: '0.5rem', fontSize: '0.82rem' }}>
+                Split ${fmt(lastCryptoBuy.usdSpent, 2)} into 4 weekly buys instead of all at once:
+              </p>
+              {buildDcaPlan(lastCryptoBuy.usdSpent, lastCryptoBuy.coin, lastCryptoBuy.date).map((t) => (
+                <div key={t.week} className="analyzer__dca-row">
+                  <span className="analyzer__dca-week" style={{ color: t.done ? '#22c55e' : 'var(--text-muted)' }}>
+                    {t.done ? '✓' : '○'} Week {t.week}
+                  </span>
+                  <span className="analyzer__dca-date">{t.date}</span>
+                  <span className="analyzer__dca-amount">${fmt(t.amount, 2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
-      {/* ═══════════ 4. RECENT ACTIVITY ═══════════ */}
+      {/* ═══════════ 5. RECENT ACTIVITY ═══════════ */}
       {portfolio && ((portfolio.trades || []).length > 0 || (portfolio.cryptoPurchases || []).length > 0) && (
         <section className="analyzer__card card">
           <h3>Recent activity</h3>
@@ -450,7 +609,7 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 5. CHART ═══════════ */}
+      {/* ═══════════ 6. CHART ═══════════ */}
       {chartData.length > 5 && (
         <section className="analyzer__card card">
           <h3>USD/KRW history</h3>
@@ -468,7 +627,34 @@ export default function AnalyzerDashboard() {
         </section>
       )}
 
-      {/* ═══════════ 6. FULL ANALYSIS (bottom, expandable) ═══════════ */}
+      {/* ═══════════ 7. EXTERNAL SIGNALS PANEL ═══════════ */}
+      <section className="analyzer__card card analyzer__external-signals">
+        <h3>External signals to watch</h3>
+        <p className="analyzer__muted" style={{ marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+          Check these before making large KRW→USD or crypto decisions:
+        </p>
+        <div className="analyzer__ext-grid">
+          {[
+            { label: 'Fed Rate Decision', desc: 'Rate hike = USD stronger, buy more USD', url: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', icon: '🏦' },
+            { label: 'Fear & Greed Index', desc: fng ? `Now: ${fng.value} — ${fng.label}` : 'Below 30 = good crypto buy zone', url: 'https://alternative.me/crypto/fear-and-greed-index/', icon: '📊' },
+            { label: 'Bitcoin Dominance', desc: 'Rising = altcoins weakening, favor BTC', url: 'https://coinmarketcap.com/charts/', icon: '₿' },
+            { label: 'Korea Trade Balance', desc: 'Deficit = KRW weakens, buy USD', url: 'https://www.bok.or.kr/eng/main/contents.do?menuNo=400069', icon: '🇰🇷' },
+            { label: 'KOSPI', desc: 'Sharp drop often precedes KRW selloff', url: 'https://www.krx.co.kr/main/main.jsp', icon: '📉' },
+            { label: 'DXY (Dollar Index)', desc: 'DXY rising = buy USD now before it strengthens', url: 'https://www.tradingview.com/chart/?symbol=TVC%3ADXY', icon: '💵' },
+          ].map((sig) => (
+            <a key={sig.label} href={sig.url} target="_blank" rel="noopener noreferrer" className="analyzer__ext-card">
+              <span className="analyzer__ext-icon">{sig.icon}</span>
+              <div className="analyzer__ext-body">
+                <span className="analyzer__ext-label">{sig.label}</span>
+                <span className="analyzer__ext-desc">{sig.desc}</span>
+              </div>
+              <span className="analyzer__ext-arrow">↗</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════ 8. FULL ANALYSIS (bottom, expandable) ═══════════ */}
       {signal && (
         <section className="analyzer__card card">
           <button type="button" className="analyzer__toggle" onClick={() => setShowAnalysis(!showAnalysis)}>
