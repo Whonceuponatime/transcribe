@@ -12,10 +12,10 @@ const REASON_LABELS = {
   'DCA_ADJUSTED_1.5x': '🚀 DCA ×1.5 (Signal Boost)',
   'DCA_ADJUSTED_2.0x': '😱 DCA ×2 (Extreme Fear)',
   'DCA_ADJUSTED_3.0x': '😱🚀 DCA ×3 (Fear + Boost)',
-  PROFIT_TAKE_50PCT: '💰 +50% Take',
-  PROFIT_TAKE_100PCT: '💰 +100% Take',
-  PROFIT_TAKE_200PCT: '💰 +200% Take',
-  PROFIT_TAKE_300PCT: '💰 +300% Take',
+  PROFIT_TAKE_5PCT: '💰 +5% Take',
+  PROFIT_TAKE_10PCT: '💰 +10% Take',
+  PROFIT_TAKE_20PCT: '💰 +20% Take',
+  PROFIT_TAKE_40PCT: '💰 +40% Take',
   TRAILING_STOP: '🛡️ Trailing Stop',
 };
 
@@ -321,7 +321,7 @@ export default function CryptoTraderDashboard() {
         <div className="ct__toggle-row">
           <div>
             <div className="ct__toggle-label">Profit-Take</div>
-            <div className="ct__toggle-sub">Sell 15/25/35/40% at +50/100/200/300%</div>
+            <div className="ct__toggle-sub">Sell 10/15/20/25% at +5/10/20/40%</div>
           </div>
           <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
         </div>
