@@ -42,7 +42,7 @@ export default function CryptoTraderDashboard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
-  const [pingResult, setPingResult] = useState(null);
+  const [triggerPending, setTriggerPending] = useState(false);
 
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
@@ -59,6 +59,7 @@ export default function CryptoTraderDashboard() {
       if (res.ok) {
         const d = await res.json();
         setStatus(d);
+        setTriggerPending(d.triggerPending ?? false);
         setCfg({
           dca_enabled: d.config?.dca_enabled ?? true,
           weekly_budget_krw: d.config?.weekly_budget_krw ?? 100000,
@@ -75,12 +76,6 @@ export default function CryptoTraderDashboard() {
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
-  const pingUpbit = useCallback(async () => {
-    setPingResult(null);
-    const res = await fetch(`${API}/api/crypto-trader?action=ping`);
-    setPingResult(await res.json());
-  }, []);
-
   const execute = useCallback(async (forceDca = false) => {
     if (!window.confirm(forceDca
       ? 'Force a DCA buy NOW regardless of schedule? Real money will be spent.'
@@ -94,14 +89,15 @@ export default function CryptoTraderDashboard() {
       });
       const j = await res.json();
       if (j.ok) {
-        const { dca, profitTake, skipped, errors } = j.result;
-        const parts = [];
-        if (dca.length) parts.push(`${dca.filter((t) => t.ok).length} DCA buy(s)`);
-        if (profitTake.length) parts.push(`${profitTake.filter((t) => t.ok).length} profit-take sell(s)`);
-        if (skipped.length) parts.push(skipped[0]);
-        if (errors.length) setError(errors.join('; '));
-        else setMsg(`Done — ${parts.join(', ') || 'nothing to do'}`);
-        await fetchStatus();
+        setTriggerPending(true);
+        setMsg('Trigger sent — Pi trader will execute within 10 seconds. Refresh to see results.');
+        // Poll for result: refresh every 5s for up to 30s
+        let polls = 0;
+        const poll = setInterval(async () => {
+          polls++;
+          await fetchStatus();
+          if (polls >= 6) clearInterval(poll);
+        }, 5000);
       } else {
         setError(j.error);
       }
@@ -146,6 +142,9 @@ export default function CryptoTraderDashboard() {
   const signalScore = status?.signalScore;
   const signalDecision = status?.signalDecision;
   const krwBalance = status?.krwBalance ?? 0;
+  const piOnline = status?.piOnline ?? false;
+  const piLastSeen = status?.piLastSeen ?? null;
+  const lastCycle = status?.lastCycle ?? null;
 
   return (
     <div className="ct">
@@ -157,9 +156,13 @@ export default function CryptoTraderDashboard() {
         </div>
         <div className="ct__badges">
           {killSwitch && <span className="ct__badge ct__badge--kill">KILL SWITCH ON</span>}
+          <span className={`ct__badge ${piOnline ? 'ct__badge--on' : 'ct__badge--off'}`}>
+            Pi {piOnline ? 'ONLINE' : 'OFFLINE'}
+          </span>
           <span className={`ct__badge ${cfg.dca_enabled ? 'ct__badge--on' : 'ct__badge--off'}`}>
             DCA {cfg.dca_enabled ? 'ON' : 'OFF'}
           </span>
+          {triggerPending && <span className="ct__badge ct__badge--signal">⏳ Pending…</span>}
           {signalScore != null && (
             <span className="ct__badge ct__badge--signal">Signal {signalScore}</span>
           )}
@@ -340,25 +343,54 @@ export default function CryptoTraderDashboard() {
         )}
       </section>
 
-      {/* ═══ UPBIT CONNECTION ═══ */}
+      {/* ═══ PI STATUS ═══ */}
       <section className="card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
-        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Upbit Connection</h3>
-        <p className="ct__muted" style={{ marginBottom: '0.5rem' }}>
-          Test that your Upbit API key is working correctly.
-        </p>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" className="ct__btn" onClick={pingUpbit}>Test Connection</button>
-          {pingResult && (
-            <span style={{ fontSize: '0.88rem', color: pingResult.ok ? '#22c55e' : '#ef4444' }}>
-              {pingResult.ok
-                ? `✓ Connected — KRW balance: ₩${fmt(pingResult.krwBalance)}`
-                : `✗ ${pingResult.error}`}
-            </span>
+        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Raspberry Pi Trader</h3>
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+              <span style={{
+                width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
+                background: piOnline ? '#22c55e' : '#ef4444',
+                boxShadow: piOnline ? '0 0 6px #22c55e' : 'none',
+              }} />
+              <span style={{ fontWeight: 700, color: piOnline ? '#22c55e' : '#ef4444' }}>
+                {piOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+            {piLastSeen && (
+              <div className="ct__muted" style={{ fontSize: '0.78rem' }}>
+                Last seen: {new Date(piLastSeen).toLocaleString()}
+              </div>
+            )}
+            {!piOnline && (
+              <div style={{ fontSize: '0.78rem', color: '#f59e0b', marginTop: '0.3rem' }}>
+                Pi must be running for trades to execute.
+              </div>
+            )}
+          </div>
+          {lastCycle && (
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: '0.78rem', color: '#888', marginBottom: '0.2rem' }}>Last cycle</div>
+              <div style={{ fontSize: '0.82rem', color: lastCycle.ok ? '#22c55e' : '#ef4444' }}>
+                {lastCycle.ok ? '✓ Success' : `✗ ${lastCycle.error}`}
+              </div>
+              {lastCycle.reason && (
+                <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                  {lastCycle.reason} · {lastCycle.completedAt ? new Date(lastCycle.completedAt).toLocaleString() : ''}
+                </div>
+              )}
+              {lastCycle.result?.dca?.length > 0 && (
+                <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '0.2rem' }}>
+                  {lastCycle.result.dca.filter((t) => t.ok).length} buy(s) · {lastCycle.result.profitTake?.filter((t) => t.ok).length ?? 0} sell(s)
+                </div>
+              )}
+            </div>
           )}
         </div>
-        <p className="ct__muted" style={{ marginTop: '0.5rem', fontSize: '0.78rem' }}>
-          Ensure <code>UPBIT_ACCESS_KEY</code> and <code>UPBIT_SECRET_KEY</code> are set in Vercel environment variables.
-          Disable withdrawal permission on the key — trading only.
+        <p className="ct__muted" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+          Trades execute on your Raspberry Pi (IP: 59.20.105.83 → Upbit allowlisted).
+          Pi polls Supabase every 10s for triggers. Heartbeat updates every 5 min.
         </p>
       </section>
 

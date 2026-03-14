@@ -6,10 +6,5 @@
   "rewrites": [
     { "source": "/((?!api/)(?!icons/)(?!manifest\\.json)(?!sw\\.js)(?!favicon\\.ico).*)", "destination": "/index.html" }
   ],
-  "crons": [
-    {
-      "path": "/api/crypto-trader?action=execute",
-      "schedule": "0 1 * * 1"
-    }
-  ]
+  "crons": []
 }

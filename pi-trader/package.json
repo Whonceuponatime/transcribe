@@ -1,0 +1,15 @@
+{
+  "name": "pi-trader",
+  "version": "1.0.0",
+  "description": "Upbit crypto trader — runs on Raspberry Pi with fixed home IP",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0",
+    "node-cron": "^3.0.3"
+  }
+}
