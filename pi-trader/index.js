@@ -138,11 +138,9 @@ async function heartbeat() {
 
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
-// Hourly: profit-take + trailing stop checks (no forced DCA)
-// Runs at minute 0 of every hour — e.g. 10:00, 11:00, 12:00 ...
-cron.schedule('0 * * * *', async () => {
-  console.log('[pi-trader] ── Hourly check (profit-take + trailing stop) ──');
-  await runCycle(false, 'hourly_check');
+// Every 5 minutes: profit-take + trailing stop checks (no forced DCA)
+cron.schedule('*/5 * * * *', async () => {
+  await runCycle(false, 'auto_check');
 }, { timezone: 'UTC' });
 
 // Weekly DCA: Monday 01:00 UTC = 10:00 KST
@@ -162,7 +160,7 @@ heartbeat(); // immediate on start
 setTimeout(() => runCycle(false, 'startup_check'), 5000);
 
 console.log('[pi-trader] Started — v2.0 fully automated.');
-console.log('  Hourly check: profit-take + trailing stop every hour');
+console.log('  Auto check  : profit-take + trailing stop every 5 min');
 console.log('  Weekly DCA  : Monday 01:00 UTC (10:00 KST)');
 console.log('  Kill switch : checked before every cycle (10s response)');
 console.log('  Manual      : dashboard triggers via Supabase poll');
