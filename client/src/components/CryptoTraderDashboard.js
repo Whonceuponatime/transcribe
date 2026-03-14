@@ -2,18 +2,28 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './CryptoTraderDashboard.css';
 
 const API = '';
-const fmt = (n, d = 0) => n != null ? Number(n).toLocaleString('ko-KR', { maximumFractionDigits: d }) : '—';
+const fmt    = (n, d = 0) => n != null ? Number(n).toLocaleString('ko-KR', { maximumFractionDigits: d }) : '—';
+const fmtUsd = (n, d = 0) => n != null ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: d })}` : '—';
 const fmtCoin = (n) => n != null ? Number(n).toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—';
-const pct = (n) => n != null ? `${Number(n) >= 0 ? '+' : ''}${Number(n).toFixed(1)}%` : '—';
+const pct    = (n) => n != null ? `${Number(n) >= 0 ? '+' : ''}${Number(n).toFixed(1)}%` : '—';
 
 const REASON_LABELS = {
-  DCA: '📅 DCA', 'DCA_1.0x': '📅 DCA', 'DCA_1.5x': '🚀 DCA ×1.5', 'DCA_2.0x': '😱 DCA ×2', 'DCA_3.0x': '😱🚀 DCA ×3',
-  PROFIT_TAKE_5PCT: '💰 +5%', PROFIT_TAKE_10PCT: '💰 +10%', PROFIT_TAKE_20PCT: '💰 +20%', PROFIT_TAKE_40PCT: '💰 +40%',
-  SIGNAL_RSI_OVERBOUGHT: '📊 RSI OB', SIGNAL_RSI_OB_STRONG: '🔴 RSI OB!',
-  SIGNAL_BB_UPPER: '📈 BB Upper', SIGNAL_MACD_BEAR: '📉 MACD Bear', SIGNAL_STOCHRSI_OB: '📊 StochRSI OB',
-  TRAILING_STOP: '🛡️ Trail Stop',
-  DIP_RSI_OVERSOLD: '🟢 RSI Dip', DIP_RSI_STRONG_OS: '🟢🟢 RSI Dip!', DIP_BB_BELOW_LOWER: '📉 BB Dip',
-  DIP_MACD_BULL_CROSS: '📊 MACD Bull', DIP_STOCHRSI_OS: '🟢 StochRSI Dip',
+  // DCA buys
+  DCA: 'DCA', 'DCA_1.0x': 'DCA', 'DCA_1.5x': 'DCA x1.5', 'DCA_2.0x': 'DCA x2', 'DCA_3.0x': 'DCA x3',
+  // Profit-take sells
+  PROFIT_TAKE_5PCT: '+5% Take', PROFIT_TAKE_10PCT: '+10% Take', PROFIT_TAKE_20PCT: '+20% Take', PROFIT_TAKE_40PCT: '+40% Take',
+  // Signal sells
+  SIGNAL_RSI_OVERBOUGHT: 'RSI OB', SIGNAL_RSI_OB_STRONG: 'RSI OB!',
+  SIGNAL_BB_UPPER: 'BB Upper', SIGNAL_MACD_BEAR: 'MACD Bear', SIGNAL_STOCHRSI_OB: 'StochRSI OB',
+  SIGNAL_VWAP_ABOVE: 'VWAP High', SIGNAL_WILLIAMS_OB: 'Williams OB', SIGNAL_CCI_OB: 'CCI OB',
+  SIGNAL_KIMCHI_HIGH: 'Kimchi High',
+  TRAILING_STOP: 'Trail Stop',
+  // Dip buys
+  DIP_RSI_EXTREME_OS: 'RSI Dip!!', DIP_RSI_OVERSOLD: 'RSI Dip',
+  DIP_BB_BELOW_LOWER: 'BB Dip', DIP_VWAP_DEEP_BELOW: 'VWAP Dip',
+  DIP_WILLIAMS_DEEP_OS: 'Williams Dip', DIP_CCI_DEEP_OS: 'CCI Dip',
+  DIP_STOCHRSI_OS: 'StochRSI Dip', DIP_MACD_BULL_CROSS: 'MACD Bull',
+  DIP_ROC_SHARP_DIP: 'ROC Dip', DIP_EMERGENCY_24H: 'Emergency Dip',
 };
 
 const rsiColor = (v) => v == null ? '#666' : v > 70 ? '#ef4444' : v < 30 ? '#22c55e' : '#f59e0b';
@@ -151,16 +161,18 @@ export default function CryptoTraderDashboard() {
     } catch (e) { setError(e.message); }
   }, [status, fetchStatus]);
 
-  const killSwitch = status?.killSwitch ?? false;
-  const positions = status?.positions ?? [];
-  const trades = status?.recentTrades ?? [];
-  const signalScore = status?.signalScore;
+  const killSwitch     = status?.killSwitch ?? false;
+  const positions      = status?.positions ?? [];
+  const trades         = status?.recentTrades ?? [];
+  const signalScore    = status?.signalScore;
   const signalDecision = status?.signalDecision;
-  const krwBalance = status?.krwBalance ?? 0;
-  const piOnline = status?.piOnline ?? false;
-  const piLastSeen = status?.piLastSeen ?? null;
-  const lastCycle = status?.lastCycle ?? null;
-  const fearGreed = status?.fearGreed ?? null;
+  const krwBalance     = status?.krwBalance ?? 0;
+  const usdKrw         = status?.usdKrw ?? null;
+  const totalValueUsd  = status?.totalValueUsd ?? null;
+  const piOnline       = status?.piOnline ?? false;
+  const piLastSeen     = status?.piLastSeen ?? null;
+  const lastCycle      = status?.lastCycle ?? null;
+  const fearGreed      = status?.fearGreed ?? null;
 
   return (
     <div className="ct">
@@ -207,12 +219,20 @@ export default function CryptoTraderDashboard() {
         <div className="ct__krw-block">
           <div className="ct__krw-label">Available KRW</div>
           <div className="ct__krw-value">₩{fmt(krwBalance)}</div>
+          {usdKrw && <div style={{ fontSize: '0.78rem', color: '#888' }}>{fmtUsd(krwBalance / usdKrw)} · 1 USD = ₩{fmt(usdKrw)}</div>}
           <div className="ct__krw-sub">
             {cfg.weekly_budget_krw > 0 && krwBalance > 0
               ? `~${Math.floor(krwBalance / cfg.weekly_budget_krw)} weeks of DCA remaining`
               : 'Set weekly budget below'}
           </div>
         </div>
+        {totalValueUsd != null && (
+          <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', textAlign: 'center', background: '#ffffff08', border: '1px solid #ffffff18' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#00e5ff' }}>{fmtUsd(totalValueUsd)}</div>
+            <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Total Portfolio (USD)</span>
+            <div style={{ fontSize: '0.72rem', color: '#666' }}>₩{fmt(status?.totalValueKrw)} incl. KRW</div>
+          </div>
+        )}
         {signalScore != null && (
           <div className="ct__signal-block">
             <div className="ct__signal-score">{signalScore}</div>
@@ -262,11 +282,13 @@ export default function CryptoTraderDashboard() {
                   <span className="ct__pos-balance">{fmtCoin(pos.balance)} {pos.coin}</span>
                   {pos.currentPrice && (
                     <span className="ct__pos-price">
-                      ₩{fmt(pos.currentPrice)} · Value ₩{fmt(pos.currentValueKrw)}
+                      ₩{fmt(pos.currentPrice)}{pos.currentValueUsd ? ` ≈ ${fmtUsd(pos.currentValueUsd, 0)}` : ''} · ₩{fmt(pos.currentValueKrw)}
                     </span>
                   )}
                   {pos.avgBuyKrw > 0 && (
-                    <span className="ct__pos-price">Avg buy ₩{fmt(pos.avgBuyKrw)}</span>
+                    <span className="ct__pos-price">
+                      Avg ₩{fmt(pos.avgBuyKrw)}{pos.avgBuyUsd ? ` (${fmtUsd(pos.avgBuyUsd, 0)})` : ''}
+                    </span>
                   )}
                   {pos.gainPct != null && (
                     <span className={`ct__pos-gain ${gainClass}`}>{pct(pos.gainPct)}</span>
@@ -290,29 +312,70 @@ export default function CryptoTraderDashboard() {
                     </span>
                   )}
                   {pos.indicators && (
-                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                      {/* Combined signal score */}
+                      {pos.indicators.scoreCombined != null && (() => {
+                        const s = Number(pos.indicators.scoreCombined);
+                        const c = s >= 3 ? '#22c55e' : s <= -3 ? '#ef4444' : s > 0 ? '#86efac' : s < 0 ? '#fca5a5' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: `${c}20`, color: c, fontWeight: 700, border: `1px solid ${c}40` }}>Score {s > 0 ? '+' : ''}{s}</span>;
+                      })()}
+                      {/* RSI */}
                       {pos.indicators.rsi != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.rsi))}22`, color: rsiColor(Number(pos.indicators.rsi)), fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.rsi))}20`, color: rsiColor(Number(pos.indicators.rsi)), fontWeight: 600 }}>
                           RSI {pos.indicators.rsi}
                         </span>
                       )}
+                      {/* StochRSI */}
                       {pos.indicators.stochRsi != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.stochRsi))}22`, color: rsiColor(Number(pos.indicators.stochRsi)) }}>
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.stochRsi))}20`, color: rsiColor(Number(pos.indicators.stochRsi)) }}>
                           StochRSI {pos.indicators.stochRsi}
                         </span>
                       )}
+                      {/* Williams %R */}
+                      {pos.indicators.williamsR != null && (() => {
+                        const w = Number(pos.indicators.williamsR);
+                        const c = w > -20 ? '#ef4444' : w < -80 ? '#22c55e' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${c}18`, color: c }}>%R {pos.indicators.williamsR}</span>;
+                      })()}
+                      {/* CCI */}
+                      {pos.indicators.cci != null && (() => {
+                        const c2 = Number(pos.indicators.cci);
+                        const col = c2 > 100 ? '#ef4444' : c2 < -100 ? '#22c55e' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>CCI {pos.indicators.cci}</span>;
+                      })()}
+                      {/* VWAP deviation */}
+                      {pos.indicators.vwapDev != null && (() => {
+                        const v = Number(pos.indicators.vwapDev);
+                        const col = v > 2 ? '#ef4444' : v < -2 ? '#22c55e' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>VWAP {v >= 0 ? '+' : ''}{pos.indicators.vwapDev}%</span>;
+                      })()}
+                      {/* Bollinger */}
                       {pos.indicators.bb_pctB != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: '#ffffff11', color: '#888' }}>
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: '#ffffff0d', color: '#888' }}>
                           BB {(Number(pos.indicators.bb_pctB) * 100).toFixed(0)}%
                         </span>
                       )}
-                      {pos.indicators.macdBull && <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700 }}>MACD ↑</span>}
-                      {pos.indicators.macdBear && <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>MACD ↓</span>}
-                      {pos.indicators.score != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: pos.indicators.score > 0 ? '#22c55e22' : pos.indicators.score < 0 ? '#ef444422' : '#ffffff11', color: pos.indicators.score > 0 ? '#22c55e' : pos.indicators.score < 0 ? '#ef4444' : '#888' }}>
-                          Score {pos.indicators.score > 0 ? '+' : ''}{pos.indicators.score}
-                        </span>
-                      )}
+                      {/* MACD */}
+                      {pos.indicators.macdBull && <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700 }}>MACD↑</span>}
+                      {pos.indicators.macdBear && <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>MACD↓</span>}
+                      {/* Order book */}
+                      {pos.indicators.obImbalance != null && (() => {
+                        const ob = Number(pos.indicators.obImbalance);
+                        const col = ob > 60 ? '#22c55e' : ob < 40 ? '#ef4444' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>OB {ob}% bid</span>;
+                      })()}
+                      {/* Kimchi premium */}
+                      {pos.indicators.kimchiPremium != null && (() => {
+                        const k = Number(pos.indicators.kimchiPremium);
+                        const col = k > 3 ? '#ef4444' : k < 0 ? '#22c55e' : '#f59e0b';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>Kimchi {k >= 0 ? '+' : ''}{pos.indicators.kimchiPremium}%</span>;
+                      })()}
+                      {/* ROC */}
+                      {pos.indicators.roc != null && (() => {
+                        const r = Number(pos.indicators.roc);
+                        const col = r < -4 ? '#22c55e' : r > 4 ? '#ef4444' : '#888';
+                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>ROC {r >= 0 ? '+' : ''}{pos.indicators.roc}%</span>;
+                      })()}
                     </div>
                   )}
                 </div>
@@ -352,14 +415,14 @@ export default function CryptoTraderDashboard() {
         <div className="ct__toggle-row">
           <div>
             <div className="ct__toggle-label">Signal Sells</div>
-            <div className="ct__toggle-sub">Sell on RSI overbought, Bollinger upper, MACD bear cross</div>
+            <div className="ct__toggle-sub">RSI OB, BB upper, MACD bear, StochRSI OB, VWAP high, Williams OB, CCI OB, Kimchi high</div>
           </div>
           <Toggle checked={cfg.signal_sell_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, signal_sell_enabled: v }))} />
         </div>
         <div className="ct__toggle-row">
           <div>
             <div className="ct__toggle-label">Dip Buys</div>
-            <div className="ct__toggle-sub">Buy extra on RSI oversold, Bollinger lower, MACD bull cross (hourly check)</div>
+            <div className="ct__toggle-sub">RSI/BB/VWAP/Williams/CCI/StochRSI/ROC dip signals — checked every hour</div>
           </div>
           <Toggle checked={cfg.dip_buy_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, dip_buy_enabled: v }))} />
         </div>

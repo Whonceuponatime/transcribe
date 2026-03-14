@@ -1,4 +1,4 @@
-﻿-- init_schema.sql -- Full consolidated schema (all migrations in order)
+-- init_schema.sql -- Full consolidated schema (all migrations in order)
 -- Run this on a fresh Supabase project to set up the complete database.
 
 -- ================================================================
@@ -601,7 +601,11 @@ CREATE INDEX IF NOT EXISTS idx_crypto_trade_log_coin ON crypto_trade_log(coin, e
 CREATE TABLE IF NOT EXISTS crypto_profit_take_log (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   coin              TEXT NOT NULL,
-  level             TEXT NOT NULL CHECK (level IN ('50pct', '100pct', '200pct')),
+  level             TEXT NOT NULL CHECK (level IN (
+                      '5pct','10pct','20pct','40pct',
+                      'rsi_ob','rsi_ob_strong','bb_upper','macd_bear','stochrsi_ob',
+                      'vwap_above','williams_ob','cci_ob','kimchi_high','trailing_stop'
+                    )),
   avg_buy_price_krw NUMERIC,
   trigger_price_krw NUMERIC,
   sold_amount       NUMERIC,
