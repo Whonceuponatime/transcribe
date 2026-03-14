@@ -2221,6 +2221,10 @@ const analyzer = require('./lib/analyzer');
 const analyzerHandler = require('./api/analyzer');
 app.all('/api/analyzer', (req, res) => analyzerHandler(req, res));
 
+// ─── Crypto Trader (Upbit DCA + profit-take automation) ─────────────────
+const cryptoTraderHandler = require('./api/crypto-trader');
+app.all('/api/crypto-trader', (req, res) => cryptoTraderHandler(req, res));
+
 // ─── Live Trading (KRW→USD) ─────────────────────────────────────────────
 const liveTrading = require('./lib/liveTrading');
 

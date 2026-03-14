@@ -19,6 +19,7 @@ import ImageToText from './components/ImageToText';
 import EthernetExtractor from './components/EthernetExtractor';
 import AnalyzerDashboard from './components/AnalyzerDashboard';
 import LiveTradingDashboard from './components/LiveTradingDashboard';
+import CryptoTraderDashboard from './components/CryptoTraderDashboard';
 import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
@@ -150,6 +151,8 @@ function App() {
           <AnalyzerDashboard />
         ) : activeTab === 'live-trading' ? (
           <LiveTradingDashboard />
+        ) : activeTab === 'crypto-trader' ? (
+          <CryptoTraderDashboard />
         ) : (
           <ImageConverter />
         )}

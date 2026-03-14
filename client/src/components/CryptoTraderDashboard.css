@@ -1,0 +1,140 @@
+.ct { padding: 1rem; max-width: 960px; margin: 0 auto; }
+
+/* ═══ HEADER ═══ */
+.ct__header {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.ct__title { font-size: 1.2rem; margin: 0; }
+.ct__subtitle { font-size: 0.78rem; color: #888; margin: 0.1rem 0 0 0; }
+.ct__badges { display: flex; gap: 0.5rem; align-items: center; }
+.ct__badge {
+  padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;
+}
+.ct__badge--on  { background: rgba(34,197,94,0.2);  color: #22c55e; }
+.ct__badge--off { background: rgba(148,163,184,0.2); color: #94a3b8; }
+.ct__badge--kill { background: var(--destructive, #dc2626); color: #fff; }
+.ct__badge--signal { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.ct__actions { display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
+
+/* ═══ BUTTONS ═══ */
+.ct__btn {
+  padding: 0.4rem 0.85rem; border-radius: 6px;
+  border: 1px solid var(--border, #444); background: var(--bg-surface, #1a1a1a);
+  color: var(--text, #eee); cursor: pointer; font-size: 0.88rem;
+}
+.ct__btn:hover:not(:disabled) { background: var(--bg-surface-hover, #252525); }
+.ct__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ct__btn--primary { background: #22c55e; color: #000; border-color: #22c55e; }
+.ct__btn--danger  { border-color: #ef4444; color: #ef4444; }
+.ct__btn--warn    { border-color: #f59e0b; color: #f59e0b; }
+.ct__btn--sm      { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
+
+/* ═══ ALERTS ═══ */
+.ct__error   { padding: 0.6rem 0.9rem; background: rgba(239,68,68,0.12); border: 1px solid #ef4444; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.88rem; }
+.ct__success { padding: 0.6rem 0.9rem; background: rgba(34,197,94,0.12); border: 1px solid #22c55e; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.88rem; }
+
+/* ═══ KRW BALANCE HERO ═══ */
+.ct__balance-hero {
+  background: linear-gradient(135deg, #0a1a0a 0%, #111 100%);
+  border: 1px solid #22c55e33; border-radius: 12px;
+  padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.ct__krw-block { flex: 1; min-width: 160px; }
+.ct__krw-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.ct__krw-value { font-size: 2rem; font-weight: 700; color: #fff; margin: 0.15rem 0; }
+.ct__krw-sub   { font-size: 0.8rem; color: #666; }
+.ct__signal-block {
+  padding: 0.6rem 1rem; border-radius: 8px; text-align: center;
+  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+}
+.ct__signal-score { font-size: 1.6rem; font-weight: 700; color: #f59e0b; }
+.ct__signal-label { font-size: 0.75rem; color: #888; display: block; }
+.ct__signal-decision { font-size: 0.78rem; font-weight: 600; color: #f59e0b; margin-top: 0.1rem; }
+
+/* ═══ POSITIONS GRID ═══ */
+.ct__positions { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.ct__pos-card {
+  background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+  padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem;
+}
+.ct__pos-coin { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.ct__pos-balance { font-size: 1.25rem; font-weight: 700; }
+.ct__pos-price { font-size: 0.85rem; color: #aaa; }
+.ct__pos-gain {
+  font-size: 0.88rem; font-weight: 600; padding: 0.15rem 0.4rem;
+  border-radius: 4px; align-self: flex-start; margin-top: 0.15rem;
+}
+.ct__pos-gain--up   { color: #22c55e; background: rgba(34,197,94,0.12); }
+.ct__pos-gain--down { color: #ef4444; background: rgba(239,68,68,0.12); }
+.ct__pos-gain--flat { color: #888; }
+.ct__pos-next { font-size: 0.75rem; color: #555; margin-top: 0.2rem; }
+
+/* Progress bar toward next profit-take */
+.ct__pos-progress { margin-top: 0.4rem; }
+.ct__pos-progress-bar {
+  height: 4px; border-radius: 2px; background: #222; overflow: hidden;
+}
+.ct__pos-progress-fill { height: 100%; border-radius: 2px; background: #22c55e; transition: width 0.3s; }
+.ct__pos-progress-label { font-size: 0.7rem; color: #555; margin-top: 0.2rem; }
+
+/* ═══ CONFIG PANEL ═══ */
+.ct__config { margin-bottom: 0.75rem; }
+.ct__config h3 { margin: 0 0 0.75rem 0; font-size: 0.95rem; }
+.ct__config-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+}
+@media (max-width: 600px) { .ct__config-grid { grid-template-columns: 1fr; } }
+.ct__field { display: flex; flex-direction: column; gap: 0.3rem; }
+.ct__field label { font-size: 0.78rem; color: #888; }
+.ct__field input, .ct__field select {
+  padding: 0.4rem 0.6rem; background: #1a1a1a; border: 1px solid #444;
+  color: #eee; border-radius: 6px; font-size: 0.9rem;
+}
+.ct__toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0; border-bottom: 1px solid #1a1a1a;
+}
+.ct__toggle-row:last-child { border-bottom: none; }
+.ct__toggle-label { font-size: 0.88rem; color: #ccc; }
+.ct__toggle-sub { font-size: 0.75rem; color: #666; }
+.ct__toggle { position: relative; display: inline-block; width: 40px; height: 22px; }
+.ct__toggle input { opacity: 0; width: 0; height: 0; }
+.ct__toggle-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: #333; border-radius: 22px; transition: 0.2s;
+}
+.ct__toggle-slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s;
+}
+.ct__toggle input:checked + .ct__toggle-slider { background: #22c55e; }
+.ct__toggle input:checked + .ct__toggle-slider::before { transform: translateX(18px); }
+.ct__config-footer { display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center; }
+
+/* ═══ TRADES TABLE ═══ */
+.ct__trades { overflow-x: auto; }
+.ct__table {
+  width: 100%; border-collapse: collapse; font-size: 0.85rem;
+}
+.ct__table th, .ct__table td {
+  padding: 0.4rem 0.6rem; text-align: left; border-bottom: 1px solid #1a1a1a;
+  white-space: nowrap;
+}
+.ct__table th { color: #666; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+.ct__table td:first-child { color: #888; }
+.ct__side--buy  { color: #22c55e; font-weight: 700; }
+.ct__side--sell { color: #f59e0b; font-weight: 700; }
+.ct__reason { font-size: 0.75rem; color: #666; }
+
+/* ═══ DANGER ZONE ═══ */
+.ct__danger {
+  border: 1px solid #ef444433; border-radius: 8px;
+  padding: 1rem; margin-top: 0.5rem;
+}
+.ct__danger h4 { color: #ef4444; margin: 0 0 0.4rem 0; font-size: 0.88rem; }
+.ct__danger p  { font-size: 0.8rem; color: #888; margin: 0 0 0.6rem 0; }
+
+.ct__muted { color: #666; font-size: 0.85rem; }
+.ct__empty { text-align: center; padding: 1.5rem; color: #555; font-size: 0.88rem; }

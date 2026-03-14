@@ -33,6 +33,7 @@ const CATEGORIES = {
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
       { id: 'buy-usd', label: 'Buy USD → Crypto', icon: '💸' },
       { id: 'live-trading', label: 'Live Trading', icon: '📡' },
+      { id: 'crypto-trader', label: 'Crypto Bot', icon: '🤖' },
     ],
   },
 };
