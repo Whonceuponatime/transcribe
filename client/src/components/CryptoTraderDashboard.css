@@ -34,17 +34,72 @@
 .ct__error   { padding: 0.6rem 0.9rem; background: rgba(239,68,68,0.12); border: 1px solid #ef4444; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.88rem; }
 .ct__success { padding: 0.6rem 0.9rem; background: rgba(34,197,94,0.12); border: 1px solid #22c55e; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.88rem; }
 
-/* ═══ KRW BALANCE HERO ═══ */
-.ct__balance-hero {
-  background: linear-gradient(135deg, #0a1a0a 0%, #111 100%);
-  border: 1px solid #22c55e33; border-radius: 12px;
-  padding: 1.25rem 1.5rem; margin-bottom: 1rem;
-  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+/* ═══ COIN PORTFOLIO HERO ═══ */
+.ct__coin-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
-.ct__krw-block { flex: 1; min-width: 160px; }
-.ct__krw-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-.ct__krw-value { font-size: 2rem; font-weight: 700; color: #fff; margin: 0.15rem 0; }
-.ct__krw-sub   { font-size: 0.8rem; color: #666; }
+.ct__coin-card {
+  border-radius: 12px; padding: 1.1rem 1.2rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+  position: relative; overflow: hidden;
+  border: 1px solid #2a2a2a; background: #0d0d0d;
+  transition: border-color 0.2s;
+}
+.ct__coin-card--up   { border-color: #22c55e44; background: linear-gradient(145deg, #0a1a0a 0%, #0d0d0d 100%); }
+.ct__coin-card--down { border-color: #ef444433; background: linear-gradient(145deg, #1a0a0a 0%, #0d0d0d 100%); }
+.ct__coin-card--flat { border-color: #2a2a2a; }
+
+.ct__coin-ticker {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #888;
+}
+.ct__coin-price {
+  font-size: 1.4rem; font-weight: 700; color: #fff; line-height: 1.2;
+}
+.ct__coin-price-sub { font-size: 0.78rem; color: #666; }
+
+.ct__coin-divider { height: 1px; background: #1e1e1e; margin: 0.4rem 0; }
+
+.ct__coin-row { display: flex; justify-content: space-between; align-items: baseline; }
+.ct__coin-label { font-size: 0.72rem; color: #666; }
+.ct__coin-value { font-size: 0.88rem; color: #ccc; font-weight: 600; }
+
+.ct__coin-pnl {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-top: 0.3rem; flex-wrap: wrap;
+}
+.ct__coin-pnl-pct {
+  font-size: 1.1rem; font-weight: 800; padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+}
+.ct__coin-pnl-pct--up   { color: #22c55e; background: rgba(34,197,94,0.12); }
+.ct__coin-pnl-pct--down { color: #ef4444; background: rgba(239,68,68,0.12); }
+.ct__coin-pnl-pct--flat { color: #888; background: rgba(255,255,255,0.05); }
+.ct__coin-pnl-abs { font-size: 0.78rem; color: #666; }
+
+.ct__coin-indicators {
+  display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.4rem;
+  padding-top: 0.4rem; border-top: 1px solid #1a1a1a;
+}
+.ct__ind-pill {
+  font-size: 0.68rem; padding: 0.1rem 0.3rem; border-radius: 3px;
+  font-weight: 600; letter-spacing: 0.3px;
+}
+
+/* ═══ PORTFOLIO SUMMARY BAR ═══ */
+.ct__summary-bar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 10px;
+  padding: 0.75rem 1.1rem; margin-bottom: 1rem;
+}
+.ct__summary-item { display: flex; flex-direction: column; gap: 0.1rem; }
+.ct__summary-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+.ct__summary-val { font-size: 1rem; font-weight: 700; color: #fff; }
+.ct__summary-sub { font-size: 0.72rem; color: #666; }
+.ct__summary-sep { width: 1px; height: 2rem; background: #222; flex-shrink: 0; }
+
 .ct__signal-block {
   padding: 0.6rem 1rem; border-radius: 8px; text-align: center;
   background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
@@ -52,6 +107,11 @@
 .ct__signal-score { font-size: 1.6rem; font-weight: 700; color: #f59e0b; }
 .ct__signal-label { font-size: 0.75rem; color: #888; display: block; }
 .ct__signal-decision { font-size: 0.78rem; font-weight: 600; color: #f59e0b; margin-top: 0.1rem; }
+/* keep for compat */
+.ct__krw-block { flex: 1; min-width: 160px; }
+.ct__krw-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.ct__krw-value { font-size: 2rem; font-weight: 700; color: #fff; margin: 0.15rem 0; }
+.ct__krw-sub   { font-size: 0.8rem; color: #666; }
 
 /* ═══ POSITIONS GRID ═══ */
 .ct__positions { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }

@@ -31,18 +31,6 @@ const rsiColor = (v) => v == null ? '#666' : v > 70 ? '#ef4444' : v < 30 ? '#22c
 const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#888' : v > 25 ? '#22c55e' : '#00e5ff';
 const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
 
-// Progress toward next profit-take level
-function progressToNextLevel(gainPct) {
-  if (gainPct == null) return null;
-  const levels = [50, 100, 200];
-  for (const lvl of levels) {
-    if (gainPct < lvl) {
-      return { next: lvl, progress: Math.max(0, gainPct) / lvl * 100 };
-    }
-  }
-  return { next: null, progress: 100 };
-}
-
 function Toggle({ checked, onChange }) {
   return (
     <label className="ct__toggle">
@@ -184,16 +172,9 @@ export default function CryptoTraderDashboard() {
         </div>
         <div className="ct__badges">
           {killSwitch && <span className="ct__badge ct__badge--kill">KILL SWITCH ON</span>}
-          <span className={`ct__badge ${piOnline ? 'ct__badge--on' : 'ct__badge--off'}`}>
-            Pi {piOnline ? 'ONLINE' : 'OFFLINE'}
-          </span>
           <span className={`ct__badge ${cfg.dca_enabled ? 'ct__badge--on' : 'ct__badge--off'}`}>
             DCA {cfg.dca_enabled ? 'ON' : 'OFF'}
           </span>
-          {triggerPending && <span className="ct__badge ct__badge--signal">⏳ Pending…</span>}
-          {signalScore != null && (
-            <span className="ct__badge ct__badge--signal">Signal {signalScore}</span>
-          )}
         </div>
         <div className="ct__actions">
           <button type="button" className="ct__btn" onClick={fetchStatus} disabled={loading}>
@@ -214,178 +195,196 @@ export default function CryptoTraderDashboard() {
       {error && <div className="ct__error">{error}</div>}
       {msg && <div className="ct__success">{msg}</div>}
 
-      {/* ═══ BALANCE HERO ═══ */}
-      <div className="ct__balance-hero">
-        <div className="ct__krw-block">
-          <div className="ct__krw-label">Available KRW</div>
-          <div className="ct__krw-value">₩{fmt(krwBalance)}</div>
-          {usdKrw && <div style={{ fontSize: '0.78rem', color: '#888' }}>{fmtUsd(krwBalance / usdKrw)} · 1 USD = ₩{fmt(usdKrw)}</div>}
-          <div className="ct__krw-sub">
-            {cfg.weekly_budget_krw > 0 && krwBalance > 0
-              ? `~${Math.floor(krwBalance / cfg.weekly_budget_krw)} weeks of DCA remaining`
-              : 'Set weekly budget below'}
-          </div>
+      {/* ═══ COIN PORTFOLIO HERO ═══ */}
+      {positions.length > 0 && (
+        <div className="ct__coin-hero">
+          {positions.map((pos) => {
+            const g       = pos.gainPct;
+            const cardMod = g == null || pos.balance <= 0 ? 'flat' : g > 0 ? 'up' : g < 0 ? 'down' : 'flat';
+            const pnlColor = g == null ? '#888' : g > 0 ? '#22c55e' : g < 0 ? '#ef4444' : '#888';
+            const ind      = pos.indicators ?? {};
+            const pnlKrw   = pos.avgBuyKrw > 0 && pos.currentValueKrw
+              ? pos.currentValueKrw - (pos.avgBuyKrw * pos.balance) : null;
+            const pnlUsd   = pnlKrw && usdKrw ? pnlKrw / usdKrw : null;
+
+            const pill = (label, val, col) => (
+              <span key={label} className="ct__ind-pill"
+                style={{ background: `${col}18`, color: col, border: `1px solid ${col}30` }}>
+                {label} {val}
+              </span>
+            );
+
+            return (
+              <div key={pos.coin} className={`ct__coin-card ct__coin-card--${cardMod}`}>
+                {/* Ticker + price */}
+                <div className="ct__coin-ticker">{pos.coin}</div>
+                <div className="ct__coin-price">
+                  ₩{fmt(pos.currentPrice)}
+                </div>
+                {pos.currentPrice && usdKrw && (
+                  <div className="ct__coin-price-sub">{fmtUsd(pos.currentPrice / usdKrw, 2)} per coin</div>
+                )}
+
+                <div className="ct__coin-divider" />
+
+                {/* Holdings + value */}
+                <div className="ct__coin-row">
+                  <span className="ct__coin-label">Holdings</span>
+                  <span className="ct__coin-value">{fmtCoin(pos.balance)} {pos.coin}</span>
+                </div>
+                <div className="ct__coin-row">
+                  <span className="ct__coin-label">Value</span>
+                  <span className="ct__coin-value">
+                    ₩{fmt(pos.currentValueKrw)}
+                    {pos.currentValueUsd != null && (
+                      <span style={{ color: '#666', fontWeight: 400 }}> · {fmtUsd(pos.currentValueUsd, 0)}</span>
+                    )}
+                  </span>
+                </div>
+                <div className="ct__coin-row">
+                  <span className="ct__coin-label">Avg buy</span>
+                  <span className="ct__coin-value" style={{ color: '#777' }}>
+                    ₩{fmt(pos.avgBuyKrw)}
+                    {pos.avgBuyUsd != null && (
+                      <span style={{ color: '#555', fontWeight: 400 }}> · {fmtUsd(pos.avgBuyUsd, 0)}</span>
+                    )}
+                  </span>
+                </div>
+
+                {/* P&L */}
+                {g != null && pos.balance > 0 && (
+                  <div className="ct__coin-pnl">
+                    <span className={`ct__coin-pnl-pct ct__coin-pnl-pct--${cardMod}`}>
+                      {pct(g)}
+                    </span>
+                    {pnlKrw != null && (
+                      <span className="ct__coin-pnl-abs" style={{ color: pnlColor }}>
+                        {pnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(pnlKrw))}
+                        {pnlUsd != null && ` / ${pnlUsd >= 0 ? '+' : ''}${fmtUsd(Math.abs(pnlUsd), 0)}`}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {pos.balance <= 0 && (
+                  <div style={{ fontSize: '0.78rem', color: '#555', marginTop: '0.3rem' }}>No position</div>
+                )}
+
+                {/* Drop from 14d high */}
+                {pos.dropFromHigh != null && pos.dropFromHigh > 10 && (
+                  <div style={{ fontSize: '0.72rem', color: pos.dropFromHigh > 25 ? '#ef4444' : '#f59e0b', marginTop: '0.1rem' }}>
+                    ↓{pos.dropFromHigh.toFixed(1)}% from 14d high{pos.dropFromHigh > 25 ? ' ⚠' : ''}
+                  </div>
+                )}
+
+                {/* Next profit-take */}
+                {pos.nextProfitTakeLevel && pos.balance > 0 && (
+                  <div style={{ fontSize: '0.7rem', color: '#555', marginTop: '0.1rem' }}>
+                    Next: {pos.nextProfitTakeLevel}
+                  </div>
+                )}
+
+                {/* Indicator pills */}
+                {Object.keys(ind).length > 0 && (
+                  <div className="ct__coin-indicators">
+                    {(() => {
+                      const pills = [];
+                      const sc = ind.scoreCombined != null ? Number(ind.scoreCombined) : null;
+                      if (sc != null) {
+                        const c = sc >= 3 ? '#22c55e' : sc <= -3 ? '#ef4444' : sc > 0 ? '#86efac' : sc < 0 ? '#fca5a5' : '#888';
+                        pills.push(pill('Score', `${sc > 0 ? '+' : ''}${sc}`, c));
+                      }
+                      if (ind.rsi != null) {
+                        const c = rsiColor(Number(ind.rsi));
+                        pills.push(pill('RSI', ind.rsi, c));
+                      }
+                      if (ind.williamsR != null) {
+                        const w = Number(ind.williamsR); const c = w > -20 ? '#ef4444' : w < -80 ? '#22c55e' : '#666';
+                        pills.push(pill('%R', ind.williamsR, c));
+                      }
+                      if (ind.cci != null) {
+                        const c2 = Number(ind.cci); const col = c2 > 100 ? '#ef4444' : c2 < -100 ? '#22c55e' : '#666';
+                        pills.push(pill('CCI', ind.cci, col));
+                      }
+                      if (ind.vwapDev != null) {
+                        const v = Number(ind.vwapDev); const col = v > 2 ? '#ef4444' : v < -2 ? '#22c55e' : '#666';
+                        pills.push(pill('VWAP', `${v >= 0 ? '+' : ''}${ind.vwapDev}%`, col));
+                      }
+                      if (ind.obImbalance != null) {
+                        const ob = Number(ind.obImbalance); const col = ob > 60 ? '#22c55e' : ob < 40 ? '#ef4444' : '#666';
+                        pills.push(pill('OB', `${ob}%`, col));
+                      }
+                      if (ind.kimchiPremium != null) {
+                        const k = Number(ind.kimchiPremium); const col = k > 3 ? '#ef4444' : k < 0 ? '#22c55e' : '#f59e0b';
+                        pills.push(pill('Kimchi', `${k >= 0 ? '+' : ''}${ind.kimchiPremium}%`, col));
+                      }
+                      if (ind.macdBull) pills.push(pill('MACD', '↑', '#22c55e'));
+                      if (ind.macdBear) pills.push(pill('MACD', '↓', '#ef4444'));
+                      return pills;
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {/* ═══ PORTFOLIO SUMMARY BAR ═══ */}
+      <div className="ct__summary-bar">
         {totalValueUsd != null && (
-          <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', textAlign: 'center', background: '#ffffff08', border: '1px solid #ffffff18' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#00e5ff' }}>{fmtUsd(totalValueUsd)}</div>
-            <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Total Portfolio (USD)</span>
-            <div style={{ fontSize: '0.72rem', color: '#666' }}>₩{fmt(status?.totalValueKrw)} incl. KRW</div>
-          </div>
+          <>
+            <div className="ct__summary-item">
+              <span className="ct__summary-label">Total Portfolio</span>
+              <span className="ct__summary-val" style={{ color: '#00e5ff' }}>{fmtUsd(totalValueUsd, 0)}</span>
+              <span className="ct__summary-sub">₩{fmt(status?.totalValueKrw)}</span>
+            </div>
+            <div className="ct__summary-sep" />
+          </>
+        )}
+        <div className="ct__summary-item">
+          <span className="ct__summary-label">KRW Cash</span>
+          <span className="ct__summary-val">₩{fmt(krwBalance)}</span>
+          {usdKrw && <span className="ct__summary-sub">{fmtUsd(krwBalance / usdKrw)} · ~{Math.floor(krwBalance / (cfg.weekly_budget_krw || 1))}w DCA</span>}
+        </div>
+        {fearGreed && (
+          <>
+            <div className="ct__summary-sep" />
+            <div className="ct__summary-item" style={{ textAlign: 'center' }}>
+              <span className="ct__summary-label">Fear & Greed</span>
+              <span className="ct__summary-val" style={{ color: FNG_COLOR(fearGreed.value) }}>{fearGreed.value}</span>
+              <span className="ct__summary-sub" style={{ color: FNG_COLOR(fearGreed.value) }}>
+                {fearGreed.label || FNG_LABEL(fearGreed.value)}
+                {fearGreed.value > 75 ? ' · DCA off' : fearGreed.value < 25 ? ' · DCA ×2' : ''}
+              </span>
+            </div>
+          </>
         )}
         {signalScore != null && (
-          <div className="ct__signal-block">
-            <div className="ct__signal-score">{signalScore}</div>
-            <span className="ct__signal-label">Macro Score / 10</span>
-            <div className="ct__signal-decision">{signalDecision?.replace('_', ' ')}</div>
-          </div>
-        )}
-        {fearGreed && (
-          <div style={{
-            padding: '0.6rem 1rem', borderRadius: '8px', textAlign: 'center',
-            background: `${FNG_COLOR(fearGreed.value)}18`,
-            border: `1px solid ${FNG_COLOR(fearGreed.value)}44`,
-          }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: FNG_COLOR(fearGreed.value) }}>
-              {fearGreed.value}
+          <>
+            <div className="ct__summary-sep" />
+            <div className="ct__summary-item" style={{ textAlign: 'center' }}>
+              <span className="ct__summary-label">Macro Signal</span>
+              <span className="ct__summary-val" style={{ color: '#f59e0b' }}>{signalScore}/10</span>
+              <span className="ct__summary-sub">{signalDecision?.replace(/_/g, ' ')}</span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Fear & Greed</span>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: FNG_COLOR(fearGreed.value) }}>
-              {fearGreed.label || FNG_LABEL(fearGreed.value)}
-            </div>
-            {fearGreed.value > 75 && (
-              <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>DCA paused</div>
-            )}
-            {fearGreed.value < 25 && (
-              <div style={{ fontSize: '0.7rem', color: '#22c55e', marginTop: '0.2rem' }}>DCA ×2 active</div>
-            )}
-          </div>
+          </>
         )}
         {status?.config?.last_dca_run && (
-          <div style={{ fontSize: '0.8rem', color: '#666' }}>
-            Last DCA: {new Date(status.config.last_dca_run).toLocaleDateString()}
-          </div>
+          <>
+            <div className="ct__summary-sep" />
+            <div className="ct__summary-item">
+              <span className="ct__summary-label">Last DCA</span>
+              <span className="ct__summary-sub" style={{ fontSize: '0.8rem', color: '#888' }}>{new Date(status.config.last_dca_run).toLocaleDateString()}</span>
+            </div>
+          </>
         )}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className={`ct__badge ${piOnline ? 'ct__badge--on' : 'ct__badge--off'}`}>
+            Pi {piOnline ? 'ONLINE' : 'OFFLINE'}
+          </span>
+          {triggerPending && <span className="ct__badge ct__badge--signal">⏳ Pending…</span>}
+        </div>
       </div>
-
-      {/* ═══ POSITIONS ═══ */}
-      <section className="card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
-        <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>Live Positions (from Upbit)</h3>
-        {positions.length > 0 ? (
-          <div className="ct__positions">
-            {positions.map((pos) => {
-              const progress = progressToNextLevel(pos.gainPct);
-              const gainClass = pos.gainPct == null ? '' : pos.gainPct > 0 ? 'ct__pos-gain--up' : pos.gainPct < 0 ? 'ct__pos-gain--down' : 'ct__pos-gain--flat';
-              return (
-                <div key={pos.coin} className="ct__pos-card">
-                  <span className="ct__pos-coin">{pos.coin}</span>
-                  <span className="ct__pos-balance">{fmtCoin(pos.balance)} {pos.coin}</span>
-                  {pos.currentPrice && (
-                    <span className="ct__pos-price">
-                      ₩{fmt(pos.currentPrice)}{pos.currentValueUsd ? ` ≈ ${fmtUsd(pos.currentValueUsd, 0)}` : ''} · ₩{fmt(pos.currentValueKrw)}
-                    </span>
-                  )}
-                  {pos.avgBuyKrw > 0 && (
-                    <span className="ct__pos-price">
-                      Avg ₩{fmt(pos.avgBuyKrw)}{pos.avgBuyUsd ? ` (${fmtUsd(pos.avgBuyUsd, 0)})` : ''}
-                    </span>
-                  )}
-                  {pos.gainPct != null && (
-                    <span className={`ct__pos-gain ${gainClass}`}>{pct(pos.gainPct)}</span>
-                  )}
-                  {progress && progress.next && (
-                    <div className="ct__pos-progress">
-                      <div className="ct__pos-progress-bar">
-                        <div className="ct__pos-progress-fill" style={{ width: `${Math.min(100, progress.progress)}%` }} />
-                      </div>
-                      <div className="ct__pos-progress-label">
-                        {progress.progress.toFixed(0)}% to +{progress.next}% sell trigger
-                      </div>
-                    </div>
-                  )}
-                  {pos.gainPct != null && progress?.next == null && (
-                    <span className="ct__pos-next" style={{ color: '#22c55e' }}>All profit-take levels passed</span>
-                  )}
-                  {pos.dropFromHigh != null && pos.dropFromHigh > 10 && (
-                    <span className="ct__pos-next" style={{ color: pos.dropFromHigh > 25 ? '#ef4444' : '#f59e0b' }}>
-                      ↓{pos.dropFromHigh.toFixed(1)}% from 14d high{pos.dropFromHigh > 25 ? ' ⚠️' : ''}
-                    </span>
-                  )}
-                  {pos.indicators && (
-                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
-                      {/* Combined signal score */}
-                      {pos.indicators.scoreCombined != null && (() => {
-                        const s = Number(pos.indicators.scoreCombined);
-                        const c = s >= 3 ? '#22c55e' : s <= -3 ? '#ef4444' : s > 0 ? '#86efac' : s < 0 ? '#fca5a5' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: `${c}20`, color: c, fontWeight: 700, border: `1px solid ${c}40` }}>Score {s > 0 ? '+' : ''}{s}</span>;
-                      })()}
-                      {/* RSI */}
-                      {pos.indicators.rsi != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.rsi))}20`, color: rsiColor(Number(pos.indicators.rsi)), fontWeight: 600 }}>
-                          RSI {pos.indicators.rsi}
-                        </span>
-                      )}
-                      {/* StochRSI */}
-                      {pos.indicators.stochRsi != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.stochRsi))}20`, color: rsiColor(Number(pos.indicators.stochRsi)) }}>
-                          StochRSI {pos.indicators.stochRsi}
-                        </span>
-                      )}
-                      {/* Williams %R */}
-                      {pos.indicators.williamsR != null && (() => {
-                        const w = Number(pos.indicators.williamsR);
-                        const c = w > -20 ? '#ef4444' : w < -80 ? '#22c55e' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${c}18`, color: c }}>%R {pos.indicators.williamsR}</span>;
-                      })()}
-                      {/* CCI */}
-                      {pos.indicators.cci != null && (() => {
-                        const c2 = Number(pos.indicators.cci);
-                        const col = c2 > 100 ? '#ef4444' : c2 < -100 ? '#22c55e' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>CCI {pos.indicators.cci}</span>;
-                      })()}
-                      {/* VWAP deviation */}
-                      {pos.indicators.vwapDev != null && (() => {
-                        const v = Number(pos.indicators.vwapDev);
-                        const col = v > 2 ? '#ef4444' : v < -2 ? '#22c55e' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>VWAP {v >= 0 ? '+' : ''}{pos.indicators.vwapDev}%</span>;
-                      })()}
-                      {/* Bollinger */}
-                      {pos.indicators.bb_pctB != null && (
-                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: '#ffffff0d', color: '#888' }}>
-                          BB {(Number(pos.indicators.bb_pctB) * 100).toFixed(0)}%
-                        </span>
-                      )}
-                      {/* MACD */}
-                      {pos.indicators.macdBull && <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700 }}>MACD↑</span>}
-                      {pos.indicators.macdBear && <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>MACD↓</span>}
-                      {/* Order book */}
-                      {pos.indicators.obImbalance != null && (() => {
-                        const ob = Number(pos.indicators.obImbalance);
-                        const col = ob > 60 ? '#22c55e' : ob < 40 ? '#ef4444' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>OB {ob}% bid</span>;
-                      })()}
-                      {/* Kimchi premium */}
-                      {pos.indicators.kimchiPremium != null && (() => {
-                        const k = Number(pos.indicators.kimchiPremium);
-                        const col = k > 3 ? '#ef4444' : k < 0 ? '#22c55e' : '#f59e0b';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>Kimchi {k >= 0 ? '+' : ''}{pos.indicators.kimchiPremium}%</span>;
-                      })()}
-                      {/* ROC */}
-                      {pos.indicators.roc != null && (() => {
-                        const r = Number(pos.indicators.roc);
-                        const col = r < -4 ? '#22c55e' : r > 4 ? '#ef4444' : '#888';
-                        return <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${col}18`, color: col }}>ROC {r >= 0 ? '+' : ''}{pos.indicators.roc}%</span>;
-                      })()}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="ct__empty">No positions yet. Run DCA to start accumulating.</p>
-        )}
-      </section>
 
       {/* ═══ CONFIG ═══ */}
       <section className="card ct__config" style={{ padding: '1rem' }}>
