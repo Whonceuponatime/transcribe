@@ -106,7 +106,7 @@ module.exports = async function handler(req, res) {
     // ── POST update config ──────────────────────────────────────────────────
     if (action === 'config' && req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const allowed = ['dca_enabled', 'weekly_budget_krw', 'coins', 'split', 'profit_take_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled', 'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled', 'min_signal_score'];
+      const allowed = ['dca_enabled', 'weekly_budget_krw', 'dip_buy_enabled', 'dip_budget_krw', 'coins', 'split', 'profit_take_enabled', 'signal_sell_enabled', 'signal_buy_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled', 'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled', 'min_signal_score'];
       const updates = {};
       for (const key of allowed) {
         if (body[key] !== undefined) updates[key] = body[key];

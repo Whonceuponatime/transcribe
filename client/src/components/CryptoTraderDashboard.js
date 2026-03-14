@@ -7,17 +7,16 @@ const fmtCoin = (n) => n != null ? Number(n).toLocaleString('en-US', { maximumFr
 const pct = (n) => n != null ? `${Number(n) >= 0 ? '+' : ''}${Number(n).toFixed(1)}%` : '—';
 
 const REASON_LABELS = {
-  DCA: '📅 DCA',
-  DCA_SIGNAL_BOOST: '🚀 DCA + Signal Boost',
-  'DCA_ADJUSTED_1.5x': '🚀 DCA ×1.5 (Signal Boost)',
-  'DCA_ADJUSTED_2.0x': '😱 DCA ×2 (Extreme Fear)',
-  'DCA_ADJUSTED_3.0x': '😱🚀 DCA ×3 (Fear + Boost)',
-  PROFIT_TAKE_5PCT: '💰 +5% Take',
-  PROFIT_TAKE_10PCT: '💰 +10% Take',
-  PROFIT_TAKE_20PCT: '💰 +20% Take',
-  PROFIT_TAKE_40PCT: '💰 +40% Take',
-  TRAILING_STOP: '🛡️ Trailing Stop',
+  DCA: '📅 DCA', 'DCA_1.0x': '📅 DCA', 'DCA_1.5x': '🚀 DCA ×1.5', 'DCA_2.0x': '😱 DCA ×2', 'DCA_3.0x': '😱🚀 DCA ×3',
+  PROFIT_TAKE_5PCT: '💰 +5%', PROFIT_TAKE_10PCT: '💰 +10%', PROFIT_TAKE_20PCT: '💰 +20%', PROFIT_TAKE_40PCT: '💰 +40%',
+  SIGNAL_RSI_OVERBOUGHT: '📊 RSI OB', SIGNAL_RSI_OB_STRONG: '🔴 RSI OB!',
+  SIGNAL_BB_UPPER: '📈 BB Upper', SIGNAL_MACD_BEAR: '📉 MACD Bear', SIGNAL_STOCHRSI_OB: '📊 StochRSI OB',
+  TRAILING_STOP: '🛡️ Trail Stop',
+  DIP_RSI_OVERSOLD: '🟢 RSI Dip', DIP_RSI_STRONG_OS: '🟢🟢 RSI Dip!', DIP_BB_BELOW_LOWER: '📉 BB Dip',
+  DIP_MACD_BULL_CROSS: '📊 MACD Bull', DIP_STOCHRSI_OS: '🟢 StochRSI Dip',
 };
+
+const rsiColor = (v) => v == null ? '#666' : v > 70 ? '#ef4444' : v < 30 ? '#22c55e' : '#f59e0b';
 
 const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#888' : v > 25 ? '#22c55e' : '#00e5ff';
 const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
@@ -287,9 +286,34 @@ export default function CryptoTraderDashboard() {
                   )}
                   {pos.dropFromHigh != null && pos.dropFromHigh > 10 && (
                     <span className="ct__pos-next" style={{ color: pos.dropFromHigh > 25 ? '#ef4444' : '#f59e0b' }}>
-                      ↓{pos.dropFromHigh.toFixed(1)}% from 14d high
-                      {pos.dropFromHigh > 25 ? ' ⚠️ near trailing stop' : ''}
+                      ↓{pos.dropFromHigh.toFixed(1)}% from 14d high{pos.dropFromHigh > 25 ? ' ⚠️' : ''}
                     </span>
+                  )}
+                  {pos.indicators && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+                      {pos.indicators.rsi != null && (
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.rsi))}22`, color: rsiColor(Number(pos.indicators.rsi)), fontWeight: 600 }}>
+                          RSI {pos.indicators.rsi}
+                        </span>
+                      )}
+                      {pos.indicators.stochRsi != null && (
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: `${rsiColor(Number(pos.indicators.stochRsi))}22`, color: rsiColor(Number(pos.indicators.stochRsi)) }}>
+                          StochRSI {pos.indicators.stochRsi}
+                        </span>
+                      )}
+                      {pos.indicators.bb_pctB != null && (
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: '#ffffff11', color: '#888' }}>
+                          BB {(Number(pos.indicators.bb_pctB) * 100).toFixed(0)}%
+                        </span>
+                      )}
+                      {pos.indicators.macdBull && <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700 }}>MACD ↑</span>}
+                      {pos.indicators.macdBear && <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>MACD ↓</span>}
+                      {pos.indicators.score != null && (
+                        <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: pos.indicators.score > 0 ? '#22c55e22' : pos.indicators.score < 0 ? '#ef444422' : '#ffffff11', color: pos.indicators.score > 0 ? '#22c55e' : pos.indicators.score < 0 ? '#ef4444' : '#888' }}>
+                          Score {pos.indicators.score > 0 ? '+' : ''}{pos.indicators.score}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -327,6 +351,20 @@ export default function CryptoTraderDashboard() {
         </div>
         <div className="ct__toggle-row">
           <div>
+            <div className="ct__toggle-label">Signal Sells</div>
+            <div className="ct__toggle-sub">Sell on RSI overbought, Bollinger upper, MACD bear cross</div>
+          </div>
+          <Toggle checked={cfg.signal_sell_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, signal_sell_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div>
+            <div className="ct__toggle-label">Dip Buys</div>
+            <div className="ct__toggle-sub">Buy extra on RSI oversold, Bollinger lower, MACD bull cross (hourly check)</div>
+          </div>
+          <Toggle checked={cfg.dip_buy_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, dip_buy_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div>
             <div className="ct__toggle-label">Trailing Stop</div>
             <div className="ct__toggle-sub">Sell 40% if price drops 30% from 14-day high (while profitable)</div>
           </div>
@@ -359,10 +397,11 @@ export default function CryptoTraderDashboard() {
             />
           </div>
           <div className="ct__field">
-            <label>Split (BTC / ETH / SOL)</label>
-            <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.82rem', color: '#aaa', alignItems: 'center', padding: '0.4rem 0' }}>
-              BTC 50% · ETH 30% · SOL 20%
-            </div>
+            <label>Dip Buy Reserve (₩)</label>
+            <input type="number" min="5000" step="10000"
+              value={cfg.dip_budget_krw ?? 100000}
+              onChange={(e) => setCfg((c) => ({ ...c, dip_budget_krw: Number(e.target.value) }))}
+            />
           </div>
         </div>
 
