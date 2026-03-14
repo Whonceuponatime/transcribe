@@ -26,14 +26,17 @@ CREATE INDEX IF NOT EXISTS idx_ethernet_jobs_created_at ON ethernet_jobs(created
 -- RLS: users can read/insert their own jobs
 ALTER TABLE ethernet_jobs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own ethernet jobs" ON ethernet_jobs;
 CREATE POLICY "Users can view own ethernet jobs"
   ON ethernet_jobs FOR SELECT
   USING (auth.uid() = user_id OR user_id IS NULL);
 
+DROP POLICY IF EXISTS "Users can insert ethernet jobs" ON ethernet_jobs;
 CREATE POLICY "Users can insert ethernet jobs"
   ON ethernet_jobs FOR INSERT
   WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 
+DROP POLICY IF EXISTS "Users can update own ethernet jobs" ON ethernet_jobs;
 CREATE POLICY "Users can update own ethernet jobs"
   ON ethernet_jobs FOR UPDATE
   USING (auth.uid() = user_id OR user_id IS NULL);
@@ -107,14 +110,17 @@ CREATE INDEX IF NOT EXISTS idx_forex_snapshots_created_at ON forex_snapshots(cre
 
 ALTER TABLE forex_snapshots ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own forex snapshots" ON forex_snapshots;
 CREATE POLICY "Users can view own forex snapshots"
   ON forex_snapshots FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own forex snapshots" ON forex_snapshots;
 CREATE POLICY "Users can insert own forex snapshots"
   ON forex_snapshots FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own forex snapshots" ON forex_snapshots;
 CREATE POLICY "Users can delete own forex snapshots"
   ON forex_snapshots FOR DELETE
   USING (auth.uid() = user_id);
@@ -210,9 +216,13 @@ ALTER TABLE fx_advice_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fx_conversions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fx_manual_flags ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all for service role" ON fx_market_snapshots;
 CREATE POLICY "Allow all for service role" ON fx_market_snapshots FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service role" ON fx_advice_runs;
 CREATE POLICY "Allow all for service role" ON fx_advice_runs FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service role" ON fx_conversions;
 CREATE POLICY "Allow all for service role" ON fx_conversions FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service role" ON fx_manual_flags;
 CREATE POLICY "Allow all for service role" ON fx_manual_flags FOR ALL USING (true) WITH CHECK (true);
 
 
@@ -394,15 +404,25 @@ ALTER TABLE risk_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all for service" ON market_ticks;
 CREATE POLICY "Allow all for service" ON market_ticks FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON market_bars_1m;
 CREATE POLICY "Allow all for service" ON market_bars_1m FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON signal_runs;
 CREATE POLICY "Allow all for service" ON signal_runs FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON order_requests;
 CREATE POLICY "Allow all for service" ON order_requests FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON order_events;
 CREATE POLICY "Allow all for service" ON order_events FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fills;
 CREATE POLICY "Allow all for service" ON fills FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON portfolio_snapshots;
 CREATE POLICY "Allow all for service" ON portfolio_snapshots FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON risk_events;
 CREATE POLICY "Allow all for service" ON risk_events FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON app_settings;
 CREATE POLICY "Allow all for service" ON app_settings FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON provider_health;
 CREATE POLICY "Allow all for service" ON provider_health FOR ALL USING (true) WITH CHECK (true);
 
 
@@ -545,14 +565,21 @@ ALTER TABLE fx_signal_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fx_manual_trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all for service" ON fx_live_quotes;
 CREATE POLICY "Allow all for service" ON fx_live_quotes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fx_bars_1m;
 CREATE POLICY "Allow all for service" ON fx_bars_1m FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fx_analyzer_snapshots;
 CREATE POLICY "Allow all for service" ON fx_analyzer_snapshots FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fx_signal_runs;
 CREATE POLICY "Allow all for service" ON fx_signal_runs FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fx_manual_trades;
 CREATE POLICY "Allow all for service" ON fx_manual_trades FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON provider_health;
 CREATE POLICY "Allow all for service" ON provider_health FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE crypto_purchases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for service" ON crypto_purchases;
 CREATE POLICY "Allow all for service" ON crypto_purchases FOR ALL USING (true) WITH CHECK (true);
 
 
@@ -620,8 +647,11 @@ ALTER TABLE crypto_trader_config    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_trade_log        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_profit_take_log  ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all for service" ON crypto_trader_config;
 CREATE POLICY "Allow all for service" ON crypto_trader_config    FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON crypto_trade_log;
 CREATE POLICY "Allow all for service" ON crypto_trade_log        FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON crypto_profit_take_log;
 CREATE POLICY "Allow all for service" ON crypto_profit_take_log  FOR ALL USING (true) WITH CHECK (true);
 
 
