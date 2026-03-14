@@ -9,10 +9,18 @@ const pct = (n) => n != null ? `${Number(n) >= 0 ? '+' : ''}${Number(n).toFixed(
 const REASON_LABELS = {
   DCA: '📅 DCA',
   DCA_SIGNAL_BOOST: '🚀 DCA + Signal Boost',
-  PROFIT_TAKE_50PCT: '💰 Profit Take +50%',
-  PROFIT_TAKE_100PCT: '💰 Profit Take +100%',
-  PROFIT_TAKE_200PCT: '💰 Profit Take +200%',
+  'DCA_ADJUSTED_1.5x': '🚀 DCA ×1.5 (Signal Boost)',
+  'DCA_ADJUSTED_2.0x': '😱 DCA ×2 (Extreme Fear)',
+  'DCA_ADJUSTED_3.0x': '😱🚀 DCA ×3 (Fear + Boost)',
+  PROFIT_TAKE_50PCT: '💰 +50% Take',
+  PROFIT_TAKE_100PCT: '💰 +100% Take',
+  PROFIT_TAKE_200PCT: '💰 +200% Take',
+  PROFIT_TAKE_300PCT: '💰 +300% Take',
+  TRAILING_STOP: '🛡️ Trailing Stop',
 };
+
+const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#888' : v > 25 ? '#22c55e' : '#00e5ff';
+const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
 
 // Progress toward next profit-take level
 function progressToNextLevel(gainPct) {
@@ -50,6 +58,10 @@ export default function CryptoTraderDashboard() {
     weekly_budget_krw: 100000,
     profit_take_enabled: true,
     signal_boost_enabled: true,
+    fear_greed_gate_enabled: true,
+    trailing_stop_enabled: true,
+    bear_market_pause_enabled: true,
+    min_signal_score: 0,
   });
 
   const fetchStatus = useCallback(async () => {
@@ -65,6 +77,10 @@ export default function CryptoTraderDashboard() {
           weekly_budget_krw: d.config?.weekly_budget_krw ?? 100000,
           profit_take_enabled: d.config?.profit_take_enabled ?? true,
           signal_boost_enabled: d.config?.signal_boost_enabled ?? true,
+          fear_greed_gate_enabled: d.config?.fear_greed_gate_enabled ?? true,
+          trailing_stop_enabled: d.config?.trailing_stop_enabled ?? true,
+          bear_market_pause_enabled: d.config?.bear_market_pause_enabled ?? true,
+          min_signal_score: d.config?.min_signal_score ?? 0,
         });
       } else {
         const e = await res.json();
@@ -145,6 +161,7 @@ export default function CryptoTraderDashboard() {
   const piOnline = status?.piOnline ?? false;
   const piLastSeen = status?.piLastSeen ?? null;
   const lastCycle = status?.lastCycle ?? null;
+  const fearGreed = status?.fearGreed ?? null;
 
   return (
     <div className="ct">
@@ -204,6 +221,27 @@ export default function CryptoTraderDashboard() {
             <div className="ct__signal-decision">{signalDecision?.replace('_', ' ')}</div>
           </div>
         )}
+        {fearGreed && (
+          <div style={{
+            padding: '0.6rem 1rem', borderRadius: '8px', textAlign: 'center',
+            background: `${FNG_COLOR(fearGreed.value)}18`,
+            border: `1px solid ${FNG_COLOR(fearGreed.value)}44`,
+          }}>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: FNG_COLOR(fearGreed.value) }}>
+              {fearGreed.value}
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Fear & Greed</span>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: FNG_COLOR(fearGreed.value) }}>
+              {fearGreed.label || FNG_LABEL(fearGreed.value)}
+            </div>
+            {fearGreed.value > 75 && (
+              <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>DCA paused</div>
+            )}
+            {fearGreed.value < 25 && (
+              <div style={{ fontSize: '0.7rem', color: '#22c55e', marginTop: '0.2rem' }}>DCA ×2 active</div>
+            )}
+          </div>
+        )}
         {status?.config?.last_dca_run && (
           <div style={{ fontSize: '0.8rem', color: '#666' }}>
             Last DCA: {new Date(status.config.last_dca_run).toLocaleDateString()}
@@ -247,6 +285,12 @@ export default function CryptoTraderDashboard() {
                   {pos.gainPct != null && progress?.next == null && (
                     <span className="ct__pos-next" style={{ color: '#22c55e' }}>All profit-take levels passed</span>
                   )}
+                  {pos.dropFromHigh != null && pos.dropFromHigh > 10 && (
+                    <span className="ct__pos-next" style={{ color: pos.dropFromHigh > 25 ? '#ef4444' : '#f59e0b' }}>
+                      ↓{pos.dropFromHigh.toFixed(1)}% from 14d high
+                      {pos.dropFromHigh > 25 ? ' ⚠️ near trailing stop' : ''}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -277,9 +321,30 @@ export default function CryptoTraderDashboard() {
         <div className="ct__toggle-row">
           <div>
             <div className="ct__toggle-label">Profit-Take</div>
-            <div className="ct__toggle-sub">Auto-sell 20% at +50%, +100%, +200%</div>
+            <div className="ct__toggle-sub">Sell 15/25/35/40% at +50/100/200/300%</div>
           </div>
           <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div>
+            <div className="ct__toggle-label">Trailing Stop</div>
+            <div className="ct__toggle-sub">Sell 40% if price drops 30% from 14-day high (while profitable)</div>
+          </div>
+          <Toggle checked={cfg.trailing_stop_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, trailing_stop_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div>
+            <div className="ct__toggle-label">Fear & Greed Gate</div>
+            <div className="ct__toggle-sub">Skip DCA on Extreme Greed (&gt;75) · Double on Extreme Fear (&lt;25)</div>
+          </div>
+          <Toggle checked={cfg.fear_greed_gate_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, fear_greed_gate_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div>
+            <div className="ct__toggle-label">Bear Market Pause</div>
+            <div className="ct__toggle-sub">Halve DCA budget if BTC is 30%+ below 90-day high</div>
+          </div>
+          <Toggle checked={cfg.bear_market_pause_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, bear_market_pause_enabled: v }))} />
         </div>
 
         <div className="ct__config-grid" style={{ marginTop: '0.75rem' }}>
