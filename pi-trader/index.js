@@ -50,7 +50,7 @@ async function runCycle(opts = {}, label = 'auto') {
     if (trades.length || result.errors?.length) {
       console.log(`[${label}] Trades executed: ${trades.length}`);
       for (const t of trades) {
-        console.log(`  ${t.side || (t.reason?.startsWith('DIP') ? 'BUY' : t.reason?.includes('PROFIT') || t.reason?.includes('SIGNAL') ? 'SELL' : 'BUY')} ${t.coin} — ${t.reason} | ${t.krwAmount ? `₩${t.krwAmount.toLocaleString()}` : `${t.soldAmount} ${t.coin}`}`);
+        console.log(`  ${t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA') ? 'BUY' : 'SELL'} ${t.coin} — ${t.reason} | ${t.krwAmount ? `₩${t.krwAmount.toLocaleString()}` : `${t.soldAmount} ${t.coin}`}`);
       }
       if (result.errors?.length) console.error(`[${label}] Errors:`, result.errors);
     } else {
@@ -58,22 +58,27 @@ async function runCycle(opts = {}, label = 'auto') {
       console.log(`[${label}] Done — ${skipMsg}`);
     }
 
-    await supabase.from('app_settings').upsert({
-      key: 'last_cycle_result',
-      value: { result, label, startedAt, completedAt: new Date().toISOString(), ok: true },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'last_cycle_result',
+        value: { result, label, startedAt, completedAt: new Date().toISOString(), ok: true },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (_) {}
 
   } catch (err) {
-    console.error(`[${label}] Error:`, err.message);
-    await supabase.from('app_settings').upsert({
-      key: 'last_cycle_result',
-      value: { error: err.message, label, startedAt, ok: false },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' }).catch(() => {});
+    console.error(`[pi-trader] Cycle error: ${err.message}`);
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'last_cycle_result',
+        value: { error: err.message, label, startedAt, ok: false },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (_) {}
+  } finally {
+    // Always release the lock, even if an error occurs mid-cycle
+    running = false;
   }
-
-  running = false;
 }
 
 async function heartbeat() {
