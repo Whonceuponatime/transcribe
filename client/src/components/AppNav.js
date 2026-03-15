@@ -31,7 +31,6 @@ const CATEGORIES = {
       { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
       { id: 'tts', label: 'Text to Speech', icon: '📖' },
       { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
-      { id: 'buy-usd', label: 'Buy USD → Crypto', icon: '💸' },
       { id: 'crypto-trader', label: 'Upbit Bot', icon: '🤖' },
     ],
   },

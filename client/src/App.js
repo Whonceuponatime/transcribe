@@ -147,8 +147,6 @@ function App() {
           <EthernetExtractor />
         ) : activeTab === 'markdown-csv' ? (
           <MarkdownCSVConverter />
-        ) : activeTab === 'buy-usd' ? (
-          <AnalyzerDashboard />
         ) : activeTab === 'crypto-trader' ? (
           <CryptoTraderDashboard />
         ) : (
