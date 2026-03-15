@@ -89,6 +89,27 @@ async function heartbeat() {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'key' });
   } catch (_) {}
+
+  // Also refresh the portfolio snapshot so the dashboard always shows live balances
+  try {
+    const upbit  = require('../lib/upbit');
+    const config = await trader.getConfig(supabase);
+    const coins  = config.coins || ['BTC', 'ETH', 'SOL'];
+
+    const [accounts, tickers] = await Promise.all([
+      upbit.getAccounts().catch(() => []),
+      upbit.getTicker(coins.map((c) => `KRW-${c}`)).catch(() => []),
+    ]);
+
+    const priceMap = {};
+    for (const t of tickers) priceMap[t.market.split('-')[1]] = t.trade_price;
+
+    // Get cached USD/KRW rate
+    const { data: fxRow } = await supabase.from('app_settings').select('value').eq('key', 'usd_krw_rate').single();
+    const usdKrw = fxRow?.value?.rate ?? null;
+
+    await trader.savePortfolioSnapshot(supabase, { accounts, priceMap, usdKrw, coins, config });
+  } catch (_) {}
 }
 
 async function pollTrigger() {

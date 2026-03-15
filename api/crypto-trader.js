@@ -70,16 +70,42 @@ module.exports = async function handler(req, res) {
         .eq('key', 'kill_switch')
         .single();
 
+      // Portfolio snapshot — saved by Pi each cycle (Pi has Upbit keys, Vercel doesn't)
+      const { data: snapshotRow } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'crypto_portfolio_snapshot')
+        .single();
+
+      const { data: fgRow } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'fear_greed')
+        .single();
+
+      const snap = snapshotRow?.value ?? {};
+
       return res.status(200).json({
         config,
-        signalScore: sigData?.score ?? null,
-        signalDecision: sigData?.decision ?? null,
-        recentTrades: recentTrades || [],
-        lastCycle: lastCycle?.value ?? null,
+        signalScore:      sigData?.score ?? null,
+        signalDecision:   sigData?.decision ?? null,
+        recentTrades:     recentTrades || [],
+        lastCycle:        lastCycle?.value ?? null,
         piOnline,
         piLastSeen,
         triggerPending,
-        killSwitch: ks?.value?.enabled ?? false,
+        killSwitch:       ks?.value?.enabled ?? false,
+        // Portfolio data from Pi snapshot
+        krwBalance:       snap.krwBalance ?? 0,
+        krwBalanceUsd:    snap.krwBalanceUsd ?? null,
+        usdKrw:           snap.usdKrw ?? null,
+        positions:        snap.positions ?? [],
+        totalValueKrw:    snap.totalValueKrw ?? null,
+        totalValueUsd:    snap.totalValueUsd ?? null,
+        effectiveDcaBudget: snap.effectiveDcaBudget ?? null,
+        effectiveDipBudget: snap.effectiveDipBudget ?? null,
+        fearGreed:        fgRow?.value ?? null,
+        snapshotAge:      snap.updatedAt ? Math.round((Date.now() - new Date(snap.updatedAt).getTime()) / 1000) : null,
       });
     }
 
@@ -106,7 +132,14 @@ module.exports = async function handler(req, res) {
     // ── POST update config ──────────────────────────────────────────────────
     if (action === 'config' && req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const allowed = ['dca_enabled', 'weekly_budget_krw', 'dip_buy_enabled', 'dip_budget_krw', 'coins', 'split', 'profit_take_enabled', 'signal_sell_enabled', 'signal_buy_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled', 'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled', 'min_signal_score'];
+      const allowed = [
+        'dca_enabled', 'weekly_budget_krw', 'dip_buy_enabled', 'dip_budget_krw',
+        'coins', 'split', 'profit_take_enabled', 'signal_sell_enabled',
+        'signal_buy_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled',
+        'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled',
+        'min_signal_score', 'capital_pct_mode', 'dca_pct_of_krw', 'dip_pct_of_krw',
+        'max_dca_krw', 'max_dip_krw',
+      ];
       const updates = {};
       for (const key of allowed) {
         if (body[key] !== undefined) updates[key] = body[key];
