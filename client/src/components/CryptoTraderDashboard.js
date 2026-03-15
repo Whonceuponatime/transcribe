@@ -52,14 +52,13 @@ export default function CryptoTraderDashboard() {
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
     dca_enabled: true,
-    weekly_budget_krw: 100000,
     profit_take_enabled: true,
     signal_boost_enabled: true,
     fear_greed_gate_enabled: true,
     trailing_stop_enabled: true,
     bear_market_pause_enabled: true,
     min_signal_score: 0,
-    capital_pct_mode: false,
+    capital_pct_mode: true,
     dca_pct_of_krw: 20,
     dip_pct_of_krw: 10,
     max_dca_krw: 0,
@@ -75,19 +74,18 @@ export default function CryptoTraderDashboard() {
         setStatus(d);
         setTriggerPending(d.triggerPending ?? false);
         setCfg({
-          dca_enabled: d.config?.dca_enabled ?? true,
-          weekly_budget_krw: d.config?.weekly_budget_krw ?? 100000,
-          profit_take_enabled: d.config?.profit_take_enabled ?? true,
-          signal_boost_enabled: d.config?.signal_boost_enabled ?? true,
-          fear_greed_gate_enabled: d.config?.fear_greed_gate_enabled ?? true,
-          trailing_stop_enabled: d.config?.trailing_stop_enabled ?? true,
-          bear_market_pause_enabled: d.config?.bear_market_pause_enabled ?? true,
-          min_signal_score: d.config?.min_signal_score ?? 0,
-          capital_pct_mode: d.config?.capital_pct_mode ?? false,
-          dca_pct_of_krw: d.config?.dca_pct_of_krw ?? 20,
-          dip_pct_of_krw: d.config?.dip_pct_of_krw ?? 10,
-          max_dca_krw: d.config?.max_dca_krw ?? 0,
-          max_dip_krw: d.config?.max_dip_krw ?? 0,
+          dca_enabled:              d.config?.dca_enabled ?? true,
+          profit_take_enabled:      d.config?.profit_take_enabled ?? true,
+          signal_boost_enabled:     d.config?.signal_boost_enabled ?? true,
+          fear_greed_gate_enabled:  d.config?.fear_greed_gate_enabled ?? true,
+          trailing_stop_enabled:    d.config?.trailing_stop_enabled ?? true,
+          bear_market_pause_enabled:d.config?.bear_market_pause_enabled ?? true,
+          min_signal_score:         d.config?.min_signal_score ?? 0,
+          capital_pct_mode:         true, // always % mode — budget = live Upbit balance
+          dca_pct_of_krw:           d.config?.dca_pct_of_krw ?? 20,
+          dip_pct_of_krw:           d.config?.dip_pct_of_krw ?? 10,
+          max_dca_krw:              d.config?.max_dca_krw ?? 0,
+          max_dip_krw:              d.config?.max_dip_krw ?? 0,
         });
       } else {
         const e = await res.json();
@@ -466,56 +464,44 @@ export default function CryptoTraderDashboard() {
           <Toggle checked={cfg.bear_market_pause_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, bear_market_pause_enabled: v }))} />
         </div>
 
-        {/* Budget mode */}
-        <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: '8px', background: cfg.capital_pct_mode ? 'rgba(34,197,94,0.05)' : '#0a0a0a', border: `1px solid ${cfg.capital_pct_mode ? '#22c55e33' : '#1a1a1a'}` }}>
-          <div className="ct__toggle-row" style={{ borderBottom: 'none', padding: 0 }}>
-            <div>
-              <div className="ct__toggle-label" style={{ color: cfg.capital_pct_mode ? '#22c55e' : '#bbb' }}>Auto-Scale Budget (% of KRW)</div>
-              <div className="ct__toggle-sub">{cfg.capital_pct_mode ? `DCA ${cfg.dca_pct_of_krw}% · Dip buys ${cfg.dip_pct_of_krw}% — scales as you deposit more` : 'Fixed amounts below'}</div>
-            </div>
-            <Toggle checked={cfg.capital_pct_mode} onChange={(v) => setCfg((c) => ({ ...c, capital_pct_mode: v }))} />
+        {/* Budget — always % of live Upbit KRW balance */}
+        <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'rgba(34,197,94,0.04)', border: '1px solid #22c55e22' }}>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <div className="ct__toggle-label" style={{ color: '#22c55e' }}>Budget — % of your Upbit KRW balance</div>
+            <div className="ct__toggle-sub">The bot automatically uses whatever KRW you have. Add more funds to Upbit and the bot scales up.</div>
           </div>
-
-          {cfg.capital_pct_mode ? (
-            <div className="ct__config-grid" style={{ marginTop: '0.65rem' }}>
-              <div className="ct__field">
-                <label>DCA % of KRW per week</label>
-                <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
-                  onChange={(e) => setCfg((c) => ({ ...c, dca_pct_of_krw: Number(e.target.value) }))} />
-                {status?.krwBalance > 0 && <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>= ₩{fmt(Math.round(status.krwBalance * cfg.dca_pct_of_krw / 100))} now</span>}
-              </div>
-              <div className="ct__field">
-                <label>Dip Buy % of KRW per signal</label>
-                <input type="number" min="1" max="100" step="1" value={cfg.dip_pct_of_krw}
-                  onChange={(e) => setCfg((c) => ({ ...c, dip_pct_of_krw: Number(e.target.value) }))} />
-                {status?.krwBalance > 0 && <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>= ₩{fmt(Math.round(status.krwBalance * cfg.dip_pct_of_krw / 100))} now</span>}
-              </div>
-              <div className="ct__field">
-                <label>Max DCA cap (₩, 0 = none)</label>
-                <input type="number" min="0" step="10000" value={cfg.max_dca_krw}
-                  onChange={(e) => setCfg((c) => ({ ...c, max_dca_krw: Number(e.target.value) }))} />
-              </div>
-              <div className="ct__field">
-                <label>Max dip-buy cap (₩, 0 = none)</label>
-                <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
-                  onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
-              </div>
+          <div className="ct__config-grid">
+            <div className="ct__field">
+              <label>DCA % per buy cycle</label>
+              <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, dca_pct_of_krw: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {status?.krwBalance > 0
+                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dca_pct_of_krw / 100))} at current balance`
+                  : 'e.g. 20% of ₩500,000 = ₩100,000'}
+              </span>
             </div>
-          ) : (
-            <div className="ct__config-grid" style={{ marginTop: '0.65rem' }}>
-              <div className="ct__field">
-                <label>Weekly DCA Budget (₩)</label>
-                <input type="number" min="5000" step="10000" value={cfg.weekly_budget_krw}
-                  onChange={(e) => setCfg((c) => ({ ...c, weekly_budget_krw: Number(e.target.value) }))} />
-              </div>
-              <div className="ct__field">
-                <label>Dip Buy Reserve (₩)</label>
-                <input type="number" min="5000" step="10000" value={cfg.dip_budget_krw ?? 100000}
-                  onChange={(e) => setCfg((c) => ({ ...c, dip_budget_krw: Number(e.target.value) }))} />
-              </div>
+            <div className="ct__field">
+              <label>Dip buy % per signal</label>
+              <input type="number" min="1" max="100" step="1" value={cfg.dip_pct_of_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, dip_pct_of_krw: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {status?.krwBalance > 0
+                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dip_pct_of_krw / 100))} at current balance`
+                  : 'e.g. 10% of ₩500,000 = ₩50,000'}
+              </span>
             </div>
-          )}
-
+            <div className="ct__field">
+              <label>Max DCA cap (₩, 0 = no cap)</label>
+              <input type="number" min="0" step="10000" value={cfg.max_dca_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, max_dca_krw: Number(e.target.value) }))} />
+            </div>
+            <div className="ct__field">
+              <label>Max dip-buy cap (₩, 0 = no cap)</label>
+              <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
+            </div>
+          </div>
           {status?.effectiveDcaBudget != null && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#555', display: 'flex', gap: '1rem' }}>
               <span>Next DCA: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDcaBudget)}</strong></span>

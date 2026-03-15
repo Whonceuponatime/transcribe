@@ -149,8 +149,6 @@ function App() {
           <MarkdownCSVConverter />
         ) : activeTab === 'buy-usd' ? (
           <AnalyzerDashboard />
-        ) : activeTab === 'live-trading' ? (
-          <LiveTradingDashboard />
         ) : activeTab === 'crypto-trader' ? (
           <CryptoTraderDashboard />
         ) : (
