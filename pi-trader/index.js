@@ -201,14 +201,16 @@ async function pollTrigger() {
 
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
-// Every 5 min — sell checks (profit-take + signal sells + trailing stop)
-cron.schedule('*/5 * * * *', () => runCycle({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
+// Every 2 min — sell checks (profit-take + signal sells + trailing stop)
+// Upbit allows ~600 market-data req/min; each cycle uses ~11 → safe headroom.
+cron.schedule('*/2 * * * *', () => runCycle({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
 
-// Every hour — dip-buy check (runs full cycle so it also catches sells)
-cron.schedule('0 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
+// Every 15 min — dip-buy check (catches oversold entries sooner than hourly)
+cron.schedule('*/15 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
 
-// Weekly DCA — Monday 01:00 UTC (10:00 KST)
-cron.schedule('0 1 * * 1', () => runCycle({ forceDca: false }, 'weekly_dca'), { timezone: 'UTC' });
+// Daily DCA check — runs every day at 01:00 UTC (10:00 KST)
+// Actual buy only happens when cooldown (dca_cooldown_days) has elapsed.
+cron.schedule('0 1 * * *', () => runCycle({ forceDca: false }, 'daily_dca'), { timezone: 'UTC' });
 
 // Poll manual trigger / kill switch / deploy every 10s
 setInterval(pollTrigger, 10_000);
@@ -221,8 +223,8 @@ heartbeat();
 // Startup check 5s after boot
 setTimeout(() => runCycle({}, 'startup'), 5000);
 
-console.log('[pi-trader] v3.0 started — signal-driven trading');
-console.log('  Sell checks : every 5 min (RSI, Bollinger, MACD, profit-take, trailing stop)');
-console.log('  Dip buys    : every hour (RSI oversold, BB lower band, MACD bull cross)');
-console.log('  Weekly DCA  : Monday 01:00 UTC (10:00 KST)');
+console.log('[pi-trader] v3.1 started — signal-driven trading');
+console.log('  Sell checks : every 2 min (RSI, Bollinger, MACD, profit-take, trailing stop)');
+console.log('  Dip buys    : every 15 min (RSI oversold, BB lower band, MACD bull cross, VWAP)');
+console.log('  DCA         : daily at 01:00 UTC / 10:00 KST (cooldown configurable)');
 console.log('  Kill switch : checked before every cycle (~10s response)');

@@ -63,6 +63,7 @@ export default function CryptoTraderDashboard() {
     min_signal_score: 0,
     capital_pct_mode: true,
     dca_pct_of_krw: 20,
+    dca_cooldown_days: 1,
     dip_pct_of_krw: 10,
     max_dca_krw: 0,
     max_dip_krw: 0,
@@ -86,6 +87,7 @@ export default function CryptoTraderDashboard() {
           min_signal_score:         d.config?.min_signal_score ?? 0,
           capital_pct_mode:         true, // always % mode — budget = live Upbit balance
           dca_pct_of_krw:           d.config?.dca_pct_of_krw ?? 20,
+          dca_cooldown_days:        d.config?.dca_cooldown_days ?? 1,
           dip_pct_of_krw:           d.config?.dip_pct_of_krw ?? 10,
           max_dca_krw:              d.config?.max_dca_krw ?? 0,
           max_dip_krw:              d.config?.max_dip_krw ?? 0,
@@ -473,7 +475,7 @@ export default function CryptoTraderDashboard() {
           <Toggle checked={cfg.signal_boost_enabled} onChange={(v) => setCfg((c) => ({ ...c, signal_boost_enabled: v }))} />
         </div>
         <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Profit-Take</div><div className="ct__toggle-sub">Sell 10/15/20/25% at +5/10/20/40% gain</div></div>
+          <div><div className="ct__toggle-label">Profit-Take</div><div className="ct__toggle-sub">Sell 10/15/20/25% at +10/20/40/80% gain (12/24/48/96h cooldown)</div></div>
           <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
         </div>
         <div className="ct__toggle-row">
@@ -504,6 +506,14 @@ export default function CryptoTraderDashboard() {
             <div className="ct__toggle-sub">The bot automatically uses whatever KRW you have. Add more funds to Upbit and the bot scales up.</div>
           </div>
           <div className="ct__config-grid">
+            <div className="ct__field">
+              <label>DCA frequency (days between buys)</label>
+              <input type="number" min="1" max="30" step="1" value={cfg.dca_cooldown_days}
+                onChange={(e) => setCfg((c) => ({ ...c, dca_cooldown_days: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)' : `Every ${cfg.dca_cooldown_days} days`}
+              </span>
+            </div>
             <div className="ct__field">
               <label>DCA % per buy cycle</label>
               <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
