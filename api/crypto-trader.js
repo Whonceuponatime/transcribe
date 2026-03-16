@@ -165,6 +165,16 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, killSwitch: enabled });
     }
 
+    // ── POST deploy — trigger git pull + PM2 restart on Pi ────────────────
+    if (action === 'deploy' && req.method === 'POST') {
+      await supabase.from('app_settings').upsert({
+        key: 'crypto_deploy_trigger',
+        value: { pending: true, requestedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      return res.status(200).json({ ok: true, message: 'Deploy triggered — Pi will git pull and restart within 10 seconds' });
+    }
+
     // ── GET bot logs ────────────────────────────────────────────────────────
     if (action === 'logs' && req.method === 'GET') {
       const limit = Math.min(Number(req.query.limit) || 100, 200);

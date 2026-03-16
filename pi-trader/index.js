@@ -74,9 +74,19 @@ async function runCycle(opts = {}, label = 'auto') {
     // ── Structured log for dashboard ──────────────────────────────────────
     if (trades.length > 0) {
       const lines = trades.map((t) => {
-        const side = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA') ? 'BUY' : 'SELL';
-        const amt  = t.krwAmount ? `₩${Math.round(t.krwAmount).toLocaleString()}` : `${t.soldAmount} ${t.coin}`;
-        return `${side} ${t.coin} ${amt} (${t.reason})`;
+        const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
+        const side  = isBuy ? 'BUY' : 'SELL';
+        let amt;
+        if (isBuy) {
+          amt = t.krwAmount ? `₩${Math.round(t.krwAmount).toLocaleString()}` : '?';
+        } else {
+          // Show coin amount AND approximate KRW value so logs are easy to read
+          const krwVal = t.grossKrw ?? (t.soldAmount && t.priceKrw ? Math.round(t.soldAmount * t.priceKrw) : null);
+          amt = krwVal
+            ? `${t.soldAmount} ${t.coin} (≈₩${krwVal.toLocaleString()})`
+            : `${t.soldAmount} ${t.coin}`;
+        }
+        return `${side} ${t.coin} ${amt} — ${t.reason ?? '?'}`;
       });
       await writeLog('info', label, lines.join(' · '), {
         tradeCount: trades.length,
@@ -147,6 +157,33 @@ async function heartbeat() {
   } catch (_) {}
 }
 
+async function pollDeploy() {
+  try {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'crypto_deploy_trigger').single();
+    if (data?.value?.pending) {
+      // Clear flag immediately so a crash doesn't loop
+      await supabase.from('app_settings').upsert({
+        key: 'crypto_deploy_trigger',
+        value: { pending: false, startedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+
+      await writeLog('info', 'deploy', 'git pull triggered — pulling latest code…');
+      console.log('[deploy] Running git pull…');
+
+      const { execSync } = require('child_process');
+      execSync('git pull', { cwd: require('path').resolve(__dirname, '..'), stdio: 'inherit' });
+
+      await writeLog('info', 'deploy', 'git pull complete — exiting so PM2 restarts with new code');
+      console.log('[deploy] git pull done — exiting for PM2 restart');
+      setTimeout(() => process.exit(0), 500); // give log write a moment
+    }
+  } catch (err) {
+    await writeLog('error', 'deploy', `Deploy failed: ${err.message}`);
+    console.error('[deploy] Error:', err.message);
+  }
+}
+
 async function pollTrigger() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'crypto_manual_trigger').single();
@@ -173,8 +210,9 @@ cron.schedule('0 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' })
 // Weekly DCA — Monday 01:00 UTC (10:00 KST)
 cron.schedule('0 1 * * 1', () => runCycle({ forceDca: false }, 'weekly_dca'), { timezone: 'UTC' });
 
-// Poll manual trigger / kill switch every 10s
+// Poll manual trigger / kill switch / deploy every 10s
 setInterval(pollTrigger, 10_000);
+setInterval(pollDeploy,  10_000);
 
 // Heartbeat every 5 min
 setInterval(heartbeat, 5 * 60_000);

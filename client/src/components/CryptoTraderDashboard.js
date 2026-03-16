@@ -175,6 +175,21 @@ export default function CryptoTraderDashboard() {
     if (next && logs.length === 0) await fetchLogs();
   }, [logsOpen, logs.length, fetchLogs]);
 
+  const [deploying, setDeploying] = useState(false);
+  const deployPi = useCallback(async () => {
+    if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
+    setDeploying(true); setError(null); setMsg(null);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=deploy`, { method: 'POST' });
+      const j = await res.json();
+      if (j.ok) {
+        setMsg('Deploy triggered — Pi is pulling code and restarting. Check logs in ~15s.');
+        setTimeout(fetchStatus, 20000); // auto-refresh after 20s
+      } else { setError(j.error); }
+    } catch (e) { setError(e.message); }
+    setDeploying(false);
+  }, [fetchStatus]);
+
   const killSwitch     = status?.killSwitch ?? false;
   const positions      = status?.positions ?? [];
   const trades         = status?.recentTrades ?? [];
@@ -536,28 +551,33 @@ export default function CryptoTraderDashboard() {
       </div>
 
       {/* ═══ PI + LAST CYCLE ═══ */}
-      {(lastCycle || !piOnline) && (
-        <div className="ct__section">
-          <h3 className="ct__section-title">Pi Trader Status</h3>
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
-            <div>
-              <div style={{ color: piOnline ? '#22c55e' : '#ef4444', fontWeight: 700, marginBottom: '0.2rem' }}>
-                {piOnline ? '● Online' : '○ Offline'}
-              </div>
-              {piLastSeen && <div className="ct__muted">Last seen {new Date(piLastSeen).toLocaleString()}</div>}
-              {!piOnline && <div style={{ color: '#f59e0b', marginTop: '0.2rem', fontSize: '0.75rem' }}>Pi must be running for trades to execute.</div>}
-            </div>
-            {lastCycle && (
-              <div>
-                <div style={{ color: lastCycle.ok ? '#22c55e' : '#ef4444', marginBottom: '0.15rem' }}>
-                  {lastCycle.ok ? '✓ Last cycle OK' : `✗ ${lastCycle.error}`}
-                </div>
-                {lastCycle.label && <div className="ct__muted">{lastCycle.label} · {lastCycle.completedAt ? new Date(lastCycle.completedAt).toLocaleString() : ''}</div>}
-              </div>
-            )}
-          </div>
+      <div className="ct__section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+          <h3 className="ct__section-title" style={{ margin: 0 }}>Pi Trader</h3>
+          <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
+            onClick={deployPi} disabled={deploying || !piOnline}
+            title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
+            {deploying ? 'Deploying…' : '↓ Pull & Restart'}
+          </button>
         </div>
-      )}
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
+          <div>
+            <div style={{ color: piOnline ? '#22c55e' : '#ef4444', fontWeight: 700, marginBottom: '0.2rem' }}>
+              {piOnline ? '● Online' : '○ Offline'}
+            </div>
+            {piLastSeen && <div className="ct__muted">Last seen {new Date(piLastSeen).toLocaleString()}</div>}
+            {!piOnline && <div style={{ color: '#f59e0b', marginTop: '0.2rem', fontSize: '0.75rem' }}>Pi must be running for trades to execute.</div>}
+          </div>
+          {lastCycle && (
+            <div>
+              <div style={{ color: lastCycle.ok ? '#22c55e' : '#ef4444', marginBottom: '0.15rem' }}>
+                {lastCycle.ok ? '✓ Last cycle OK' : `✗ ${lastCycle.error}`}
+              </div>
+              {lastCycle.label && <div className="ct__muted">{lastCycle.label} · {lastCycle.completedAt ? new Date(lastCycle.completedAt).toLocaleString() : ''}</div>}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ═══ BOT LOGS ═══ */}
       <div className="ct__section">
