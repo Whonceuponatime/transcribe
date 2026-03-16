@@ -642,10 +642,22 @@ CREATE TABLE IF NOT EXISTS crypto_profit_take_log (
 );
 CREATE INDEX IF NOT EXISTS idx_profit_take_log_coin_level ON crypto_profit_take_log(coin, level, triggered_at DESC);
 
+-- Bot log table (Pi writes cycle summaries; dashboard reads last N rows)
+CREATE TABLE IF NOT EXISTS crypto_bot_logs (
+  id         BIGSERIAL PRIMARY KEY,
+  level      TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+  tag        TEXT,
+  message    TEXT NOT NULL,
+  meta       JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON crypto_bot_logs(created_at DESC);
+
 -- RLS
 ALTER TABLE crypto_trader_config    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_trade_log        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_profit_take_log  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crypto_bot_logs         ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow all for service" ON crypto_trader_config;
 CREATE POLICY "Allow all for service" ON crypto_trader_config    FOR ALL USING (true) WITH CHECK (true);
@@ -653,6 +665,8 @@ DROP POLICY IF EXISTS "Allow all for service" ON crypto_trade_log;
 CREATE POLICY "Allow all for service" ON crypto_trade_log        FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow all for service" ON crypto_profit_take_log;
 CREATE POLICY "Allow all for service" ON crypto_profit_take_log  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON crypto_bot_logs;
+CREATE POLICY "Allow all for service" ON crypto_bot_logs         FOR ALL USING (true) WITH CHECK (true);
 
 
 

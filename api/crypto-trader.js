@@ -165,7 +165,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, killSwitch: enabled });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch' });
+    // ── GET bot logs ────────────────────────────────────────────────────────
+    if (action === 'logs' && req.method === 'GET') {
+      const limit = Math.min(Number(req.query.limit) || 100, 200);
+      const { data: logs, error: logsErr } = await supabase
+        .from('crypto_bot_logs')
+        .select('id, level, tag, message, meta, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (logsErr) return res.status(500).json({ error: logsErr.message });
+      return res.status(200).json({ logs: logs || [] });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

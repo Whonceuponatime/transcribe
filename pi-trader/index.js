@@ -23,6 +23,17 @@ for (const key of required) {
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 let running = false;
 
+/** Write one structured log row and prune entries older than 14 days. */
+async function writeLog(level, tag, message, meta = null) {
+  try {
+    await supabase.from('crypto_bot_logs').insert({ level, tag, message, meta });
+    // Prune logs older than 14 days to keep the table tidy
+    await supabase.from('crypto_bot_logs')
+      .delete()
+      .lt('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString());
+  } catch (_) {}
+}
+
 async function isKilled() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'kill_switch').single();
@@ -47,6 +58,8 @@ async function runCycle(opts = {}, label = 'auto') {
       ...(result.dipBuys || []).filter((t) => t.ok),
     ];
 
+    const completedAt = new Date().toISOString();
+
     if (trades.length || result.errors?.length) {
       console.log(`[${label}] Trades executed: ${trades.length}`);
       for (const t of trades) {
@@ -58,16 +71,38 @@ async function runCycle(opts = {}, label = 'auto') {
       console.log(`[${label}] Done — ${skipMsg}`);
     }
 
+    // ── Structured log for dashboard ──────────────────────────────────────
+    if (trades.length > 0) {
+      const lines = trades.map((t) => {
+        const side = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA') ? 'BUY' : 'SELL';
+        const amt  = t.krwAmount ? `₩${Math.round(t.krwAmount).toLocaleString()}` : `${t.soldAmount} ${t.coin}`;
+        return `${side} ${t.coin} ${amt} (${t.reason})`;
+      });
+      await writeLog('info', label, lines.join(' · '), {
+        tradeCount: trades.length,
+        trades: trades.map((t) => ({ coin: t.coin, reason: t.reason, krwAmount: t.krwAmount })),
+      });
+    } else if (result.errors?.length) {
+      await writeLog('warn', label, `Cycle finished with errors: ${result.errors.join('; ')}`);
+    } else {
+      // Only log a "nothing happened" entry every ~30 min (sell_check fires every 5 min — too noisy)
+      if (label !== 'sell_check') {
+        const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
+        await writeLog('info', label, `No trades — ${skipMsg}`);
+      }
+    }
+
     try {
       await supabase.from('app_settings').upsert({
         key: 'last_cycle_result',
-        value: { result, label, startedAt, completedAt: new Date().toISOString(), ok: true },
-        updated_at: new Date().toISOString(),
+        value: { result, label, startedAt, completedAt, ok: true },
+        updated_at: completedAt,
       }, { onConflict: 'key' });
     } catch (_) {}
 
   } catch (err) {
     console.error(`[pi-trader] Cycle error: ${err.message}`);
+    await writeLog('error', label, `Cycle error: ${err.message}`);
     try {
       await supabase.from('app_settings').upsert({
         key: 'last_cycle_result',

@@ -48,6 +48,9 @@ export default function CryptoTraderDashboard() {
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const [triggerPending, setTriggerPending] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
@@ -156,6 +159,21 @@ export default function CryptoTraderDashboard() {
       else setError(j.error);
     } catch (e) { setError(e.message); }
   }, [status, fetchStatus]);
+
+  const fetchLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=logs&limit=100`);
+      if (res.ok) { const d = await res.json(); setLogs(d.logs || []); }
+    } catch (_) {}
+    setLogsLoading(false);
+  }, []);
+
+  const toggleLogs = useCallback(async () => {
+    const next = !logsOpen;
+    setLogsOpen(next);
+    if (next && logs.length === 0) await fetchLogs();
+  }, [logsOpen, logs.length, fetchLogs]);
 
   const killSwitch     = status?.killSwitch ?? false;
   const positions      = status?.positions ?? [];
@@ -540,6 +558,39 @@ export default function CryptoTraderDashboard() {
           </div>
         </div>
       )}
+
+      {/* ═══ BOT LOGS ═══ */}
+      <div className="ct__section">
+        <div className="ct__logs-header" onClick={toggleLogs} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 className="ct__section-title" style={{ margin: 0 }}>Bot Logs</h3>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {logsOpen && (
+              <button className="ct__btn" style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem' }}
+                onClick={(e) => { e.stopPropagation(); fetchLogs(); }}>
+                {logsLoading ? '…' : 'Refresh'}
+              </button>
+            )}
+            <span style={{ color: '#555', fontSize: '0.8rem' }}>{logsOpen ? '▲ hide' : '▼ show'}</span>
+          </div>
+        </div>
+        {logsOpen && (
+          <div className="ct__logs-panel">
+            {logsLoading && <div className="ct__logs-empty">Loading…</div>}
+            {!logsLoading && logs.length === 0 && (
+              <div className="ct__logs-empty">No logs yet — the bot will write entries here after its next cycle.</div>
+            )}
+            {!logsLoading && logs.length > 0 && logs.map((log) => (
+              <div key={log.id} className={`ct__log-row ct__log-row--${log.level}`}>
+                <span className="ct__log-time">
+                  {new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                <span className="ct__log-tag">{log.tag || '—'}</span>
+                <span className="ct__log-msg">{log.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ═══ DANGER ZONE ═══ */}
       <div className="ct__section ct__danger">
