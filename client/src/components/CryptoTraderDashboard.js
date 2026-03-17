@@ -508,10 +508,13 @@ export default function CryptoTraderDashboard() {
           <div className="ct__config-grid">
             <div className="ct__field">
               <label>DCA frequency (days between buys)</label>
-              <input type="number" min="1" max="30" step="1" value={cfg.dca_cooldown_days}
+              <input type="number" min="0.25" max="30" step="0.25" value={cfg.dca_cooldown_days}
                 onChange={(e) => setCfg((c) => ({ ...c, dca_cooldown_days: Number(e.target.value) }))} />
               <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)' : `Every ${cfg.dca_cooldown_days} days`}
+                {cfg.dca_cooldown_days < 1
+                  ? `Every ${Math.round(cfg.dca_cooldown_days * 24)}h`
+                  : cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)'
+                  : `Every ${cfg.dca_cooldown_days} days`}
               </span>
             </div>
             <div className="ct__field">
