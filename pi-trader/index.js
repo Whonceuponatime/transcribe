@@ -101,7 +101,12 @@ async function runCycle(opts = {}, label = 'auto') {
         await writeLog('info', label, `No trades — ${skipMsg}`);
       } else if (sellCheckCount % 5 === 0) {
         // Log sell_check every ~10 min (every 5 cycles) so dashboard shows the bot is active
-        await writeLog('info', label, `Active — ${skipMsg}`);
+        const diagSummary = result.sellDiag?.map((d) => {
+          if (d.atProfit) return `${d.coin} ✓ profitable`;
+          const needs = d.needsPctForProfit ? `+${d.needsPctForProfit}% to sell` : 'blocked';
+          return `${d.coin} ${d.gainPct}% (needs ${needs})`;
+        }).join(' | ') || '';
+        await writeLog('info', label, `Active — ${diagSummary || skipMsg}`);
       }
     }
 
