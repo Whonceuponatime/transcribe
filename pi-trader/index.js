@@ -95,10 +95,13 @@ async function runCycle(opts = {}, label = 'auto') {
     } else if (result.errors?.length) {
       await writeLog('warn', label, `Cycle finished with errors: ${result.errors.join('; ')}`);
     } else {
-      // Only log a "nothing happened" entry every ~30 min (sell_check fires every 2 min — too noisy)
+      const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
       if (label !== 'sell_check') {
-        const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
+        // Always log dip_check / startup / manual_trigger no-trade cycles
         await writeLog('info', label, `No trades — ${skipMsg}`);
+      } else if (sellCheckCount % 5 === 0) {
+        // Log sell_check every ~10 min (every 5 cycles) so dashboard shows the bot is active
+        await writeLog('info', label, `Active — ${skipMsg}`);
       }
     }
 
@@ -222,8 +225,8 @@ async function pollTrigger() {
 // Upbit allows ~600 market-data req/min; each cycle uses ~11 → safe headroom.
 cron.schedule('*/2 * * * *', () => runCycle({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
 
-// Every 15 min — dip-buy check (catches oversold entries sooner than hourly)
-cron.schedule('*/15 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
+// Every 5 min — dip-buy check (catches oversold entries faster)
+cron.schedule('*/5 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
 
 // Daily DCA check — runs every day at 01:00 UTC (10:00 KST)
 // Actual buy only happens when cooldown (dca_cooldown_days) has elapsed.
@@ -240,8 +243,8 @@ heartbeat();
 // Startup check 5s after boot
 setTimeout(() => runCycle({}, 'startup'), 5000);
 
-console.log('[pi-trader] v3.1 started — signal-driven trading');
+console.log('[pi-trader] v3.2 started — signal-driven trading');
 console.log('  Sell checks : every 2 min (RSI, Bollinger, MACD, profit-take, trailing stop)');
-console.log('  Dip buys    : every 15 min (RSI oversold, BB lower band, MACD bull cross, VWAP)');
-console.log('  DCA         : daily at 01:00 UTC / 10:00 KST (cooldown configurable)');
+console.log('  Dip buys    : every 5 min  (RSI oversold, BB lower band, MACD bull cross, VWAP)');
+console.log('  DCA         : every 0.5d by default (configurable, checked every cycle)');
 console.log('  Kill switch : checked before every cycle (~10s response)');
