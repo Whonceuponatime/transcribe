@@ -177,6 +177,25 @@ export default function CryptoTraderDashboard() {
     if (next && logs.length === 0) await fetchLogs();
   }, [logsOpen, logs.length, fetchLogs]);
 
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLogs, setDiagLogs] = useState([]);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  const fetchDiag = useCallback(async () => {
+    setDiagLoading(true);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=diagnostics`);
+      if (res.ok) { const d = await res.json(); setDiagLogs(d.diagnostics || []); }
+    } catch (_) {}
+    setDiagLoading(false);
+  }, []);
+
+  const toggleDiag = useCallback(async () => {
+    const next = !diagOpen;
+    setDiagOpen(next);
+    if (next) await fetchDiag();
+  }, [diagOpen, fetchDiag]);
+
   const [deploying, setDeploying] = useState(false);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
@@ -621,6 +640,53 @@ export default function CryptoTraderDashboard() {
                 <span className="ct__log-msg">{log.message}</span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ SELL DIAGNOSTICS ═══ */}
+      <div className="ct__section">
+        <div className="ct__logs-header" onClick={toggleDiag} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 className="ct__section-title" style={{ margin: 0 }}>Sell Diagnostics</h3>
+            <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.2rem' }}>Per-coin sell block reasons logged every ~15 min — use this to review why sells aren't firing</div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {diagOpen && <button className="ct__btn ct__btn--sm" onClick={(e) => { e.stopPropagation(); fetchDiag(); }}>↻ Refresh</button>}
+            <span style={{ color: '#555', fontSize: '0.8rem' }}>{diagOpen ? '▲ hide' : '▼ show'}</span>
+          </div>
+        </div>
+        {diagOpen && (
+          <div className="ct__logs-panel">
+            {diagLoading && <div className="ct__logs-empty">Loading…</div>}
+            {!diagLoading && diagLogs.length === 0 && (
+              <div className="ct__logs-empty">No diagnostics yet — they appear every ~15 min once the bot is running.</div>
+            )}
+            {!diagLoading && diagLogs.length > 0 && diagLogs.map((log) => {
+              const coins = log.meta?.sellDiag || [];
+              return (
+                <div key={log.id} className="ct__log-row ct__log-row--debug" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', opacity: 0.7, fontSize: '0.72rem' }}>
+                    <span>{new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>{log.meta?.cycleLabel || log.tag}</span>
+                  </div>
+                  {coins.length > 0 ? coins.map((d) => (
+                    <div key={d.coin} style={{ paddingLeft: '0.5rem', borderLeft: `3px solid ${d.atProfit ? '#22c55e' : '#ef4444'}`, marginLeft: '0.25rem' }}>
+                      <strong style={{ color: d.atProfit ? '#22c55e' : '#f87171' }}>{d.coin}</strong>
+                      <span style={{ margin: '0 0.4rem', color: '#ccc' }}>gain {d.gainPct}% net {d.netGainPct}%</span>
+                      {d.blockedBy
+                        ? <span style={{ color: '#fbbf24' }}>⛔ {d.blockedBy}</span>
+                        : d.signalsMet?.length
+                          ? <span style={{ color: '#22c55e' }}>✓ signals: {d.signalsMet.join(', ')}</span>
+                          : <span style={{ color: '#888' }}>no signals met</span>}
+                      <span style={{ color: '#666', fontSize: '0.7rem', marginLeft: '0.5rem' }}>
+                        RSI={d.indicators?.rsi} StochRSI={d.indicators?.stochRsi} VWAP={d.indicators?.vwapDev}% WR={d.indicators?.williamsR}
+                      </span>
+                    </div>
+                  )) : <span style={{ color: '#888', fontSize: '0.8rem' }}>{log.message}</span>}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

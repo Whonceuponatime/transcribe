@@ -178,16 +178,33 @@ module.exports = async function handler(req, res) {
     // ── GET bot logs ────────────────────────────────────────────────────────
     if (action === 'logs' && req.method === 'GET') {
       const limit = Math.min(Number(req.query.limit) || 100, 200);
+      // Exclude debug/diagnostic logs from the main log panel (too noisy)
       const { data: logs, error: logsErr } = await supabase
         .from('crypto_bot_logs')
         .select('id, level, tag, message, meta, created_at')
+        .neq('level', 'debug')
         .order('created_at', { ascending: false })
         .limit(limit);
       if (logsErr) return res.status(500).json({ error: logsErr.message });
       return res.status(200).json({ logs: logs || [] });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs' });
+    // ── GET sell diagnostics (last 7 days, one entry every ~15 min) ─────────
+    if (action === 'diagnostics' && req.method === 'GET') {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: diags, error: diagErr } = await supabase
+        .from('crypto_bot_logs')
+        .select('id, tag, message, meta, created_at')
+        .eq('level', 'debug')
+        .eq('tag', 'sell_diag')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (diagErr) return res.status(500).json({ error: diagErr.message });
+      return res.status(200).json({ diagnostics: diags || [] });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs|diagnostics' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

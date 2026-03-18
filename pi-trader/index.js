@@ -22,6 +22,7 @@ for (const key of required) {
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 let running = false;
+let sellCheckCount = 0;   // track sell_check cycles for periodic diagnostic logging
 
 /** Write one structured log row and prune entries older than 14 days. */
 async function writeLog(level, tag, message, meta = null) {
@@ -80,7 +81,6 @@ async function runCycle(opts = {}, label = 'auto') {
         if (isBuy) {
           amt = t.krwAmount ? `₩${Math.round(t.krwAmount).toLocaleString()}` : '?';
         } else {
-          // Show coin amount AND approximate KRW value so logs are easy to read
           const krwVal = t.grossKrw ?? (t.soldAmount && t.priceKrw ? Math.round(t.soldAmount * t.priceKrw) : null);
           amt = krwVal
             ? `${t.soldAmount} ${t.coin} (≈₩${krwVal.toLocaleString()})`
@@ -95,11 +95,28 @@ async function runCycle(opts = {}, label = 'auto') {
     } else if (result.errors?.length) {
       await writeLog('warn', label, `Cycle finished with errors: ${result.errors.join('; ')}`);
     } else {
-      // Only log a "nothing happened" entry every ~30 min (sell_check fires every 5 min — too noisy)
+      // Only log a "nothing happened" entry every ~30 min (sell_check fires every 2 min — too noisy)
       if (label !== 'sell_check') {
         const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
         await writeLog('info', label, `No trades — ${skipMsg}`);
       }
+    }
+
+    // ── Sell diagnostics: log to DB every ~15 min (every 7 sell_checks) ──
+    if (label === 'sell_check') sellCheckCount++;
+    const isDiagCycle = label !== 'sell_check' || sellCheckCount % 7 === 0;
+    if (isDiagCycle && result.sellDiag?.length) {
+      const diagLines = result.sellDiag.map((d) => {
+        const base = `${d.coin}: gain=${d.gainPct ?? '?'}% net=${d.netGainPct ?? '?'}%`;
+        const block = d.blockedBy ? ` | BLOCKED: ${d.blockedBy}` : (d.signalsMet.length ? ` | SIGNALS: ${d.signalsMet.join(',')}` : ' | no signals');
+        const ind = ` | RSI=${d.indicators.rsi} StochRSI=${d.indicators.stochRsi} VWAP=${d.indicators.vwapDev}% WR=${d.indicators.williamsR} CCI=${d.indicators.cci}`;
+        return base + block + ind;
+      });
+      await writeLog('debug', 'sell_diag', diagLines.join('  ·  '), {
+        sellDiag: result.sellDiag,
+        skipped:  result.skipped,
+        cycleLabel: label,
+      });
     }
 
     try {

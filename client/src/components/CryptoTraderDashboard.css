@@ -209,6 +209,7 @@
 .ct__log-row--info  { color: #ccc; }
 .ct__log-row--warn  { color: #f59e0b; background: rgba(245,158,11,0.04); }
 .ct__log-row--error { color: #ef4444; background: rgba(239,68,68,0.06); }
+.ct__log-row--debug { color: #a78bfa; background: rgba(139,92,246,0.04); display: flex !important; grid-template-columns: none !important; padding: 0.55rem 0.75rem; }
 .ct__log-time { color: #444; white-space: nowrap; }
 .ct__log-tag  { color: #555; font-size: 0.68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ct__log-msg  { word-break: break-word; line-height: 1.4; }
