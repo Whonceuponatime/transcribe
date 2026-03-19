@@ -204,7 +204,75 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ diagnostics: diags || [] });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs|diagnostics' });
+    // ── GET full log export (last 7 days, all levels & tags) ───────────────
+    // Returns structured JSON you can paste into an AI for analysis and improvements.
+    if (action === 'export' && req.method === 'GET') {
+      const days  = Math.min(Number(req.query.days) || 7, 30);
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+      const [logsRes, tradesRes, snapRes, portfolioRes] = await Promise.all([
+        // All bot logs: trade, active, hourly, sell_diag, snapshot, errors
+        supabase.from('crypto_bot_logs')
+          .select('level, tag, message, meta, created_at')
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
+          .limit(2000),
+        // All trades in window
+        supabase.from('crypto_trade_log')
+          .select('*')
+          .gte('executed_at', since)
+          .order('executed_at', { ascending: false })
+          .limit(500),
+        // Latest cycle detail (indicators + portfolio)
+        supabase.from('app_settings').select('value').eq('key', 'last_cycle_detail').single(),
+        // Latest portfolio snapshot
+        supabase.from('app_settings').select('value').eq('key', 'crypto_portfolio_snapshot').single(),
+      ]);
+
+      const logs      = logsRes.data    || [];
+      const trades    = tradesRes.data  || [];
+      const lastCycle = snapRes.data?.value ?? null;
+      const portfolio = portfolioRes.data?.value ?? null;
+
+      // Compute summary stats
+      const tradeLogs   = logs.filter((l) => l.tag === 'trade');
+      const hourlyLogs  = logs.filter((l) => l.tag === 'hourly');
+      const snapshots   = logs.filter((l) => l.tag === 'snapshot');
+      const sellDiags   = logs.filter((l) => l.tag === 'sell_diag');
+      const errors      = logs.filter((l) => l.level === 'error');
+
+      const totalPnlDelta = hourlyLogs.reduce((s, l) => s + (l.meta?.pnlDelta ?? 0), 0);
+      const buyCount  = trades.filter((t) => t.side === 'buy').length;
+      const sellCount = trades.filter((t) => t.side === 'sell').length;
+
+      const summary = {
+        exportedAt:   new Date().toISOString(),
+        windowDays:   days,
+        since,
+        stats: {
+          totalTrades:    trades.length,
+          buys:           buyCount,
+          sells:          sellCount,
+          errorCount:     errors.length,
+          snapshotCount:  snapshots.length,
+          hourlyDigests:  hourlyLogs.length,
+          approxPnlDeltaKrw: Math.round(totalPnlDelta),
+        },
+        currentPortfolio: portfolio,
+        lastCycleDetail:  lastCycle,
+        recentTrades:     trades.slice(0, 50),
+        hourlyDigests:    hourlyLogs,
+        snapshots:        snapshots.slice(0, 50),
+        sellDiagnostics:  sellDiags.slice(0, 100),
+        errors,
+        allLogs:          logs.filter((l) => l.level !== 'debug').slice(0, 500),
+      };
+
+      res.setHeader('Content-Disposition', `attachment; filename="bot-logs-${days}d.json"`);
+      return res.status(200).json(summary);
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs|diagnostics|export' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

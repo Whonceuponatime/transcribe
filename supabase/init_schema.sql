@@ -650,7 +650,7 @@ CREATE INDEX IF NOT EXISTS idx_profit_take_log_coin_level ON crypto_profit_take_
 -- Bot log table (Pi writes cycle summaries; dashboard reads last N rows)
 CREATE TABLE IF NOT EXISTS crypto_bot_logs (
   id         BIGSERIAL PRIMARY KEY,
-  level      TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+  level      TEXT NOT NULL CHECK (level IN ('debug', 'info', 'warn', 'error')),
   tag        TEXT,
   message    TEXT NOT NULL,
   meta       JSONB,

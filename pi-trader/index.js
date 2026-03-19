@@ -1,12 +1,22 @@
 /**
- * Pi Trader v3 — signal-driven, trades frequently
+ * Pi Trader v4 — signal-driven, comprehensive logging
  *
  * Schedule:
- *   Every 5 min  : sell checks (profit-take, RSI, BB, MACD, trailing stop)
- *   Every hour   : dip-buy check (RSI oversold, BB lower, MACD bull cross)
- *   Every Monday : weekly DCA buy
- *   Every 10s    : manual trigger + kill switch poll
- *   Every 5 min  : heartbeat
+ *   Every 2 min  : sell checks (profit-take, RSI, BB, MACD, trailing stop)
+ *   Every 5 min  : dip-buy check
+ *   Every day    : DCA check at 01:00 UTC
+ *   Every 10s    : manual trigger + kill switch + deploy poll
+ *   Every 5 min  : heartbeat + portfolio snapshot
+ *   Every hour   : hourly performance digest log
+ *
+ * Logging tags (all written to crypto_bot_logs):
+ *   trade        — every trade executed, with full indicator context
+ *   snapshot     — full indicator + portfolio state every ~30 min
+ *   sell_diag    — per-coin sell block analysis every ~14 min
+ *   hourly       — hourly P&L summary + trade count + near-misses
+ *   active       — brief "bot is running" heartbeat every ~10 min
+ *   error        — cycle errors
+ *   deploy       — git pull events
  */
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
@@ -22,16 +32,24 @@ for (const key of required) {
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 let running = false;
-let sellCheckCount = 0;   // track sell_check cycles for periodic diagnostic logging
 
-/** Write one structured log row and prune entries older than 14 days. */
+// Cycle counters
+let sellCheckCount  = 0;  // increments every sell_check cycle
+let snapshotCount   = 0;  // increments every cycle; snapshot logged every 15
+
+// Hourly digest accumulator — reset each hour
+let hourlyTrades    = [];
+let hourlyStartKrw  = null;
+
+/** Write one structured log row. Prunes entries older than 30 days for info+, 7 days for debug. */
 async function writeLog(level, tag, message, meta = null) {
   try {
     await supabase.from('crypto_bot_logs').insert({ level, tag, message, meta });
-    // Prune logs older than 14 days to keep the table tidy
-    await supabase.from('crypto_bot_logs')
-      .delete()
-      .lt('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString());
+    // Prune: keep debug logs 7 days, others 30 days
+    const debugCutoff = new Date(Date.now() - 7  * 24 * 60 * 60 * 1000).toISOString();
+    const infoCutoff  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('crypto_bot_logs').delete().eq('level', 'debug').lt('created_at', debugCutoff);
+    await supabase.from('crypto_bot_logs').delete().neq('level', 'debug').lt('created_at', infoCutoff);
   } catch (_) {}
 }
 
@@ -42,82 +60,90 @@ async function isKilled() {
   } catch (_) { return false; }
 }
 
+/** Format a trade line for a human-readable log message. */
+function tradeLine(t) {
+  const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
+  const side  = isBuy ? 'BUY' : 'SELL';
+  if (isBuy) {
+    return `${side} ${t.coin} ₩${Math.round(t.krwAmount || 0).toLocaleString()} — ${t.reason}`;
+  }
+  const krwVal = t.grossKrw ?? (t.soldAmount && t.priceKrw ? Math.round(t.soldAmount * t.priceKrw) : null);
+  const amt = krwVal
+    ? `${(+t.soldAmount).toFixed(6)} ${t.coin} (≈₩${krwVal.toLocaleString()})`
+    : `${t.soldAmount} ${t.coin}`;
+  return `${side} ${t.coin} ${amt} — ${t.reason}`;
+}
+
 async function runCycle(opts = {}, label = 'auto') {
   if (await isKilled()) { console.log(`[${label}] Kill switch ON — skipped`); return; }
   if (running) { console.log(`[${label}] Busy — skipped`); return; }
 
   running = true;
+  snapshotCount++;
   const startedAt = new Date().toISOString();
   console.log(`\n[${label}] ── Start at ${startedAt}`);
 
   try {
     const result = await trader.executeCycle(supabase, opts);
 
-    const trades = [
-      ...(result.sells || []).filter((t) => t.ok),
-      ...(result.dca || []).filter((t) => t.ok),
-      ...(result.dipBuys || []).filter((t) => t.ok),
+    const allTrades = [
+      ...(result.sells    || []).filter((t) => t.ok),
+      ...(result.dca      || []).filter((t) => t.ok),
+      ...(result.dipBuys  || []).filter((t) => t.ok),
     ];
-
     const completedAt = new Date().toISOString();
 
-    if (trades.length || result.errors?.length) {
-      console.log(`[${label}] Trades executed: ${trades.length}`);
-      for (const t of trades) {
-        console.log(`  ${t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA') ? 'BUY' : 'SELL'} ${t.coin} — ${t.reason} | ${t.krwAmount ? `₩${t.krwAmount.toLocaleString()}` : `${t.soldAmount} ${t.coin}`}`);
-      }
-      if (result.errors?.length) console.error(`[${label}] Errors:`, result.errors);
-    } else {
-      const skipMsg = result.skipped?.join(' | ') || 'no triggers';
-      console.log(`[${label}] Done — ${skipMsg}`);
+    // ── Accumulate trades for hourly digest ─────────────────────────────────
+    hourlyTrades.push(...allTrades.map((t) => ({ ...t, cycleLabel: label, ts: completedAt })));
+
+    // ── Log every trade with full indicator context ──────────────────────────
+    for (const t of allTrades) {
+      const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
+      const indicators = result.cycleIndicators?.[t.coin] ?? null;
+      await writeLog('info', 'trade', tradeLine(t), {
+        side:       isBuy ? 'buy' : 'sell',
+        coin:       t.coin,
+        reason:     t.reason,
+        krwAmount:  t.krwAmount   ?? null,
+        soldAmount: t.soldAmount  ?? null,
+        grossKrw:   t.grossKrw    ?? null,
+        gainPct:    t.gainPct     ?? null,
+        priceKrw:   t.priceKrw    ?? null,
+        cycleLabel: label,
+        indicators,
+      });
     }
 
-    // ── Structured log for dashboard ──────────────────────────────────────
-    if (trades.length > 0) {
-      const lines = trades.map((t) => {
-        const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
-        const side  = isBuy ? 'BUY' : 'SELL';
-        let amt;
-        if (isBuy) {
-          amt = t.krwAmount ? `₩${Math.round(t.krwAmount).toLocaleString()}` : '?';
-        } else {
-          const krwVal = t.grossKrw ?? (t.soldAmount && t.priceKrw ? Math.round(t.soldAmount * t.priceKrw) : null);
-          amt = krwVal
-            ? `${t.soldAmount} ${t.coin} (≈₩${krwVal.toLocaleString()})`
-            : `${t.soldAmount} ${t.coin}`;
-        }
-        return `${side} ${t.coin} ${amt} — ${t.reason ?? '?'}`;
-      });
-      await writeLog('info', label, lines.join(' · '), {
-        tradeCount: trades.length,
-        trades: trades.map((t) => ({ coin: t.coin, reason: t.reason, krwAmount: t.krwAmount })),
-      });
-    } else if (result.errors?.length) {
-      await writeLog('warn', label, `Cycle finished with errors: ${result.errors.join('; ')}`);
-    } else {
+    // ── Log no-trade cycles ──────────────────────────────────────────────────
+    if (allTrades.length === 0) {
+      if (label === 'sell_check') sellCheckCount++;
       const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
+
       if (label !== 'sell_check') {
-        // Always log dip_check / startup / manual_trigger no-trade cycles
         await writeLog('info', label, `No trades — ${skipMsg}`);
       } else if (sellCheckCount % 5 === 0) {
-        // Log sell_check every ~10 min (every 5 cycles) so dashboard shows the bot is active
-        const diagSummary = result.sellDiag?.map((d) => {
+        // Brief "Active" log every ~10 min with sell-block summary
+        const diagSummary = (result.sellDiag || []).map((d) => {
           if (d.atProfit) return `${d.coin} ✓ profitable`;
           const needs = d.needsPctForProfit ? `+${d.needsPctForProfit}% to sell` : 'blocked';
-          return `${d.coin} ${d.gainPct}% (needs ${needs})`;
-        }).join(' | ') || '';
-        await writeLog('info', label, `Active — ${diagSummary || skipMsg}`);
+          return `${d.coin} ${d.gainPct ?? '?'}% (needs ${needs})`;
+        }).join(' | ');
+        await writeLog('info', 'active', `Sell check — ${diagSummary || skipMsg}`);
       }
+    } else {
+      const lines = allTrades.map(tradeLine).join(' · ');
+      console.log(`[${label}] ${lines}`);
+      if (result.errors?.length) console.error(`[${label}] Errors:`, result.errors);
     }
 
-    // ── Sell diagnostics: log to DB every ~15 min (every 7 sell_checks) ──
+    // ── Sell diagnostics every ~14 min (every 7 sell_check cycles) ──────────
     if (label === 'sell_check') sellCheckCount++;
     const isDiagCycle = label !== 'sell_check' || sellCheckCount % 7 === 0;
-    if (isDiagCycle && result.sellDiag?.length) {
+    if (isDiagCycle && (result.sellDiag || []).length > 0) {
       const diagLines = result.sellDiag.map((d) => {
-        const base = `${d.coin}: gain=${d.gainPct ?? '?'}% net=${d.netGainPct ?? '?'}%`;
+        const base  = `${d.coin}: gain=${d.gainPct ?? '?'}% net=${d.netGainPct ?? '?'}%`;
         const block = d.blockedBy ? ` | BLOCKED: ${d.blockedBy}` : (d.signalsMet.length ? ` | SIGNALS: ${d.signalsMet.join(',')}` : ' | no signals');
-        const ind = ` | RSI=${d.indicators.rsi} StochRSI=${d.indicators.stochRsi} VWAP=${d.indicators.vwapDev}% WR=${d.indicators.williamsR} CCI=${d.indicators.cci}`;
+        const ind   = ` | RSI=${d.indicators?.rsi} StochRSI=${d.indicators?.stochRsi} VWAP=${d.indicators?.vwapDev}% WR=${d.indicators?.williamsR} CCI=${d.indicators?.cci}`;
         return base + block + ind;
       });
       await writeLog('debug', 'sell_diag', diagLines.join('  ·  '), {
@@ -127,6 +153,29 @@ async function runCycle(opts = {}, label = 'auto') {
       });
     }
 
+    // ── Full snapshot every ~30 min (every 15 cycles across all types) ──────
+    // Snapshot captures everything needed for post-mortem analysis:
+    // indicators, portfolio, sell decisions, dip signal evaluations, skipped reasons
+    if (snapshotCount % 15 === 0) {
+      const { data: snapRow } = await supabase.from('app_settings').select('value')
+        .eq('key', 'last_cycle_detail').single().catch(() => ({ data: null }));
+      const cycleDetail = snapRow?.value ?? null;
+      if (cycleDetail) {
+        const snapMsg = [
+          `F&G=${cycleDetail.fearGreed?.value ?? '?'}`,
+          `KRW=${cycleDetail.portfolio?.krwBalance != null ? Math.round(cycleDetail.portfolio.krwBalance / 1000) + 'K' : '?'}`,
+          ...(cycleDetail.portfolio?.positions ?? []).map((p) =>
+            `${p.coin}=${p.gainPct != null ? (p.gainPct >= 0 ? '+' : '') + p.gainPct.toFixed(1) + '%' : '?'} RSI=${cycleDetail.indicators?.[p.coin]?.rsi?.toFixed(1) ?? '?'}`
+          ),
+          `sells=${allTrades.filter((t) => !t.reason?.startsWith('DIP') && !t.reason?.startsWith('DCA')).length}`,
+          `buys=${allTrades.filter((t) => t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA')).length}`,
+        ].join(' | ');
+
+        await writeLog('debug', 'snapshot', snapMsg, cycleDetail);
+      }
+    }
+
+    // ── Persist last_cycle_result for status display ─────────────────────────
     try {
       await supabase.from('app_settings').upsert({
         key: 'last_cycle_result',
@@ -135,9 +184,13 @@ async function runCycle(opts = {}, label = 'auto') {
       }, { onConflict: 'key' });
     } catch (_) {}
 
+    if (result.errors?.length) {
+      await writeLog('warn', label, `Cycle errors: ${result.errors.join('; ')}`);
+    }
+
   } catch (err) {
     console.error(`[pi-trader] Cycle error: ${err.message}`);
-    await writeLog('error', label, `Cycle error: ${err.message}`);
+    await writeLog('error', label, `Cycle error: ${err.message}`, { stack: err.stack?.slice(0, 500) });
     try {
       await supabase.from('app_settings').upsert({
         key: 'last_cycle_result',
@@ -146,8 +199,77 @@ async function runCycle(opts = {}, label = 'auto') {
       }, { onConflict: 'key' });
     } catch (_) {}
   } finally {
-    // Always release the lock, even if an error occurs mid-cycle
     running = false;
+  }
+}
+
+/**
+ * Hourly digest — fires every hour.
+ * Aggregates trades, P&L change, and near-miss signals from the last hour.
+ */
+async function hourlyDigest() {
+  try {
+    const trades = hourlyTrades.splice(0); // drain accumulator
+
+    // Current portfolio snapshot for P&L reference
+    const { data: snapRow } = await supabase.from('app_settings').select('value')
+      .eq('key', 'crypto_portfolio_snapshot').single().catch(() => ({ data: null }));
+    const snap = snapRow?.value ?? null;
+
+    const totalKrw   = snap?.totalValueKrw ?? null;
+    const krwBalance = snap?.krwBalance    ?? null;
+
+    // P&L delta since last hour
+    let pnlDelta = null;
+    if (hourlyStartKrw != null && totalKrw != null) {
+      pnlDelta = totalKrw - hourlyStartKrw;
+    }
+    hourlyStartKrw = totalKrw;
+
+    const buys  = trades.filter((t) => t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA'));
+    const sells = trades.filter((t) => !t.reason?.startsWith('DIP') && !t.reason?.startsWith('DCA'));
+
+    // Fetch recent sell_diag for near-miss info
+    const since1h = new Date(Date.now() - 3600000).toISOString();
+    const { data: diagLogs } = await supabase.from('crypto_bot_logs')
+      .select('meta').eq('tag', 'sell_diag').gte('created_at', since1h)
+      .order('created_at', { ascending: false }).limit(3)
+      .catch(() => ({ data: [] }));
+
+    const nearMisses = [];
+    for (const log of (diagLogs || [])) {
+      for (const d of (log.meta?.sellDiag || [])) {
+        if (!d.atProfit && d.gainPct != null) {
+          nearMisses.push(`${d.coin} needs +${d.needsPctForProfit ?? '?'}% more (currently ${d.gainPct}%)`);
+        }
+      }
+    }
+
+    const msgParts = [
+      `Trades: ${trades.length} (${buys.length} buys, ${sells.length} sells)`,
+      pnlDelta != null ? `P&L delta: ${pnlDelta >= 0 ? '+' : ''}₩${Math.round(pnlDelta).toLocaleString()}` : null,
+      totalKrw  != null ? `Portfolio: ₩${Math.round(totalKrw).toLocaleString()}` : null,
+      krwBalance != null ? `KRW: ₩${Math.round(krwBalance).toLocaleString()}` : null,
+      nearMisses.length ? `Near sells: ${[...new Set(nearMisses)].slice(0, 3).join(' | ')}` : null,
+    ].filter(Boolean).join(' | ');
+
+    await writeLog('info', 'hourly', msgParts, {
+      tradesThisHour: trades.length,
+      buys:  buys.length,
+      sells: sells.length,
+      pnlDelta,
+      totalKrw,
+      krwBalance,
+      tradeDetails: trades.map((t) => ({
+        coin: t.coin, side: (t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA')) ? 'buy' : 'sell',
+        reason: t.reason, krwAmount: t.krwAmount, grossKrw: t.grossKrw, gainPct: t.gainPct,
+      })),
+      nearMisses: [...new Set(nearMisses)],
+    });
+
+    console.log(`[hourly] ${msgParts}`);
+  } catch (err) {
+    console.error('[hourly] Digest error:', err.message);
   }
 }
 
@@ -155,12 +277,11 @@ async function heartbeat() {
   try {
     await supabase.from('app_settings').upsert({
       key: 'pi_heartbeat',
-      value: { lastSeen: new Date().toISOString(), version: '3.0' },
+      value: { lastSeen: new Date().toISOString(), version: '4.0' },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'key' });
   } catch (_) {}
 
-  // Also refresh the portfolio snapshot so the dashboard always shows live balances
   try {
     const upbit  = require('../lib/upbit');
     const config = await trader.getConfig(supabase);
@@ -174,7 +295,6 @@ async function heartbeat() {
     const priceMap = {};
     for (const t of tickers) priceMap[t.market.split('-')[1]] = t.trade_price;
 
-    // Get cached USD/KRW rate
     const { data: fxRow } = await supabase.from('app_settings').select('value').eq('key', 'usd_krw_rate').single();
     const usdKrw = fxRow?.value?.rate ?? null;
 
@@ -186,7 +306,6 @@ async function pollDeploy() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'crypto_deploy_trigger').single();
     if (data?.value?.pending) {
-      // Clear flag immediately so a crash doesn't loop
       await supabase.from('app_settings').upsert({
         key: 'crypto_deploy_trigger',
         value: { pending: false, startedAt: new Date().toISOString() },
@@ -201,7 +320,7 @@ async function pollDeploy() {
 
       await writeLog('info', 'deploy', 'git pull complete — exiting so PM2 restarts with new code');
       console.log('[deploy] git pull done — exiting for PM2 restart');
-      setTimeout(() => process.exit(0), 500); // give log write a moment
+      setTimeout(() => process.exit(0), 500);
     }
   } catch (err) {
     await writeLog('error', 'deploy', `Deploy failed: ${err.message}`);
@@ -226,16 +345,17 @@ async function pollTrigger() {
 
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
-// Every 2 min — sell checks (profit-take + signal sells + trailing stop)
-// Upbit allows ~600 market-data req/min; each cycle uses ~11 → safe headroom.
+// Every 2 min — sell checks
 cron.schedule('*/2 * * * *', () => runCycle({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
 
-// Every 5 min — dip-buy check (catches oversold entries faster)
+// Every 5 min — dip-buy checks
 cron.schedule('*/5 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
 
-// Daily DCA check — runs every day at 01:00 UTC (10:00 KST)
-// Actual buy only happens when cooldown (dca_cooldown_days) has elapsed.
+// Daily DCA at 01:00 UTC
 cron.schedule('0 1 * * *', () => runCycle({ forceDca: false }, 'daily_dca'), { timezone: 'UTC' });
+
+// Hourly performance digest
+cron.schedule('0 * * * *', hourlyDigest, { timezone: 'UTC' });
 
 // Poll manual trigger / kill switch / deploy every 10s
 setInterval(pollTrigger, 10_000);
@@ -245,11 +365,14 @@ setInterval(pollDeploy,  10_000);
 setInterval(heartbeat, 5 * 60_000);
 heartbeat();
 
-// Startup check 5s after boot
+// Startup
 setTimeout(() => runCycle({}, 'startup'), 5000);
 
-console.log('[pi-trader] v3.2 started — signal-driven trading');
-console.log('  Sell checks : every 2 min (RSI, Bollinger, MACD, profit-take, trailing stop)');
-console.log('  Dip buys    : every 5 min  (RSI oversold, BB lower band, MACD bull cross, VWAP)');
-console.log('  DCA         : every 0.5d by default (configurable, checked every cycle)');
-console.log('  Kill switch : checked before every cycle (~10s response)');
+console.log('[pi-trader] v4.0 started — comprehensive logging');
+console.log('  Sell checks : every 2 min');
+console.log('  Dip buys    : every 5 min');
+console.log('  DCA         : daily at 01:00 UTC (configurable cooldown)');
+console.log('  Snapshots   : every ~30 min to crypto_bot_logs');
+console.log('  Hourly      : P&L digest + near-miss summary');
+console.log('  Sell diag   : every ~14 min with block reasons');
+console.log('  Trades      : logged immediately with full indicator context');

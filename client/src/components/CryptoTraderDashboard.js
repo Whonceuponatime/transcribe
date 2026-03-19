@@ -198,6 +198,22 @@ export default function CryptoTraderDashboard() {
     if (next) await fetchDiag();
   }, [diagOpen, fetchDiag]);
 
+  const [exporting, setExporting] = useState(false);
+  const exportLogs = useCallback(async () => {
+    setExporting(true); setError(null);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=export&days=7`);
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `bot-logs-7d.json`; a.click();
+      URL.revokeObjectURL(url);
+      setMsg('Logs exported — share bot-logs-7d.json with me for analysis.');
+    } catch (e) { setError(e.message); }
+    setExporting(false);
+  }, []);
+
   const [deploying, setDeploying] = useState(false);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
@@ -598,11 +614,18 @@ export default function CryptoTraderDashboard() {
       <div className="ct__section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
           <h3 className="ct__section-title" style={{ margin: 0 }}>Pi Trader</h3>
-          <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
-            onClick={deployPi} disabled={deploying || !piOnline}
-            title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
-            {deploying ? 'Deploying…' : '↓ Pull & Restart'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
+              onClick={deployPi} disabled={deploying || !piOnline}
+              title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
+              {deploying ? 'Deploying…' : '↓ Pull & Restart'}
+            </button>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+              onClick={exportLogs} disabled={exporting}
+              title="Download last 7 days of bot logs as JSON for AI analysis">
+              {exporting ? 'Exporting…' : '⬇ Export Logs'}
+            </button>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
           <div>
