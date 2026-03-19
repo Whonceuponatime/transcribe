@@ -67,6 +67,7 @@ export default function CryptoTraderDashboard() {
     dip_pct_of_krw: 10,
     max_dca_krw: 0,
     max_dip_krw: 0,
+    stop_loss_pct: 0,
   });
 
   const fetchStatus = useCallback(async () => {
@@ -91,6 +92,7 @@ export default function CryptoTraderDashboard() {
           dip_pct_of_krw:           d.config?.dip_pct_of_krw ?? 10,
           max_dca_krw:              d.config?.max_dca_krw ?? 0,
           max_dip_krw:              d.config?.max_dip_krw ?? 0,
+          stop_loss_pct:            d.config?.stop_loss_pct ?? 0,
         });
       } else {
         const e = await res.json();
@@ -565,6 +567,16 @@ export default function CryptoTraderDashboard() {
               <label>Max dip-buy cap (₩, 0 = no cap)</label>
               <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
                 onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
+            </div>
+            <div className="ct__field" style={{ gridColumn: '1 / -1', borderTop: '1px solid #1a1a2e', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+              <label style={{ color: '#f87171' }}>⛔ Stop-Loss % (0 = disabled)</label>
+              <input type="number" min="0" max="20" step="0.5" value={cfg.stop_loss_pct}
+                onChange={(e) => setCfg((c) => ({ ...c, stop_loss_pct: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: cfg.stop_loss_pct > 0 ? '#f87171' : '#555' }}>
+                {cfg.stop_loss_pct > 0
+                  ? `Sell 50% if any position drops >${cfg.stop_loss_pct}% and held >24h`
+                  : 'Disabled — bot holds losing positions until recovery'}
+              </span>
             </div>
           </div>
           {status?.effectiveDcaBudget != null && (

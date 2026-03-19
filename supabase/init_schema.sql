@@ -599,7 +599,9 @@ CREATE TABLE IF NOT EXISTS crypto_trader_config (
   signal_boost_enabled  BOOLEAN NOT NULL DEFAULT true,
   last_dca_run          TIMESTAMPTZ,
   created_at            TIMESTAMPTZ DEFAULT now(),
-  updated_at            TIMESTAMPTZ DEFAULT now()
+  updated_at            TIMESTAMPTZ DEFAULT now(),
+  -- Stop-loss: sell 50% if position drops this % and held >24h (0 = disabled)
+  stop_loss_pct         NUMERIC(5,2) NOT NULL DEFAULT 0
 );
 
 -- Seed default config row

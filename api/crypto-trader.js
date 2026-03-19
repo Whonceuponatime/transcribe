@@ -138,7 +138,7 @@ module.exports = async function handler(req, res) {
         'signal_buy_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled',
         'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled',
         'min_signal_score', 'capital_pct_mode', 'dca_pct_of_krw', 'dip_pct_of_krw',
-        'max_dca_krw', 'max_dip_krw', 'dca_cooldown_days',
+        'max_dca_krw', 'max_dip_krw', 'dca_cooldown_days', 'stop_loss_pct',
       ];
       const updates = {};
       for (const key of allowed) {
