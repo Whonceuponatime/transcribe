@@ -157,8 +157,10 @@ async function runCycle(opts = {}, label = 'auto') {
     // Snapshot captures everything needed for post-mortem analysis:
     // indicators, portfolio, sell decisions, dip signal evaluations, skipped reasons
     if (snapshotCount % 15 === 0) {
-      const { data: snapRow } = await supabase.from('app_settings').select('value')
-        .eq('key', 'last_cycle_detail').single().catch(() => ({ data: null }));
+      const { data: snapRow } = await Promise.resolve(
+        supabase.from('app_settings').select('value')
+          .eq('key', 'last_cycle_detail').single()
+      ).catch(() => ({ data: null }));
       const cycleDetail = snapRow?.value ?? null;
       if (cycleDetail) {
         const snapMsg = [
@@ -212,8 +214,10 @@ async function hourlyDigest() {
     const trades = hourlyTrades.splice(0); // drain accumulator
 
     // Current portfolio snapshot for P&L reference
-    const { data: snapRow } = await supabase.from('app_settings').select('value')
-      .eq('key', 'crypto_portfolio_snapshot').single().catch(() => ({ data: null }));
+    const { data: snapRow } = await Promise.resolve(
+      supabase.from('app_settings').select('value')
+        .eq('key', 'crypto_portfolio_snapshot').single()
+    ).catch(() => ({ data: null }));
     const snap = snapRow?.value ?? null;
 
     const totalKrw   = snap?.totalValueKrw ?? null;
