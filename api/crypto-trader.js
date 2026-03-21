@@ -217,40 +217,47 @@ module.exports = async function handler(req, res) {
       const [
         botLogsRes, botEventsRes, tradesRes,
         reconRes, adoptionRes, positionsRes,
-        lastCycleRes, portfolioRes, freezeRes, reconStatusRes,
+        v2OrdersRes, lastCycleRes, portfolioRes,
+        freezeRes, reconStatusRes, v2ConfigRes,
       ] = await Promise.all([
-        // V1 cycle logs (all tags and levels)
+        // V1 cycle logs
         supabase.from('crypto_bot_logs')
           .select('level, tag, message, meta, created_at')
           .gte('created_at', since)
           .order('created_at', { ascending: false })
           .limit(1000),
-        // V2 structured events (all types)
+        // V2 structured events
         supabase.from('bot_events')
           .select('event_type, severity, subsystem, message, context_json, regime, mode, created_at')
           .gte('created_at', since)
           .order('created_at', { ascending: false })
           .limit(1000),
-        // V1 trade history
+        // V1 trades — these are ALWAYS live account mutations (V1 has no paper mode)
         supabase.from('crypto_trade_log')
           .select('coin, side, krw_amount, coin_amount, price_krw, reason, signal_score, executed_at')
           .gte('executed_at', since)
           .order('executed_at', { ascending: false })
           .limit(500),
-        // Reconciliation run records
+        // Reconciliation runs
         supabase.from('reconciliation_checks')
           .select('status, freeze_reasons, checks_run, trading_enabled, open_orders_found, discrepancies, run_at')
           .gte('run_at', since)
           .order('run_at', { ascending: false })
           .limit(50),
-        // Adoption run records
+        // Adoption runs
         supabase.from('adoption_runs')
           .select('status, adopted_count, skipped_count, unsupported_count, adopted_assets, unsupported_assets, error_message, run_at, completed_at')
           .order('run_at', { ascending: false })
           .limit(10),
-        // Current position state
+        // Current positions
         supabase.from('positions')
-          .select('asset, strategy_tag, state, origin, managed, supported_universe, qty_open, avg_cost_krw, operator_classified_at, operator_note, opened_at, updated_at'),
+          .select('position_id, asset, strategy_tag, state, origin, managed, supported_universe, qty_open, avg_cost_krw, operator_classified_at, operator_note, opened_at, updated_at'),
+        // V2 orders — includes engine source (always V2) and mode (paper/shadow/live)
+        supabase.from('orders')
+          .select('id, identifier, asset, side, state, reason, krw_requested, qty_requested, mode, strategy_tag, regime_at_order, retry_count, error_message, created_at, updated_at')
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
+          .limit(500),
         // Latest V1 cycle detail
         safe(supabase.from('app_settings').select('value').eq('key', 'last_cycle_detail').single()),
         // Latest V2 portfolio snapshot
@@ -259,111 +266,209 @@ module.exports = async function handler(req, res) {
         safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
         // Latest reconciliation summary
         safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
+        // V2 bot_config (for current mode)
+        safe(supabase.from('bot_config').select('mode, enabled, coins').limit(1).single()),
       ]);
 
       const botLogs      = botLogsRes.data    || [];
       const botEvents    = botEventsRes.data   || [];
-      const trades       = tradesRes.data      || [];
+      const v1Trades     = tradesRes.data      || [];
       const reconRuns    = reconRes.data        || [];
       const adoptionRuns = adoptionRes.data     || [];
       const positions    = positionsRes.data    || [];
+      const v2Orders     = v2OrdersRes.data     || [];
+      const v2CurrentMode = v2ConfigRes.data?.mode ?? 'unknown';
 
-      // ── V1 log slices by tag ──────────────────────────────────────────────
-      const v1ByTag = {};
+      // ── Index by tag / type ──────────────────────────────────────────────
+      const v1ByTag  = {};
       for (const log of botLogs) {
         if (!v1ByTag[log.tag]) v1ByTag[log.tag] = [];
         v1ByTag[log.tag].push(log);
       }
-
-      // ── V2 event slices by type ───────────────────────────────────────────
       const v2ByType = {};
       for (const ev of botEvents) {
         if (!v2ByType[ev.event_type]) v2ByType[ev.event_type] = [];
         v2ByType[ev.event_type].push(ev);
       }
 
+      // ── Order source analysis (Q1, Q2, Q3) ───────────────────────────────
+      // V1 always places live orders (crypto_trade_log). V1 has no paper mode.
+      // V2 places orders in orders table, each tagged with mode=paper/shadow/live.
+      const v1HasTrades          = v1Trades.length > 0;
+      const v2LiveOrders         = v2Orders.filter((o) => o.mode === 'live');
+      const v2PaperOrders        = v2Orders.filter((o) => o.mode === 'paper' || o.mode === 'shadow');
+      const v2HasLiveOrders      = v2LiveOrders.length > 0;
+      const v2HasAnyOrders       = v2Orders.length > 0;
+
+      // Live account mutations: V1 trades are always live. V2 live orders are live.
+      const liveMutationsDetected = v1HasTrades || v2HasLiveOrders;
+
+      // Mixed-mode risk: V1 placed live trades while V2 is in paper mode.
+      // This means live account state diverges from V2's internal position model.
+      const mixedModeRisk = v1HasTrades && v2CurrentMode === 'paper';
+
+      let orderSourceSummary;
+      if (v1HasTrades && v2HasAnyOrders) orderSourceSummary = 'both';
+      else if (v1HasTrades)              orderSourceSummary = 'V1_only';
+      else if (v2HasAnyOrders)           orderSourceSummary = 'V2_only';
+      else                               orderSourceSummary = 'neither';
+
+      // ── Audit diagnostics — explain WHY events may be empty ──────────────
+      const lastRecon    = reconRuns[0] ?? null;
+      const lastAdoption = adoptionRuns[0] ?? null;
+      const v2WasFrozenEntireWindow = (v2ByType['CYCLE_FROZEN'] || []).length > 0
+        && (v2ByType['FREEZE_STATE_CHANGED'] || []).filter((e) => e.context_json?.new_frozen === false).length === 0;
+
+      const adoptionImportCount = (v2ByType['ADOPTION_IMPORT'] || []).length
+                                + (v2ByType['ADOPTION_ALREADY_COMPLETE'] || []).length;
+
+      const auditDiagnostics = {
+        // Q4: ADOPTION_IMPORT empty
+        adoptionAuditCoverage: {
+          adoption_import_events:              (v2ByType['ADOPTION_IMPORT']           || []).length,
+          adoption_already_complete_events:    (v2ByType['ADOPTION_ALREADY_COMPLETE'] || []).length,
+          total_adoption_evidence:             adoptionImportCount,
+          adopted_positions_in_db:             positions.filter((p) => p.origin === 'adopted_at_startup').length,
+          gap_detected:                        adoptionImportCount === 0 && positions.some((p) => p.origin === 'adopted_at_startup'),
+          likely_cause:                        adoptionImportCount === 0
+            ? 'bot_events was TRUNCATED after adoption ran. ADOPTION_IMPORT events from the original run were wiped. On next restart, ADOPTION_ALREADY_COMPLETE will be emitted instead.'
+            : null,
+        },
+        // Q5: POSITION_CLASSIFIED incomplete
+        classificationAuditCoverage: {
+          position_classified_events:          (v2ByType['POSITION_CLASSIFIED'] || []).length,
+          core_positions_in_db:                positions.filter((p) => p.strategy_tag === 'core').length,
+          gap_detected:                        (v2ByType['POSITION_CLASSIFIED'] || []).length < positions.filter((p) => p.strategy_tag === 'core').length,
+          likely_cause:                        (v2ByType['POSITION_CLASSIFIED'] || []).length < positions.filter((p) => p.strategy_tag === 'core').length
+            ? 'Some classifications happened before the API .catch() bug was fixed (the 500 error meant the DB update succeeded but the bot_events insert was never reached). Future classifications will log correctly.'
+            : null,
+        },
+        // Q6: EXIT_EVALUATION / POSITION_SKIP_PROTECTED / EXECUTION empty
+        sellCycleAuditCoverage: {
+          exit_evaluation_events:              (v2ByType['EXIT_EVALUATION']            || []).length,
+          position_skip_protected_events:      (v2ByType['POSITION_SKIP_PROTECTED']    || []).length,
+          execution_events:                    (v2ByType['EXECUTION']                  || []).length,
+          cycle_frozen_events:                 (v2ByType['CYCLE_FROZEN']               || []).length,
+          v2_frozen_entire_window:             v2WasFrozenEntireWindow,
+          gap_detected:                        (v2ByType['EXIT_EVALUATION'] || []).length === 0,
+          likely_cause:                        v2WasFrozenEntireWindow
+            ? 'V2 was frozen the entire export window. executeCycleV2() returns early before reaching sell logic — EXIT_EVALUATION, POSITION_SKIP_PROTECTED, and EXECUTION are expected to be empty. See CYCLE_FROZEN events for details.'
+            : (v2ByType['EXIT_EVALUATION'] || []).length === 0
+              ? 'V2 may still be frozen or no positions reached the required profit edge. Check CYCLE_FROZEN and RECONCILIATION events.'
+              : null,
+        },
+        // Q3: Live mutations while V2 was paper
+        mixedModeAnalysis: {
+          v1_live_trades_in_window:            v1Trades.length,
+          v2_mode_at_export_time:              v2CurrentMode,
+          v2_live_orders_in_window:            v2LiveOrders.length,
+          v2_paper_orders_in_window:           v2PaperOrders.length,
+          mixed_mode_risk_explanation:         mixedModeRisk
+            ? 'V1 placed real trades on the Upbit account while V2 was in paper mode. V2 position quantities in the DB are now out of sync with the exchange. This caused the balance_mismatch reconciliation freeze.'
+            : null,
+        },
+      };
+
       // ── Summary stats ─────────────────────────────────────────────────────
-      const buyCount  = trades.filter((t) => t.side === 'buy').length;
-      const sellCount = trades.filter((t) => t.side === 'sell').length;
+      const buyCount  = v1Trades.filter((t) => t.side === 'buy').length;
+      const sellCount = v1Trades.filter((t) => t.side === 'sell').length;
       const hourlyLogs = v1ByTag['hourly'] || [];
       const totalPnlDelta = hourlyLogs.reduce((s, l) => s + (l.meta?.pnlDelta ?? 0), 0);
-      const lastRecon = reconRuns[0] ?? null;
-      const lastAdoption = adoptionRuns[0] ?? null;
 
       const summary = {
         exportedAt:  new Date().toISOString(),
         windowDays:  days,
         since,
 
-        // ── Top-level system state ──────────────────────────────────────────
+        // ── Q1, Q2, Q3, Q7: Engine source + mode + mutations ─────────────
+        orderSourceSummary,
+        liveAccountMutationsDetected: liveMutationsDetected,
+        mixedModeRisk,
+
+        // ── Current system state ──────────────────────────────────────────
         systemState: {
+          v2Mode:               v2CurrentMode,
           freezeState:          freezeRes.data?.value ?? null,
           latestReconciliation: reconStatusRes.data?.value ?? null,
           v2Portfolio:          portfolioRes.data?.value ?? null,
           v1LastCycle:          lastCycleRes.data?.value ?? null,
         },
 
-        // ── Current positions (source of truth for holdings) ───────────────
+        // ── Audit diagnostics (Q4–Q6) ─────────────────────────────────────
+        auditDiagnostics,
+
+        // ── Current positions ─────────────────────────────────────────────
         positions,
 
-        // ── Stats ──────────────────────────────────────────────────────────
+        // ── Stats ─────────────────────────────────────────────────────────
         stats: {
-          v1Trades:             trades.length,
+          v1Trades:             v1Trades.length,
           v1Buys:               buyCount,
           v1Sells:              sellCount,
-          v1ErrorLogs:          (v1ByTag['error'] || []).length,
           v1HourlyPnlDeltaKrw:  Math.round(totalPnlDelta),
+          v2OrdersTotal:        v2Orders.length,
+          v2OrdersLive:         v2LiveOrders.length,
+          v2OrdersPaper:        v2PaperOrders.length,
           v2EventCount:         botEvents.length,
           reconRuns:            reconRuns.length,
           lastReconPassed:      lastRecon?.trading_enabled ?? null,
-          lastReconFreezeCount: lastRecon?.freeze_reasons?.length ?? 0,
           adoptionRuns:         adoptionRuns.length,
           lastAdoptionStatus:   lastAdoption?.status ?? null,
           protectedPositions:   positions.filter((p) => p.origin === 'adopted_at_startup' && p.strategy_tag === 'unassigned').length,
+          corePositions:        positions.filter((p) => p.strategy_tag === 'core').length,
           managedPositions:     positions.filter((p) => p.managed).length,
         },
 
-        // ── V2 bot_events by type (decision-proof audit trail) ─────────────
+        // ── V2 bot_events by type ─────────────────────────────────────────
         v2Events: {
-          RECONCILIATION:        v2ByType['RECONCILIATION']        || [],
-          FREEZE_STATE_CHANGED:  v2ByType['FREEZE_STATE_CHANGED']  || [],
-          FREEZE_CLEARED:        v2ByType['FREEZE_CLEARED']        || [],
-          FREEZE_CLEAR_REQUESTED:v2ByType['FREEZE_CLEAR_REQUESTED']|| [],
-          REGIME_SWITCH:         v2ByType['REGIME_SWITCH']         || [],
-          ADOPTION_IMPORT:       v2ByType['ADOPTION_IMPORT']       || [],
-          ADOPTION_UNSUPPORTED:  v2ByType['ADOPTION_UNSUPPORTED']  || [],
-          POSITION_CLASSIFIED:   v2ByType['POSITION_CLASSIFIED']   || [],
+          RECONCILIATION:          v2ByType['RECONCILIATION']          || [],
+          FREEZE_STATE_CHANGED:    v2ByType['FREEZE_STATE_CHANGED']    || [],
+          FREEZE_CLEARED:          v2ByType['FREEZE_CLEARED']          || [],
+          FREEZE_CLEAR_REQUESTED:  v2ByType['FREEZE_CLEAR_REQUESTED']  || [],
+          CYCLE_FROZEN:            v2ByType['CYCLE_FROZEN']            || [],
+          REGIME_SWITCH:           v2ByType['REGIME_SWITCH']           || [],
+          ADOPTION_IMPORT:         v2ByType['ADOPTION_IMPORT']         || [],
+          ADOPTION_ALREADY_COMPLETE: v2ByType['ADOPTION_ALREADY_COMPLETE'] || [],
+          ADOPTION_UNSUPPORTED:    v2ByType['ADOPTION_UNSUPPORTED']    || [],
+          POSITION_CLASSIFIED:     v2ByType['POSITION_CLASSIFIED']     || [],
           POSITION_SKIP_PROTECTED: v2ByType['POSITION_SKIP_PROTECTED'] || [],
-          EXIT_EVALUATION:       v2ByType['EXIT_EVALUATION']       || [],
-          EXECUTION:             v2ByType['EXECUTION']             || [],
-          CYCLE_ERROR:           v2ByType['CYCLE_ERROR']           || [],
-          // Any other event types not listed above
+          EXIT_EVALUATION:         v2ByType['EXIT_EVALUATION']         || [],
+          EXECUTION:               v2ByType['EXECUTION']               || [],
+          CYCLE_ERROR:             v2ByType['CYCLE_ERROR']             || [],
           other: botEvents.filter((e) => ![
             'RECONCILIATION','FREEZE_STATE_CHANGED','FREEZE_CLEARED','FREEZE_CLEAR_REQUESTED',
-            'REGIME_SWITCH','ADOPTION_IMPORT','ADOPTION_UNSUPPORTED','POSITION_CLASSIFIED',
-            'POSITION_SKIP_PROTECTED','EXIT_EVALUATION','EXECUTION','CYCLE_ERROR','RESEARCH_INDICATORS',
+            'CYCLE_FROZEN','REGIME_SWITCH','ADOPTION_IMPORT','ADOPTION_ALREADY_COMPLETE',
+            'ADOPTION_UNSUPPORTED','POSITION_CLASSIFIED','POSITION_SKIP_PROTECTED',
+            'EXIT_EVALUATION','EXECUTION','CYCLE_ERROR','RESEARCH_INDICATORS',
           ].includes(e.event_type)),
         },
 
-        // ── Reconciliation history ─────────────────────────────────────────
+        // ── V2 orders (engine=V2, mode tagged per order) ──────────────────
+        v2Orders: {
+          all:    v2Orders,
+          live:   v2LiveOrders,
+          paper:  v2PaperOrders,
+        },
+
+        // ── Reconciliation history ────────────────────────────────────────
         reconciliationRuns: reconRuns,
 
-        // ── Adoption history ───────────────────────────────────────────────
+        // ── Adoption history ──────────────────────────────────────────────
         adoptionRuns,
 
-        // ── V1 trades ──────────────────────────────────────────────────────
-        v1Trades: trades,
+        // ── V1 trades (engine=V1, always live) ───────────────────────────
+        v1Trades,
 
-        // ── V1 logs by tag ─────────────────────────────────────────────────
+        // ── V1 logs by tag ────────────────────────────────────────────────
         v1Logs: {
-          adoption:   v1ByTag['adoption']   || [],
-          reconcile:  v1ByTag['reconcile']  || [],
-          trade:      v1ByTag['trade']      || [],
-          active:     v1ByTag['active']     || [],
-          hourly:     v1ByTag['hourly']     || [],
-          snapshot:   (v1ByTag['snapshot']  || []).slice(0, 20), // cap snapshots
-          sell_diag:  v1ByTag['sell_diag']  || [],
-          error:      v1ByTag['error']      || [],
+          adoption:  v1ByTag['adoption']  || [],
+          reconcile: v1ByTag['reconcile'] || [],
+          trade:     v1ByTag['trade']     || [],
+          active:    v1ByTag['active']    || [],
+          hourly:    v1ByTag['hourly']    || [],
+          snapshot:  (v1ByTag['snapshot'] || []).slice(0, 20),
+          sell_diag: v1ByTag['sell_diag'] || [],
+          error:     v1ByTag['error']     || [],
         },
       };
 
