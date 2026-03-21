@@ -278,25 +278,113 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ regime: data?.value ?? null });
     }
 
-    // ── GET v2 open positions (tactical sleeve with cost basis + unrealized PnL) ─
+    // ── GET v2 positions (open, adopted, partial — all managed states) ──────────
+    // Returns all active positions including adopted/unassigned ones so the
+    // dashboard can show operator-action-required warnings.
     if (action === 'positions' && req.method === 'GET') {
       const { data: positions, error: posErr } = await supabase.from('positions')
-        .select('*').eq('state', 'open').order('opened_at', { ascending: false });
+        .select('*')
+        .in('state', ['open', 'adopted', 'partial'])
+        .order('opened_at', { ascending: false });
       if (posErr) return res.status(500).json({ error: posErr.message });
 
       // Enrich with current price from latest portfolio snapshot
       const { data: snap } = await supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single().catch(() => ({ data: null }));
       const enriched = (positions || []).map((p) => {
-        const priceKey  = p.asset.toLowerCase();
-        const valueKrw  = snap?.value?.[`${priceKey}_value_krw`];
-        const navKrw    = snap?.value?.nav_krw;
-        // Approximate current price from holdings value / qty_open
-        const curPrice  = p.qty_open > 0 && valueKrw ? valueKrw / p.qty_open : null;
-        const gainPct   = curPrice && p.avg_cost_krw > 0 ? ((curPrice - p.avg_cost_krw) / p.avg_cost_krw) * 100 : null;
-        return { ...p, current_price_krw: curPrice, unrealized_pnl_pct: gainPct };
+        const priceKey = p.asset.toLowerCase();
+        const valueKrw = snap?.value?.[`${priceKey}_value_krw`];
+        const curPrice = p.qty_open > 0 && valueKrw ? valueKrw / p.qty_open : null;
+        const gainPct  = curPrice && p.avg_cost_krw > 0 ? ((curPrice - p.avg_cost_krw) / p.avg_cost_krw) * 100 : null;
+        const isProtected = p.origin === 'adopted_at_startup' && p.strategy_tag === 'unassigned';
+        return {
+          ...p,
+          current_price_krw:  curPrice,
+          unrealized_pnl_pct: gainPct,
+          is_protected:       isProtected,       // fully excluded from all exit logic
+          needs_classification: isProtected,      // operator action required
+          cost_basis_missing: !p.avg_cost_krw || Number(p.avg_cost_krw) <= 0,
+        };
       });
 
       return res.status(200).json({ positions: enriched });
+    }
+
+    // ── POST classify an adopted position ────────────────────────────────────
+    // Operator action: assign a strategy sleeve to an adopted/unassigned position.
+    //
+    // classification must be one of:
+    //   'core'      — retain as a long-term core holding; exits now apply normally
+    //   'unmanaged' — exclude from strategy; managed=false; bot never touches it
+    //
+    // tactical is intentionally not available via dashboard; the bot assigns
+    // tactical when it opens new positions through its own signal logic.
+    //
+    // avg_cost_krw (optional): set or update the cost basis for this position.
+    // This unblocks exit logic which requires a valid cost basis to compute gain%.
+    if (action === 'classify-position' && req.method === 'POST') {
+      const { position_id, classification, avg_cost_krw, operator_note } = req.body ?? {};
+
+      if (!position_id) {
+        return res.status(400).json({ error: 'position_id is required' });
+      }
+      if (!['core', 'unmanaged'].includes(classification)) {
+        return res.status(400).json({ error: 'classification must be core or unmanaged' });
+      }
+
+      // Verify position exists and is classifiable
+      const { data: pos, error: fetchErr } = await supabase.from('positions')
+        .select('position_id, asset, origin, strategy_tag, state, managed')
+        .eq('position_id', position_id).single();
+      if (fetchErr || !pos) {
+        return res.status(404).json({ error: 'Position not found' });
+      }
+
+      const patch = {
+        operator_classified_at: new Date().toISOString(),
+        operator_note:          operator_note ?? null,
+        updated_at:             new Date().toISOString(),
+      };
+
+      if (avg_cost_krw != null && Number(avg_cost_krw) > 0) {
+        patch.avg_cost_krw = Number(avg_cost_krw);
+      }
+
+      if (classification === 'core') {
+        // Promote to core sleeve — bot now manages exits on this position
+        patch.strategy_tag = 'core';
+        patch.managed      = true;
+        if (pos.state === 'adopted') patch.state = 'open'; // activate it
+      } else {
+        // Unmanaged — exclude from all strategy logic permanently
+        patch.managed      = false;
+        patch.strategy_tag = 'unassigned'; // keep tag as unassigned but managed=false blocks all logic
+        // Do NOT change state — position remains in DB for visibility
+      }
+
+      const { error: updateErr } = await supabase.from('positions')
+        .update(patch).eq('position_id', position_id);
+      if (updateErr) {
+        return res.status(500).json({ error: updateErr.message });
+      }
+
+      // Log the operator action
+      await supabase.from('bot_events').insert({
+        event_type:   'POSITION_CLASSIFIED',
+        severity:     'info',
+        subsystem:    'api',
+        message:      `Operator classified ${pos.asset} position as ${classification}${avg_cost_krw ? ` with cost basis ₩${Math.round(avg_cost_krw).toLocaleString()}` : ''}`,
+        context_json: { position_id, asset: pos.asset, classification, avg_cost_krw: patch.avg_cost_krw ?? null, operator_note },
+      }).catch(() => {});
+
+      return res.status(200).json({
+        ok:             true,
+        position_id,
+        asset:          pos.asset,
+        classification,
+        new_strategy_tag: patch.strategy_tag,
+        managed:        patch.managed,
+        avg_cost_krw:   patch.avg_cost_krw ?? null,
+      });
     }
 
     // ── GET v2 recent orders with state classification ───────────────────────
@@ -410,7 +498,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'Reconciliation triggered — Pi will run within 10s' });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

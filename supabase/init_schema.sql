@@ -729,18 +729,23 @@ CREATE TABLE IF NOT EXISTS positions (
   atr_at_entry    NUMERIC(20,4),
   spread_estimate NUMERIC(10,6),
   usd_proxy_fx    NUMERIC(12,4),
-  state                   TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial','adopted')),
-  origin                  TEXT NOT NULL DEFAULT 'bot_managed' CHECK (origin IN ('bot_managed','adopted_at_startup')),
-  managed                 BOOLEAN NOT NULL DEFAULT true,
-  supported_universe      BOOLEAN NOT NULL DEFAULT true,
+  state                   TEXT     NOT NULL DEFAULT 'open'        CHECK (state    IN ('open','closed','partial','adopted')),
+  origin                  TEXT     NOT NULL DEFAULT 'bot_managed'  CHECK (origin   IN ('bot_managed','adopted_at_startup')),
+  managed                 BOOLEAN  NOT NULL DEFAULT true,
+  supported_universe      BOOLEAN  NOT NULL DEFAULT true,
   current_mark_price      NUMERIC(20,4),
   estimated_market_value  NUMERIC(20,4),
   adoption_timestamp      TIMESTAMPTZ,
   adoption_run_id         UUID,
+  operator_classified_at  TIMESTAMPTZ,
+  operator_note           TEXT,
   opened_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at               TIMESTAMPTZ,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Consistency: adopted positions must record when they were imported
+  CONSTRAINT positions_adopted_has_timestamp
+    CHECK (origin != 'adopted_at_startup' OR adoption_timestamp IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS idx_positions_asset_state ON positions(asset, state);
 CREATE INDEX IF NOT EXISTS idx_positions_strategy    ON positions(strategy_tag, state);

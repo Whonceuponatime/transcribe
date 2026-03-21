@@ -66,6 +66,10 @@ export default function CryptoTraderDashboard() {
   const [tradingEnabled, setTradingEnabled] = useState(false);
   const [clearingFreeze, setClearingFreeze] = useState(false);
 
+  // Operator classification state
+  const [classifyingId, setClassifyingId] = useState(null);   // position_id currently being classified
+  const [classifyForm, setClassifyForm]   = useState({});     // { [position_id]: { costBasis, note } }
+
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
     dca_enabled: true,
@@ -160,6 +164,25 @@ export default function CryptoTraderDashboard() {
       if (j.ok) { setMsg('Reconciliation triggered — check logs in ~15s'); setTimeout(fetchV2Data, 15000); }
       else setError(j.error);
     } catch (e) { setError(e.message); }
+  }, [fetchV2Data]);
+
+  const classifyPosition = useCallback(async (positionId, classification, avgCostKrw, note) => {
+    setClassifyingId(positionId); setError(null); setMsg(null);
+    try {
+      const body = { position_id: positionId, classification };
+      if (avgCostKrw && Number(avgCostKrw) > 0) body.avg_cost_krw = Number(avgCostKrw);
+      if (note) body.operator_note = note;
+      const res = await fetch(`${API}/api/crypto-trader?action=classify-position`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setMsg(`${j.asset} classified as ${j.classification}${j.avg_cost_krw ? ` with cost ₩${Math.round(j.avg_cost_krw).toLocaleString()}` : ''}`);
+        setClassifyForm((f) => { const n = { ...f }; delete n[positionId]; return n; });
+        await fetchV2Data();
+      } else { setError(j.error); }
+    } catch (e) { setError(e.message); }
+    setClassifyingId(null);
   }, [fetchV2Data]);
 
   useEffect(() => {
@@ -851,6 +874,86 @@ export default function CryptoTraderDashboard() {
           </div>
         )}
       </div>
+
+      {/* ═══ OPERATOR ACTION REQUIRED ═══ */}
+      {(() => {
+        const protectedPositions = v2Positions.filter((p) => p.is_protected || p.needs_classification);
+        if (protectedPositions.length === 0) return null;
+        return (
+          <div className="ct__section" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+              <h3 className="ct__section-title" style={{ margin: 0 }}>Operator Action Required</h3>
+              <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.6rem', borderRadius: '4px' }}>
+                {protectedPositions.length} position{protectedPositions.length > 1 ? 's' : ''} need classification
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.78rem', color: '#888', marginBottom: '0.75rem' }}>
+              These holdings were imported at startup (<code style={{ color: '#a78bfa' }}>origin=adopted_at_startup</code>) and have not been classified into a strategy sleeve. The bot will not buy, sell, or apply any exit logic to them until you classify each one. Choose <strong style={{ color: '#22c55e' }}>Core</strong> to retain it as a long-term holding, or <strong style={{ color: '#ef4444' }}>Unmanaged</strong> to exclude it permanently.
+            </div>
+
+            {protectedPositions.map((p) => {
+              const formKey = p.position_id;
+              const form    = classifyForm[formKey] ?? {};
+              const busy    = classifyingId === formKey;
+              return (
+                <div key={formKey} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.6rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  {/* Position header */}
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#a78bfa', minWidth: '3rem' }}>{p.asset}</span>
+                    <span className="ct__muted">qty: {Number(p.qty_open).toFixed(6)}</span>
+                    {p.current_price_krw && <span className="ct__muted">mark: ₩{Math.round(p.current_price_krw).toLocaleString()}</span>}
+                    {p.estimated_market_value && <span className="ct__muted">≈₩{Math.round(p.estimated_market_value).toLocaleString()}</span>}
+                    {p.cost_basis_missing
+                      ? <span style={{ color: '#f87171', fontSize: '0.7rem', background: 'rgba(239,68,68,0.1)', padding: '0.1rem 0.45rem', borderRadius: '3px' }}>⚠ Cost basis missing</span>
+                      : <span className="ct__muted" style={{ fontSize: '0.75rem' }}>avg: ₩{Math.round(p.avg_cost_krw).toLocaleString()}</span>
+                    }
+                    <span style={{ fontSize: '0.68rem', color: '#f59e0b', background: 'rgba(245,158,11,0.08)', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>protected — no exits active</span>
+                  </div>
+
+                  {/* Classification inputs */}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    {p.cost_basis_missing && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <label style={{ fontSize: '0.68rem', color: '#555' }}>Cost basis ₩ (optional)</label>
+                        <input
+                          type="number" min="0" step="1000"
+                          placeholder="e.g. 108000000"
+                          value={form.costBasis ?? ''}
+                          onChange={(e) => setClassifyForm((f) => ({ ...f, [formKey]: { ...f[formKey], costBasis: e.target.value } }))}
+                          style={{ width: '120px', padding: '0.25rem 0.4rem', fontSize: '0.75rem', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '3px' }}
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <label style={{ fontSize: '0.68rem', color: '#555' }}>Note (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. pre-deploy holding"
+                        value={form.note ?? ''}
+                        onChange={(e) => setClassifyForm((f) => ({ ...f, [formKey]: { ...f[formKey], note: e.target.value } }))}
+                        style={{ width: '160px', padding: '0.25rem 0.4rem', fontSize: '0.75rem', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '3px' }}
+                      />
+                    </div>
+                    <button
+                      disabled={busy}
+                      onClick={() => classifyPosition(formKey, 'core', form.costBasis, form.note)}
+                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', cursor: 'pointer' }}>
+                      {busy ? '…' : 'Classify as Core'}
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => { if (!window.confirm(`Mark ${p.asset} as unmanaged? The bot will never trade this position.`)) return; classifyPosition(formKey, 'unmanaged', null, form.note); }}
+                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '4px', cursor: 'pointer' }}>
+                      {busy ? '…' : 'Mark Unmanaged'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ═══ V2 ENGINE STATUS ═══ */}
       <div className="ct__section">
