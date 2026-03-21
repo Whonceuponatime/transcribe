@@ -292,20 +292,82 @@ module.exports = async function handler(req, res) {
       }
 
       // ── Order source analysis (Q1, Q2, Q3) ───────────────────────────────
-      // V1 always places live orders (crypto_trade_log). V1 has no paper mode.
-      // V2 places orders in orders table, each tagged with mode=paper/shadow/live.
-      const v1HasTrades          = v1Trades.length > 0;
-      const v2LiveOrders         = v2Orders.filter((o) => o.mode === 'live');
-      const v2PaperOrders        = v2Orders.filter((o) => o.mode === 'paper' || o.mode === 'shadow');
-      const v2HasLiveOrders      = v2LiveOrders.length > 0;
-      const v2HasAnyOrders       = v2Orders.length > 0;
+      const v1HasTrades       = v1Trades.length > 0;
+      const v2LiveOrders      = v2Orders.filter((o) => o.mode === 'live');
+      const v2PaperOrders     = v2Orders.filter((o) => o.mode === 'paper' || o.mode === 'shadow');
+      const v2HasLiveOrders   = v2LiveOrders.length > 0;
+      const v2HasAnyOrders    = v2Orders.length > 0;
 
-      // Live account mutations: V1 trades are always live. V2 live orders are live.
       const liveMutationsDetected = v1HasTrades || v2HasLiveOrders;
 
-      // Mixed-mode risk: V1 placed live trades while V2 is in paper mode.
-      // This means live account state diverges from V2's internal position model.
-      const mixedModeRisk = v1HasTrades && v2CurrentMode === 'paper';
+      // ── Mode coherence analysis ───────────────────────────────────────────
+      // The top-level v2CurrentMode comes from bot_config (the DB right now).
+      // V2 events each carry the mode that was active WHEN they were written.
+      // These can differ if mode was changed between events and the export.
+      const v2EventModesInWindow = [...new Set(
+        botEvents.filter((e) => e.mode).map((e) => e.mode)
+      )];
+      const modeChangedDuringWindow = v2EventModesInWindow.length > 1
+        || (v2EventModesInWindow.length === 1 && !v2EventModesInWindow.includes(v2CurrentMode));
+
+      const modeCoherence = {
+        db_mode_at_export_time:          v2CurrentMode,
+        modes_seen_in_events_this_window: v2EventModesInWindow,
+        mode_changed_during_window:       modeChangedDuringWindow,
+        explanation: v2EventModesInWindow.length === 0
+          ? 'No V2 events with mode field in this window. Mode coherence cannot be verified from events — Pi may not have run V2 cycles yet or bot_events was recently cleared.'
+          : modeChangedDuringWindow
+            ? `DB mode is now "${v2CurrentMode}" but V2 events in this window were written with mode="${v2EventModesInWindow.join(' / ')}". Mode was changed in the DB after those events were written. Historical events reflect the correct mode at decision time.`
+            : `Mode is consistent: all V2 events and DB show mode="${v2CurrentMode}".`,
+      };
+
+      // ── Strict mixed-mode risk calculation ───────────────────────────────
+      // Mixed-mode risk = V1 placed real trades while V2 was NOT in live mode.
+      // The previous check used CURRENT db mode, which is wrong if mode changed
+      // after the V1 trades. We use the historical mode from events instead.
+      //
+      // V2 was in paper/shadow mode during this window if:
+      //   a) V2 events show mode=paper/shadow, OR
+      //   b) V2 placed no live orders (regardless of current DB mode), OR
+      //   c) Current DB mode is still paper
+      const v2WasPaperDuringWindow =
+        v2EventModesInWindow.includes('paper') ||
+        v2EventModesInWindow.includes('shadow') ||
+        (v2EventModesInWindow.length === 0 && !v2HasLiveOrders) || // no events = no evidence of live
+        (!v2HasLiveOrders && v2CurrentMode !== 'live');             // no live orders placed
+
+      const mixedModeRisk = v1HasTrades && (
+        v2CurrentMode === 'paper'           ||   // currently paper
+        v2WasPaperDuringWindow              ||   // was paper when V1 traded
+        (!v2HasAnyOrders && v2CurrentMode !== 'live')  // V2 was not operating live
+      );
+
+      // ── V1 suppression analysis ───────────────────────────────────────────
+      // V1 suppression is DB-driven (isV1Suppressed reads bot_config every cycle)
+      // and does NOT require a Pi restart. When mode=live, V1 should stop on its
+      // next cycle. V1 trades timestamped BEFORE the mode change are expected.
+      const v1ShouldBeSuppressed       = v2CurrentMode === 'live';
+      const v1SuppressionViolationRisk = v1ShouldBeSuppressed && v1HasTrades;
+      // Check if V1 trades are newer than any V2 'live' event (would indicate suppression failure)
+      const latestV2LiveEvent   = botEvents.filter((e) => e.mode === 'live').sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      const latestV1Trade       = v1Trades[0]; // already sorted desc
+      const v1TradesAfterLiveMode = latestV2LiveEvent && latestV1Trade
+        && new Date(latestV1Trade.executed_at) > new Date(latestV2LiveEvent.created_at);
+
+      const v1SuppressionAnalysis = {
+        v1_should_be_suppressed:          v1ShouldBeSuppressed,
+        v1_trades_in_window:              v1Trades.length,
+        suppression_violation_risk:       v1SuppressionViolationRisk,
+        v1_trades_after_live_mode_change: v1TradesAfterLiveMode,
+        v1_most_recent_trade_at:          latestV1Trade?.executed_at ?? null,
+        explanation: v1SuppressionViolationRisk
+          ? v1TradesAfterLiveMode
+            ? `SUPPRESSION FAILURE: V1 trades found AFTER V2 switched to live mode. V1 should be suppressed. Pi may not have read the mode change yet or isV1Suppressed() is not working.`
+            : `V1 trades found in window but they appear to predate the mode change to live. V1 suppression is likely working correctly now — trades are historical.`
+          : v1ShouldBeSuppressed
+            ? `V2 is live — V1 is suppressed. No V1 trades in window.`
+            : `V2 is in ${v2CurrentMode} mode — V1 is expected to be active alongside V2.`,
+      };
 
       let orderSourceSummary;
       if (v1HasTrades && v2HasAnyOrders) orderSourceSummary = 'both';
@@ -344,28 +406,53 @@ module.exports = async function handler(req, res) {
             : null,
         },
         // Q6: EXIT_EVALUATION / POSITION_SKIP_PROTECTED / EXECUTION empty
-        sellCycleAuditCoverage: {
-          exit_evaluation_events:              (v2ByType['EXIT_EVALUATION']            || []).length,
-          position_skip_protected_events:      (v2ByType['POSITION_SKIP_PROTECTED']    || []).length,
-          execution_events:                    (v2ByType['EXECUTION']                  || []).length,
-          cycle_frozen_events:                 (v2ByType['CYCLE_FROZEN']               || []).length,
-          v2_frozen_entire_window:             v2WasFrozenEntireWindow,
-          gap_detected:                        (v2ByType['EXIT_EVALUATION'] || []).length === 0,
-          likely_cause:                        v2WasFrozenEntireWindow
-            ? 'V2 was frozen the entire export window. executeCycleV2() returns early before reaching sell logic — EXIT_EVALUATION, POSITION_SKIP_PROTECTED, and EXECUTION are expected to be empty. See CYCLE_FROZEN events for details.'
-            : (v2ByType['EXIT_EVALUATION'] || []).length === 0
-              ? 'V2 may still be frozen or no positions reached the required profit edge. Check CYCLE_FROZEN and RECONCILIATION events.'
-              : null,
-        },
-        // Q3: Live mutations while V2 was paper
+        sellCycleAuditCoverage: (() => {
+          const exitEvalCount    = (v2ByType['EXIT_EVALUATION']         || []).length;
+          const skipProtCount    = (v2ByType['POSITION_SKIP_PROTECTED'] || []).length;
+          const executionCount   = (v2ByType['EXECUTION']               || []).length;
+          const cycleFrozenCount = (v2ByType['CYCLE_FROZEN']            || []).length;
+          const allEmpty         = exitEvalCount === 0 && executionCount === 0;
+          const hasCorePositions = positions.filter((p) => p.strategy_tag === 'core' && p.managed).length > 0;
+
+          // Decision tree for root cause
+          let likelyCause = null;
+          if (allEmpty) {
+            if (v2WasFrozenEntireWindow || cycleFrozenCount > 0) {
+              likelyCause = 'FROZEN: V2 was frozen this entire window. executeCycleV2 returns before reaching sell logic. See CYCLE_FROZEN and RECONCILIATION events. Unfreeze to restore sell-cycle logging.';
+            } else if (v2EventModesInWindow.length === 0 && !v2HasAnyOrders) {
+              likelyCause = 'OLD_CODE_OR_NOT_STARTED: No V2 events at all in window. Either the Pi has not pulled the latest code (git pull + restart required), V2 cycles have not run yet, or bot_events was recently truncated. EXIT_EVALUATION logging was added in a recent deploy.';
+            } else if (hasCorePositions) {
+              likelyCause = 'UNDERWATER_POSITIONS: Core positions exist but are below required profit edge (fees + 0.20% buffer). EXIT_EVALUATION only fires on the 30-minute rate-limit timer — this requires the Pi to run at least one cycle with the new code deployed.';
+            } else {
+              likelyCause = 'NO_MANAGED_POSITIONS: No core managed positions found. V2 sell cycle has nothing to evaluate.';
+            }
+          }
+
+          return {
+            exit_evaluation_events:         exitEvalCount,
+            position_skip_protected_events: skipProtCount,
+            execution_events:               executionCount,
+            cycle_frozen_events:            cycleFrozenCount,
+            v2_frozen_entire_window:        v2WasFrozenEntireWindow,
+            core_managed_positions:         hasCorePositions,
+            gap_detected:                   allEmpty,
+            likely_cause:                   likelyCause,
+          };
+        })(),
+        // Q3: Live mutations while V2 was paper (uses strict historical detection)
         mixedModeAnalysis: {
           v1_live_trades_in_window:            v1Trades.length,
-          v2_mode_at_export_time:              v2CurrentMode,
+          v2_mode_at_export_time_db:           v2CurrentMode,
+          v2_modes_seen_in_events:             v2EventModesInWindow,
+          v2_was_paper_during_window:          v2WasPaperDuringWindow,
           v2_live_orders_in_window:            v2LiveOrders.length,
           v2_paper_orders_in_window:           v2PaperOrders.length,
+          mixed_mode_risk:                     mixedModeRisk,
           mixed_mode_risk_explanation:         mixedModeRisk
-            ? 'V1 placed real trades on the Upbit account while V2 was in paper mode. V2 position quantities in the DB are now out of sync with the exchange. This caused the balance_mismatch reconciliation freeze.'
-            : null,
+            ? 'V1 placed real trades while V2 was not in live mode. V2 position quantities diverged from exchange. This caused balance_mismatch reconciliation freeze. Fix: sync qty_open in DB then click Reconcile.'
+            : v1HasTrades && v2CurrentMode === 'live'
+              ? 'V1 trades found but V2 is now live. Risk was present historically. Check v1SuppressionAnalysis to confirm V1 is fully suppressed going forward.'
+              : 'No mixed-mode risk detected in this window.',
         },
       };
 
@@ -504,6 +591,12 @@ module.exports = async function handler(req, res) {
         orderSourceSummary,
         liveAccountMutationsDetected: liveMutationsDetected,
         mixedModeRisk,
+
+        // ── Mode coherence (DB vs historical events) ──────────────────────
+        modeCoherence,
+
+        // ── V1 suppression analysis ───────────────────────────────────────
+        v1SuppressionAnalysis,
 
         // ── Current system state ──────────────────────────────────────────
         systemState: {
