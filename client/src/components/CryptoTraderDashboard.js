@@ -573,145 +573,6 @@ export default function CryptoTraderDashboard() {
         })}
       </div>
 
-      {/* ═══ RECENT TRADES ═══ */}
-      <div className="ct__section">
-        <h3 className="ct__section-title">Recent Trades</h3>
-        {trades.length > 0 ? (
-          <div className="ct__trades">
-            <table className="ct__table">
-              <thead>
-                <tr><th>Time</th><th>Coin</th><th>Side</th><th>KRW</th><th>Coins</th><th>Reason</th></tr>
-              </thead>
-              <tbody>
-                {trades.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ fontWeight: 700 }}>{t.coin}</td>
-                    <td className={`ct__side--${t.side}`}>{t.side === 'buy' ? '↑ BUY' : '↓ SELL'}</td>
-                    <td>{t.krw_amount ? `₩${fmt(t.krw_amount)}` : '—'}</td>
-                    <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
-                    <td><span className="ct__reason">{REASON_LABELS[t.reason] || t.reason}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="ct__empty">No trades yet — bot is watching for signals every 5 minutes.</p>
-        )}
-      </div>
-
-      {/* ═══ BOT SETTINGS ═══ */}
-      <div className="ct__section">
-        <h3 className="ct__section-title">Bot Settings</h3>
-
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">DCA Enabled</div><div className="ct__toggle-sub">Buy weekly on schedule</div></div>
-          <Toggle checked={cfg.dca_enabled} onChange={(v) => setCfg((c) => ({ ...c, dca_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Signal Boost</div><div className="ct__toggle-sub">Spend 50% extra when macro score ≥ 5</div></div>
-          <Toggle checked={cfg.signal_boost_enabled} onChange={(v) => setCfg((c) => ({ ...c, signal_boost_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Profit-Take</div><div className="ct__toggle-sub">Sell 10/15/20/25% at +10/20/40/80% gain (12/24/48/96h cooldown)</div></div>
-          <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Signal Sells</div><div className="ct__toggle-sub">RSI OB, VWAP high, Williams OB, CCI OB, Kimchi high, MACD bear…</div></div>
-          <Toggle checked={cfg.signal_sell_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, signal_sell_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Dip Buys</div><div className="ct__toggle-sub">RSI/BB/VWAP/Williams/CCI/StochRSI/ROC oversold signals — hourly</div></div>
-          <Toggle checked={cfg.dip_buy_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, dip_buy_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Trailing Stop</div><div className="ct__toggle-sub">Sell 40% if price drops 30% from 14-day high (only while profitable)</div></div>
-          <Toggle checked={cfg.trailing_stop_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, trailing_stop_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Fear & Greed Gate</div><div className="ct__toggle-sub">Skip DCA on Extreme Greed · Double on Extreme Fear</div></div>
-          <Toggle checked={cfg.fear_greed_gate_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, fear_greed_gate_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Bear Market Pause</div><div className="ct__toggle-sub">Halve budget if BTC is 30%+ below 90-day high</div></div>
-          <Toggle checked={cfg.bear_market_pause_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, bear_market_pause_enabled: v }))} />
-        </div>
-
-        {/* Budget — always % of live Upbit KRW balance */}
-        <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'rgba(34,197,94,0.04)', border: '1px solid #22c55e22' }}>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <div className="ct__toggle-label" style={{ color: '#22c55e' }}>Budget — % of your Upbit KRW balance</div>
-            <div className="ct__toggle-sub">The bot automatically uses whatever KRW you have. Add more funds to Upbit and the bot scales up.</div>
-          </div>
-          <div className="ct__config-grid">
-            <div className="ct__field">
-              <label>DCA frequency (days between buys)</label>
-              <input type="number" min="0.25" max="30" step="0.25" value={cfg.dca_cooldown_days}
-                onChange={(e) => setCfg((c) => ({ ...c, dca_cooldown_days: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {cfg.dca_cooldown_days < 1
-                  ? `Every ${Math.round(cfg.dca_cooldown_days * 24)}h`
-                  : cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)'
-                  : `Every ${cfg.dca_cooldown_days} days`}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>DCA % per buy cycle</label>
-              <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, dca_pct_of_krw: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {status?.krwBalance > 0
-                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dca_pct_of_krw / 100))} at current balance`
-                  : 'e.g. 20% of ₩500,000 = ₩100,000'}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>Dip buy % per signal</label>
-              <input type="number" min="1" max="100" step="1" value={cfg.dip_pct_of_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, dip_pct_of_krw: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {status?.krwBalance > 0
-                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dip_pct_of_krw / 100))} at current balance`
-                  : 'e.g. 10% of ₩500,000 = ₩50,000'}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>Max DCA cap (₩, 0 = no cap)</label>
-              <input type="number" min="0" step="10000" value={cfg.max_dca_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, max_dca_krw: Number(e.target.value) }))} />
-            </div>
-            <div className="ct__field">
-              <label>Max dip-buy cap (₩, 0 = no cap)</label>
-              <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
-            </div>
-            <div className="ct__field" style={{ gridColumn: '1 / -1', borderTop: '1px solid #1a1a2e', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
-              <label style={{ color: '#f87171' }}>⛔ Stop-Loss % (0 = disabled)</label>
-              <input type="number" min="0" max="20" step="0.5" value={cfg.stop_loss_pct}
-                onChange={(e) => setCfg((c) => ({ ...c, stop_loss_pct: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: cfg.stop_loss_pct > 0 ? '#f87171' : '#555' }}>
-                {cfg.stop_loss_pct > 0
-                  ? `Sell 50% if any position drops >${cfg.stop_loss_pct}% and held >24h`
-                  : 'Disabled — bot holds losing positions until recovery'}
-              </span>
-            </div>
-          </div>
-          {status?.effectiveDcaBudget != null && (
-            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#555', display: 'flex', gap: '1rem' }}>
-              <span>Next DCA: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDcaBudget)}</strong></span>
-              <span>Next dip: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDipBudget)}</strong></span>
-            </div>
-          )}
-        </div>
-
-        <div className="ct__config-footer">
-          <button className="ct__btn ct__btn--primary" onClick={saveConfig} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Settings'}
-          </button>
-        </div>
-      </div>
-
       {/* ═══ PI + LAST CYCLE ═══ */}
       <div className="ct__section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
@@ -1118,6 +979,145 @@ export default function CryptoTraderDashboard() {
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* ═══ BOT SETTINGS ═══ */}
+      <div className="ct__section">
+        <h3 className="ct__section-title">Bot Settings</h3>
+
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">DCA Enabled</div><div className="ct__toggle-sub">Buy weekly on schedule</div></div>
+          <Toggle checked={cfg.dca_enabled} onChange={(v) => setCfg((c) => ({ ...c, dca_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Signal Boost</div><div className="ct__toggle-sub">Spend 50% extra when macro score ≥ 5</div></div>
+          <Toggle checked={cfg.signal_boost_enabled} onChange={(v) => setCfg((c) => ({ ...c, signal_boost_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Profit-Take</div><div className="ct__toggle-sub">Sell 10/15/20/25% at +10/20/40/80% gain (12/24/48/96h cooldown)</div></div>
+          <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Signal Sells</div><div className="ct__toggle-sub">RSI OB, VWAP high, Williams OB, CCI OB, Kimchi high, MACD bear…</div></div>
+          <Toggle checked={cfg.signal_sell_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, signal_sell_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Dip Buys</div><div className="ct__toggle-sub">RSI/BB/VWAP/Williams/CCI/StochRSI/ROC oversold signals — hourly</div></div>
+          <Toggle checked={cfg.dip_buy_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, dip_buy_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Trailing Stop</div><div className="ct__toggle-sub">Sell 40% if price drops 30% from 14-day high (only while profitable)</div></div>
+          <Toggle checked={cfg.trailing_stop_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, trailing_stop_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Fear & Greed Gate</div><div className="ct__toggle-sub">Skip DCA on Extreme Greed · Double on Extreme Fear</div></div>
+          <Toggle checked={cfg.fear_greed_gate_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, fear_greed_gate_enabled: v }))} />
+        </div>
+        <div className="ct__toggle-row">
+          <div><div className="ct__toggle-label">Bear Market Pause</div><div className="ct__toggle-sub">Halve budget if BTC is 30%+ below 90-day high</div></div>
+          <Toggle checked={cfg.bear_market_pause_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, bear_market_pause_enabled: v }))} />
+        </div>
+
+        {/* Budget — always % of live Upbit KRW balance */}
+        <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'rgba(34,197,94,0.04)', border: '1px solid #22c55e22' }}>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <div className="ct__toggle-label" style={{ color: '#22c55e' }}>Budget — % of your Upbit KRW balance</div>
+            <div className="ct__toggle-sub">The bot automatically uses whatever KRW you have. Add more funds to Upbit and the bot scales up.</div>
+          </div>
+          <div className="ct__config-grid">
+            <div className="ct__field">
+              <label>DCA frequency (days between buys)</label>
+              <input type="number" min="0.25" max="30" step="0.25" value={cfg.dca_cooldown_days}
+                onChange={(e) => setCfg((c) => ({ ...c, dca_cooldown_days: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {cfg.dca_cooldown_days < 1
+                  ? `Every ${Math.round(cfg.dca_cooldown_days * 24)}h`
+                  : cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)'
+                  : `Every ${cfg.dca_cooldown_days} days`}
+              </span>
+            </div>
+            <div className="ct__field">
+              <label>DCA % per buy cycle</label>
+              <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, dca_pct_of_krw: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {status?.krwBalance > 0
+                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dca_pct_of_krw / 100))} at current balance`
+                  : 'e.g. 20% of ₩500,000 = ₩100,000'}
+              </span>
+            </div>
+            <div className="ct__field">
+              <label>Dip buy % per signal</label>
+              <input type="number" min="1" max="100" step="1" value={cfg.dip_pct_of_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, dip_pct_of_krw: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                {status?.krwBalance > 0
+                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dip_pct_of_krw / 100))} at current balance`
+                  : 'e.g. 10% of ₩500,000 = ₩50,000'}
+              </span>
+            </div>
+            <div className="ct__field">
+              <label>Max DCA cap (₩, 0 = no cap)</label>
+              <input type="number" min="0" step="10000" value={cfg.max_dca_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, max_dca_krw: Number(e.target.value) }))} />
+            </div>
+            <div className="ct__field">
+              <label>Max dip-buy cap (₩, 0 = no cap)</label>
+              <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
+                onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
+            </div>
+            <div className="ct__field" style={{ gridColumn: '1 / -1', borderTop: '1px solid #1a1a2e', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+              <label style={{ color: '#f87171' }}>⛔ Stop-Loss % (0 = disabled)</label>
+              <input type="number" min="0" max="20" step="0.5" value={cfg.stop_loss_pct}
+                onChange={(e) => setCfg((c) => ({ ...c, stop_loss_pct: Number(e.target.value) }))} />
+              <span style={{ fontSize: '0.7rem', color: cfg.stop_loss_pct > 0 ? '#f87171' : '#555' }}>
+                {cfg.stop_loss_pct > 0
+                  ? `Sell 50% if any position drops >${cfg.stop_loss_pct}% and held >24h`
+                  : 'Disabled — bot holds losing positions until recovery'}
+              </span>
+            </div>
+          </div>
+          {status?.effectiveDcaBudget != null && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#555', display: 'flex', gap: '1rem' }}>
+              <span>Next DCA: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDcaBudget)}</strong></span>
+              <span>Next dip: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDipBudget)}</strong></span>
+            </div>
+          )}
+        </div>
+
+        <div className="ct__config-footer">
+          <button className="ct__btn ct__btn--primary" onClick={saveConfig} disabled={saving}>
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ RECENT TRADES ═══ */}
+      <div className="ct__section">
+        <h3 className="ct__section-title">Recent Trades</h3>
+        {trades.length > 0 ? (
+          <div className="ct__trades">
+            <table className="ct__table">
+              <thead>
+                <tr><th>Time</th><th>Coin</th><th>Side</th><th>KRW</th><th>Coins</th><th>Reason</th></tr>
+              </thead>
+              <tbody>
+                {trades.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td style={{ fontWeight: 700 }}>{t.coin}</td>
+                    <td className={`ct__side--${t.side}`}>{t.side === 'buy' ? '↑ BUY' : '↓ SELL'}</td>
+                    <td>{t.krw_amount ? `₩${fmt(t.krw_amount)}` : '—'}</td>
+                    <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
+                    <td><span className="ct__reason">{REASON_LABELS[t.reason] || t.reason}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="ct__empty">No trades yet — bot is watching for signals every 5 minutes.</p>
         )}
       </div>
 
