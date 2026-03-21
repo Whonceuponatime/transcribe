@@ -729,7 +729,8 @@ CREATE TABLE IF NOT EXISTS positions (
   atr_at_entry    NUMERIC(20,4),
   spread_estimate NUMERIC(10,6),
   usd_proxy_fx    NUMERIC(12,4),
-  state           TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial')),
+  state           TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial','adopted')),
+  adoption_run_id UUID,
   opened_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at       TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -843,3 +844,25 @@ DROP POLICY IF EXISTS "Allow all for service" ON portfolio_snapshots_v2;
 CREATE POLICY "Allow all for service" ON portfolio_snapshots_v2 FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow all for service" ON bot_events;
 CREATE POLICY "Allow all for service" ON bot_events             FOR ALL USING (true) WITH CHECK (true);
+
+-- ================================================================
+-- 024_portfolio_adoption.sql
+-- ================================================================
+CREATE TABLE IF NOT EXISTS adoption_runs (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status              TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','complete','failed')),
+  adopted_count       INTEGER NOT NULL DEFAULT 0,
+  skipped_count       INTEGER NOT NULL DEFAULT 0,
+  unsupported_count   INTEGER NOT NULL DEFAULT 0,
+  unsupported_assets  JSONB,
+  adopted_assets      JSONB,
+  error_message       TEXT,
+  run_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at        TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_adoption_runs_status ON adoption_runs(status, run_at DESC);
+
+ALTER TABLE adoption_runs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for service" ON adoption_runs;
+CREATE POLICY "Allow all for service" ON adoption_runs FOR ALL USING (true) WITH CHECK (true);

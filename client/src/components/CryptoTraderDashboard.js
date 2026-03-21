@@ -59,6 +59,9 @@ export default function CryptoTraderDashboard() {
   const [v2Mode, setV2Mode]                   = useState('paper');
   const [v2SavingMode, setV2SavingMode]       = useState(false);
 
+  // Adoption state
+  const [adoption, setAdoption] = useState(null);
+
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
     dca_enabled: true,
@@ -109,17 +112,19 @@ export default function CryptoTraderDashboard() {
     setLoading(false);
   }, []);
 
-  // Fetch v2 data (regime, positions, circuit breakers, mode)
+  // Fetch v2 data (regime, positions, circuit breakers, mode, adoption)
   const fetchV2Data = useCallback(async () => {
     try {
-      const [regimeRes, posRes, cbRes] = await Promise.all([
+      const [regimeRes, posRes, cbRes, adoptionRes] = await Promise.all([
         fetch(`${API}/api/crypto-trader?action=regime`),
         fetch(`${API}/api/crypto-trader?action=positions`),
         fetch(`${API}/api/crypto-trader?action=circuit-breakers`),
+        fetch(`${API}/api/crypto-trader?action=adoption`),
       ]);
-      if (regimeRes.ok) { const d = await regimeRes.json(); setV2Regime(d.regime); }
-      if (posRes.ok)    { const d = await posRes.json();    setV2Positions(d.positions || []); }
-      if (cbRes.ok)     { const d = await cbRes.json();     setV2CircuitBreakers(d.circuitBreakers); }
+      if (regimeRes.ok)   { const d = await regimeRes.json();   setV2Regime(d.regime); }
+      if (posRes.ok)      { const d = await posRes.json();      setV2Positions(d.positions || []); }
+      if (cbRes.ok)       { const d = await cbRes.json();       setV2CircuitBreakers(d.circuitBreakers); }
+      if (adoptionRes.ok) { const d = await adoptionRes.json(); setAdoption(d.adoption); }
     } catch (_) {}
   }, []);
 
@@ -684,6 +689,71 @@ export default function CryptoTraderDashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ═══ PORTFOLIO ADOPTION ═══ */}
+      <div className="ct__section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+          <h3 className="ct__section-title" style={{ margin: 0 }}>Portfolio Adoption</h3>
+          {adoption?.complete && (
+            <span style={{ fontSize: '0.72rem', color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+              ✓ Complete
+            </span>
+          )}
+          {!adoption && (
+            <span style={{ fontSize: '0.72rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+              Pending
+            </span>
+          )}
+        </div>
+
+        {!adoption && (
+          <div style={{ fontSize: '0.82rem', color: '#888' }}>
+            Adoption runs automatically on first Pi startup. It imports your existing holdings so the bot does not force-sell them. Pull &amp; Restart the Pi to trigger it.
+          </div>
+        )}
+
+        {adoption?.complete && (
+          <div style={{ fontSize: '0.82rem' }}>
+            {/* Adopted holdings */}
+            {(adoption.adoptedAssets ?? []).length > 0 && (
+              <div style={{ marginBottom: '0.6rem' }}>
+                <div style={{ color: '#555', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Adopted Holdings (managed by bot)</div>
+                {(adoption.adoptedAssets ?? []).map((a, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, minWidth: '3rem', color: '#a78bfa' }}>{a.currency}</span>
+                    <span className="ct__muted">qty: {Number(a.qty).toFixed(6)}</span>
+                    <span className="ct__muted">avg: ₩{Math.round(a.avg_cost_krw ?? 0).toLocaleString()}</span>
+                    <span className="ct__muted">≈₩{Math.round(a.approx_value_krw ?? 0).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Unsupported holdings */}
+            {(adoption.unsupportedAssets ?? []).length > 0 && (
+              <div>
+                <div style={{ color: '#f59e0b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Unsupported Holdings (NOT managed)</div>
+                {(adoption.unsupportedAssets ?? []).map((u, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                    <span style={{ fontWeight: 700, minWidth: '3rem', color: '#f59e0b' }}>{u.currency}</span>
+                    <span className="ct__muted">qty: {Number(u.balance).toFixed(6)}</span>
+                    <span className="ct__muted">≈₩{Math.round(u.approx_value_krw ?? 0).toLocaleString()}</span>
+                    <span style={{ color: '#555', fontSize: '0.7rem' }}>— bot will not trade this asset</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(adoption.adoptedAssets ?? []).length === 0 && (adoption.unsupportedAssets ?? []).length === 0 && (
+              <div className="ct__muted">No pre-existing holdings were found at adoption time.</div>
+            )}
+
+            <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: '#555' }}>
+              Completed: {adoption.completedAt ? new Date(adoption.completedAt).toLocaleString() : '—'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ═══ V2 ENGINE STATUS ═══ */}

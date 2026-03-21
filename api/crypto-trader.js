@@ -345,7 +345,22 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, updated: patch });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers' });
+    // ── GET adoption status ──────────────────────────────────────────────────
+    if (action === 'adoption' && req.method === 'GET') {
+      const { data: statusRow } = await supabase.from('app_settings')
+        .select('value').eq('key', 'adoption_status').single().catch(() => ({ data: null }));
+
+      // Also get the most recent adoption_run row for full details
+      const { data: runRow } = await supabase.from('adoption_runs')
+        .select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null }));
+
+      return res.status(200).json({
+        adoption: statusRow?.value ?? null,
+        latestRun: runRow ?? null,
+      });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers|adoption' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

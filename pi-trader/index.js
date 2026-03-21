@@ -23,10 +23,11 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
-const trader   = require('../lib/cryptoTrader');
-const traderV2 = require('../lib/cryptoTraderV2');
-const riskEngine = require('../lib/riskEngine');
-const regimeEngine = require('../lib/regimeEngine');
+const trader      = require('../lib/cryptoTrader');
+const traderV2    = require('../lib/cryptoTraderV2');
+const riskEngine  = require('../lib/riskEngine');
+const regimeEngine= require('../lib/regimeEngine');
+const adopter     = require('../lib/portfolioAdopter');
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'UPBIT_ACCESS_KEY', 'UPBIT_SECRET_KEY'];
 for (const key of required) {
@@ -34,8 +35,9 @@ for (const key of required) {
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-let running   = false;
-let runningV2 = false;
+let running         = false;
+let runningV2       = false;
+let adoptionDone    = false; // set to true once first-deployment adoption completes
 
 // Per-coin order lock for v2 (prevents concurrent orders on same asset)
 const coinLocks = {};
@@ -364,6 +366,17 @@ async function runCycleV2(opts = {}, label = 'v2_auto') {
   if (await isKilled()) return;
   if (runningV2) { console.log(`[v2][${label}] Busy — skipped`); return; }
 
+  // Block all v2 cycles until adoption is confirmed complete.
+  // This ensures the bot never places orders before knowing what's in the account.
+  if (!adoptionDone) {
+    const done = await adopter.isAdoptionComplete(supabase).catch(() => false);
+    if (!done) {
+      console.log(`[v2][${label}] Waiting for portfolio adoption to complete — skipped`);
+      return;
+    }
+    adoptionDone = true;
+  }
+
   runningV2 = true;
   try {
     const result = await traderV2.executeCycleV2(supabase, opts);
@@ -435,6 +448,72 @@ async function reconcile(trigger = 'scheduled') {
   }
 }
 
+// ─── First-deployment portfolio adoption ─────────────────────────────────────
+
+/**
+ * Run portfolio adoption once on startup.
+ * Reads the live Upbit account, imports supported holdings as 'adopted' positions,
+ * records unsupported assets for operator awareness, and blocks v2 cycles until done.
+ *
+ * Idempotent: if a completed adoption_run already exists this is a no-op.
+ */
+async function startupAdoption() {
+  try {
+    const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
+    const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
+    const mode  = cfg.mode  ?? 'paper';
+
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log('  PORTFOLIO ADOPTION');
+    console.log(`  Coins: ${coins.join(', ')}   Mode: ${mode.toUpperCase()}`);
+    console.log(`${'═'.repeat(60)}`);
+
+    const result = await adopter.runAdoption(supabase, coins, mode);
+
+    if (result.alreadyDone) {
+      console.log('[adoption] Previously completed — skipping re-import');
+    } else if (result.error) {
+      console.error('[adoption] Failed:', result.error);
+      await writeLog('error', 'adoption', `Portfolio adoption failed: ${result.error}`);
+      // Allow cycles to proceed even if adoption fails so the bot isn't permanently blocked
+      adoptionDone = true;
+      return;
+    } else {
+      const adoptedSummary = result.adopted.map((a) =>
+        `${a.currency} qty=${a.qty} avg=₩${Math.round(a.avg_cost_krw).toLocaleString()}`
+      ).join(' | ') || '—';
+
+      const unsupportedSummary = result.unsupported.map((u) => u.currency).join(', ') || 'none';
+
+      console.log(`[adoption] Adopted: ${result.adopted.length} — ${adoptedSummary}`);
+      console.log(`[adoption] Unsupported (not managed): ${unsupportedSummary}`);
+
+      await writeLog('info', 'adoption', `Adoption complete — ${result.adopted.length} adopted, ${result.unsupported.length} unsupported`, {
+        adopted:     result.adopted,
+        unsupported: result.unsupported,
+        skipped:     result.skipped,
+        runId:       result.runId,
+        mode,
+      });
+
+      if (result.unsupported.length > 0) {
+        await writeLog('warn', 'adoption',
+          `Unsupported holdings detected (not managed): ${unsupportedSummary}. Review in dashboard.`,
+          { unsupported: result.unsupported });
+      }
+    }
+
+    adoptionDone = true;
+    console.log('[adoption] Done — v2 cycles unblocked');
+
+  } catch (err) {
+    console.error('[adoption] Unexpected error:', err.message);
+    await writeLog('error', 'adoption', `Adoption unexpected error: ${err.message}`);
+    // Unblock anyway to prevent permanent freeze
+    adoptionDone = true;
+  }
+}
+
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
 // Every 2 min — sell checks
@@ -465,10 +544,15 @@ cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC
 // Reconciliation every 4h
 cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
 
-// Startup
+// Startup sequence:
+//   1. v1 starts immediately (continues trading live)
+//   2. adoption runs and imports pre-existing holdings
+//   3. v2 starts after adoption (blocked by adoptionDone flag until then)
+//   4. reconciliation runs after v2 starts
 setTimeout(() => runCycle({}, 'startup'), 5000);
-setTimeout(() => runCycleV2({}, 'startup'), 8000);   // v2 starts 3s after v1
-setTimeout(() => reconcile('startup'), 12000);        // reconcile on boot
+// Adoption runs 3s after v1 boot; v2 is blocked until adoption completes
+setTimeout(() => startupAdoption().then(() => runCycleV2({}, 'startup')), 8000);
+setTimeout(() => reconcile('startup'), 20000);
 
 // Load risk engine state from DB
 riskEngine.loadState(supabase).catch(() => {});
