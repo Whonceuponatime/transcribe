@@ -345,22 +345,54 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, updated: patch });
     }
 
-    // ── GET adoption status ──────────────────────────────────────────────────
+    // ── GET adoption + reconciliation status ─────────────────────────────────
     if (action === 'adoption' && req.method === 'GET') {
-      const { data: statusRow } = await supabase.from('app_settings')
-        .select('value').eq('key', 'adoption_status').single().catch(() => ({ data: null }));
-
-      // Also get the most recent adoption_run row for full details
-      const { data: runRow } = await supabase.from('adoption_runs')
-        .select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null }));
+      const [adoptionRow, reconRow, freezeRow, latestRunRow, latestReconRow] = await Promise.all([
+        supabase.from('app_settings').select('value').eq('key', 'adoption_status').single().catch(() => ({ data: null })),
+        supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single().catch(() => ({ data: null })),
+        supabase.from('app_settings').select('value').eq('key', 'system_freeze').single().catch(() => ({ data: null })),
+        supabase.from('adoption_runs').select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null })),
+        supabase.from('reconciliation_checks').select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null })),
+      ]);
 
       return res.status(200).json({
-        adoption: statusRow?.value ?? null,
-        latestRun: runRow ?? null,
+        adoption:            adoptionRow.data?.value   ?? null,
+        latestRun:           latestRunRow.data         ?? null,
+        reconciliation:      reconRow.data?.value      ?? null,
+        latestReconciliation: latestReconRow.data      ?? null,
+        systemFreeze:        freezeRow.data?.value     ?? null,
+        tradingEnabled:      !(freezeRow.data?.value?.frozen ?? true),
       });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers|adoption' });
+    // ── POST manual clear freeze ──────────────────────────────────────────────
+    if (action === 'clear-freeze' && req.method === 'POST') {
+      const note = req.body?.note ?? 'operator_manual_clear';
+      // Persist the clear — the Pi process will pick it up on next reconciliation read
+      await supabase.from('app_settings').upsert({
+        key:   'system_freeze',
+        value: { frozen: false, reasons: [], updatedAt: new Date().toISOString(), clearedBy: note },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      await supabase.from('bot_events').insert({
+        event_type: 'FREEZE_CLEARED', severity: 'warn', subsystem: 'api',
+        message: `Freeze manually cleared via dashboard: ${note}`,
+      }).catch(() => {});
+      return res.status(200).json({ ok: true, message: 'Freeze cleared. Reconciliation will run on next startup or manual trigger.' });
+    }
+
+    // ── POST run reconciliation now ────────────────────────────────────────────
+    if (action === 'reconcile' && req.method === 'POST') {
+      // Schedule reconciliation by setting a flag — Pi picks it up within 10s
+      await supabase.from('app_settings').upsert({
+        key:        'reconcile_trigger',
+        value:      { pending: true, requestedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      return res.status(200).json({ ok: true, message: 'Reconciliation triggered — Pi will run within 10s' });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

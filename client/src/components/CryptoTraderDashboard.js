@@ -59,8 +59,12 @@ export default function CryptoTraderDashboard() {
   const [v2Mode, setV2Mode]                   = useState('paper');
   const [v2SavingMode, setV2SavingMode]       = useState(false);
 
-  // Adoption state
-  const [adoption, setAdoption] = useState(null);
+  // Adoption + reconciliation state
+  const [adoption, setAdoption]           = useState(null);
+  const [systemFreeze, setSystemFreeze]   = useState(null);
+  const [reconStatus, setReconStatus]     = useState(null);
+  const [tradingEnabled, setTradingEnabled] = useState(false);
+  const [clearingFreeze, setClearingFreeze] = useState(false);
 
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
@@ -124,9 +128,39 @@ export default function CryptoTraderDashboard() {
       if (regimeRes.ok)   { const d = await regimeRes.json();   setV2Regime(d.regime); }
       if (posRes.ok)      { const d = await posRes.json();      setV2Positions(d.positions || []); }
       if (cbRes.ok)       { const d = await cbRes.json();       setV2CircuitBreakers(d.circuitBreakers); }
-      if (adoptionRes.ok) { const d = await adoptionRes.json(); setAdoption(d.adoption); }
+      if (adoptionRes.ok) {
+        const d = await adoptionRes.json();
+        setAdoption(d.adoption);
+        setSystemFreeze(d.systemFreeze);
+        setReconStatus(d.reconciliation);
+        setTradingEnabled(d.tradingEnabled ?? false);
+      }
     } catch (_) {}
   }, []);
+
+  const clearFreeze = useCallback(async () => {
+    if (!window.confirm('Manually clear the system freeze? Only do this after verifying that the account state is correct.')) return;
+    setClearingFreeze(true);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=clear-freeze`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: 'dashboard_manual_clear' }),
+      });
+      const j = await res.json();
+      if (j.ok) { setMsg('Freeze cleared. Reconciliation will verify on next cycle.'); await fetchV2Data(); }
+      else setError(j.error);
+    } catch (e) { setError(e.message); }
+    setClearingFreeze(false);
+  }, [fetchV2Data]);
+
+  const triggerReconcile = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=reconcile`, { method: 'POST' });
+      const j = await res.json();
+      if (j.ok) { setMsg('Reconciliation triggered — check logs in ~15s'); setTimeout(fetchV2Data, 15000); }
+      else setError(j.error);
+    } catch (e) { setError(e.message); }
+  }, [fetchV2Data]);
 
   useEffect(() => {
     fetchStatus();
@@ -691,66 +725,128 @@ export default function CryptoTraderDashboard() {
         </div>
       </div>
 
-      {/* ═══ PORTFOLIO ADOPTION ═══ */}
+      {/* ═══ PORTFOLIO ADOPTION & RECONCILIATION ═══ */}
       <div className="ct__section">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <h3 className="ct__section-title" style={{ margin: 0 }}>Portfolio Adoption</h3>
-          {adoption?.complete && (
-            <span style={{ fontSize: '0.72rem', color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
-              ✓ Complete
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Trading enabled badge */}
+            <span style={{
+              padding: '0.2rem 0.7rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+              background: tradingEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+              color:      tradingEnabled ? '#22c55e' : '#f87171',
+            }}>
+              {tradingEnabled ? '✓ Trading Enabled' : '⛔ Trading Blocked'}
             </span>
-          )}
-          {!adoption && (
-            <span style={{ fontSize: '0.72rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
-              Pending
-            </span>
-          )}
+            {/* Reconciliation status */}
+            {reconStatus && (
+              <span style={{
+                padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.7rem',
+                background: reconStatus.passed ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.1)',
+                color:      reconStatus.passed ? '#22c55e' : '#f59e0b',
+              }}>
+                Recon: {reconStatus.passed ? 'Passed' : 'Frozen'}
+              </span>
+            )}
+            {/* Actions */}
+            <button className="ct__btn" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} onClick={triggerReconcile} title="Re-run reconciliation now">
+              ↻ Reconcile
+            </button>
+            {systemFreeze?.frozen && (
+              <button className="ct__btn" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem', color: '#f87171', background: 'rgba(239,68,68,0.08)' }}
+                onClick={clearFreeze} disabled={clearingFreeze}>
+                {clearingFreeze ? 'Clearing…' : 'Clear Freeze'}
+              </button>
+            )}
+          </div>
         </div>
 
-        {!adoption && (
+        {/* Freeze alert */}
+        {systemFreeze?.frozen && (
+          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', padding: '0.6rem 0.8rem', marginBottom: '0.75rem' }}>
+            <div style={{ color: '#f87171', fontWeight: 700, fontSize: '0.82rem', marginBottom: '0.25rem' }}>⛔ System Frozen — All v2 Orders Blocked</div>
+            {(systemFreeze.reasons ?? []).map((r, i) => (
+              <div key={i} style={{ color: '#fca5a5', fontSize: '0.75rem', marginLeft: '0.5rem' }}>• {r}</div>
+            ))}
+            <div style={{ color: '#f59e0b', fontSize: '0.7rem', marginTop: '0.3rem' }}>
+              Resolve the issue above, then click "Clear Freeze" or "↻ Reconcile" to restore trading.
+            </div>
+          </div>
+        )}
+
+        {/* Reconciliation check results */}
+        {reconStatus && !tradingEnabled && reconStatus.freezeReasons?.length > 0 && (
+          <div style={{ marginBottom: '0.6rem' }}>
+            <div style={{ fontSize: '0.72rem', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Reconciliation Freeze Reasons</div>
+            {reconStatus.freezeReasons.map((r, i) => (
+              <div key={i} style={{ fontSize: '0.75rem', color: '#fca5a5', padding: '0.15rem 0' }}>• {r}</div>
+            ))}
+          </div>
+        )}
+
+        {/* No adoption yet */}
+        {!adoption && !systemFreeze?.frozen && (
           <div style={{ fontSize: '0.82rem', color: '#888' }}>
-            Adoption runs automatically on first Pi startup. It imports your existing holdings so the bot does not force-sell them. Pull &amp; Restart the Pi to trigger it.
+            Adoption runs automatically on first Pi startup. It discovers your existing holdings, imports supported assets as managed positions, and records unsupported assets for visibility. Pull &amp; Restart the Pi to trigger it.
           </div>
         )}
 
         {adoption?.complete && (
           <div style={{ fontSize: '0.82rem' }}>
-            {/* Adopted holdings */}
+            {/* KRW cash */}
+            {adoption.krwBalance != null && (
+              <div style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: '0.3rem' }}>
+                <span style={{ fontWeight: 700, minWidth: '3rem', color: '#22c55e' }}>KRW</span>
+                <span className="ct__muted">₩{Math.round(adoption.krwBalance).toLocaleString()}</span>
+                <span style={{ fontSize: '0.7rem', color: '#555' }}>— execution cash</span>
+              </div>
+            )}
+
+            {/* Adopted supported holdings */}
             {(adoption.adoptedAssets ?? []).length > 0 && (
               <div style={{ marginBottom: '0.6rem' }}>
-                <div style={{ color: '#555', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Adopted Holdings (managed by bot)</div>
+                <div style={{ color: '#a78bfa', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Adopted Holdings — Managed</div>
                 {(adoption.adoptedAssets ?? []).map((a, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
+                  <div key={i} style={{ display: 'flex', gap: '0.75rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, minWidth: '3rem', color: '#a78bfa' }}>{a.currency}</span>
-                    <span className="ct__muted">qty: {Number(a.qty).toFixed(6)}</span>
-                    <span className="ct__muted">avg: ₩{Math.round(a.avg_cost_krw ?? 0).toLocaleString()}</span>
-                    <span className="ct__muted">≈₩{Math.round(a.approx_value_krw ?? 0).toLocaleString()}</span>
+                    <span className="ct__muted" style={{ fontSize: '0.75rem' }}>qty: {Number(a.qty ?? 0).toFixed(6)}</span>
+                    {a.avg_cost_krw ? <span className="ct__muted" style={{ fontSize: '0.75rem' }}>avg: ₩{Math.round(a.avg_cost_krw).toLocaleString()}</span>
+                      : <span style={{ color: '#555', fontSize: '0.72rem' }}>avg: unknown</span>}
+                    {a.mark_price && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>mark: ₩{Math.round(a.mark_price).toLocaleString()}</span>}
+                    {a.estimated_market_value && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>≈₩{Math.round(a.estimated_market_value).toLocaleString()}</span>}
+                    <span style={{ fontSize: '0.68rem', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                      {a.strategy_tag ?? 'unassigned'}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: '#22c55e' }}>managed</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Unsupported holdings */}
+            {/* Unsupported / excluded holdings */}
             {(adoption.unsupportedAssets ?? []).length > 0 && (
-              <div>
-                <div style={{ color: '#f59e0b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Unsupported Holdings (NOT managed)</div>
+              <div style={{ marginBottom: '0.6rem' }}>
+                <div style={{ color: '#f59e0b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Excluded Holdings — Not Managed</div>
                 {(adoption.unsupportedAssets ?? []).map((u, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                  <div key={i} style={{ display: 'flex', gap: '0.75rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, minWidth: '3rem', color: '#f59e0b' }}>{u.currency}</span>
-                    <span className="ct__muted">qty: {Number(u.balance).toFixed(6)}</span>
-                    <span className="ct__muted">≈₩{Math.round(u.approx_value_krw ?? 0).toLocaleString()}</span>
-                    <span style={{ color: '#555', fontSize: '0.7rem' }}>— bot will not trade this asset</span>
+                    <span className="ct__muted" style={{ fontSize: '0.75rem' }}>qty: {Number(u.balance ?? u.qty ?? 0).toFixed(6)}</span>
+                    {u.approx_value_krw != null && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>≈₩{Math.round(u.approx_value_krw).toLocaleString()}</span>}
+                    <span style={{ fontSize: '0.68rem', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>excluded</span>
+                    <span style={{ fontSize: '0.68rem', color: '#555' }}>bot will not buy, sell, or size against this</span>
                   </div>
                 ))}
               </div>
             )}
 
             {(adoption.adoptedAssets ?? []).length === 0 && (adoption.unsupportedAssets ?? []).length === 0 && (
-              <div className="ct__muted">No pre-existing holdings were found at adoption time.</div>
+              <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No pre-existing holdings found at adoption time — account was empty or all dust.</div>
             )}
 
-            <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: '#555' }}>
-              Completed: {adoption.completedAt ? new Date(adoption.completedAt).toLocaleString() : '—'}
+            <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#555' }}>
+              Adoption completed: {adoption.completedAt ? new Date(adoption.completedAt).toLocaleString() : '—'}
+              {adoption.mode && <span style={{ marginLeft: '0.5rem' }}>mode={adoption.mode}</span>}
             </div>
           </div>
         )}

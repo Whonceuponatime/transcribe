@@ -28,6 +28,7 @@ const traderV2    = require('../lib/cryptoTraderV2');
 const riskEngine  = require('../lib/riskEngine');
 const regimeEngine= require('../lib/regimeEngine');
 const adopter     = require('../lib/portfolioAdopter');
+const reconEngine = require('../lib/reconciliationEngine');
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'UPBIT_ACCESS_KEY', 'UPBIT_SECRET_KEY'];
 for (const key of required) {
@@ -341,6 +342,20 @@ async function pollDeploy() {
   }
 }
 
+async function pollReconcileTrigger() {
+  try {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'reconcile_trigger').single();
+    if (data?.value?.pending) {
+      await supabase.from('app_settings').upsert({
+        key: 'reconcile_trigger', value: { pending: false, clearedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      console.log('[reconcile] Manual trigger received — running reconciliation');
+      await reconcile('manual');
+    }
+  } catch (_) {}
+}
+
 async function pollTrigger() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'crypto_manual_trigger').single();
@@ -366,16 +381,14 @@ async function runCycleV2(opts = {}, label = 'v2_auto') {
   if (await isKilled()) return;
   if (runningV2) { console.log(`[v2][${label}] Busy — skipped`); return; }
 
-  // Block all v2 cycles until adoption is confirmed complete.
-  // This ensures the bot never places orders before knowing what's in the account.
+  // Block all v2 cycles until adoption is complete AND reconciliation has passed.
+  // adoptionDone is set by startupSequence(); reconEngine.isSystemFrozen() is the gate.
   if (!adoptionDone) {
-    const done = await adopter.isAdoptionComplete(supabase).catch(() => false);
-    if (!done) {
-      console.log(`[v2][${label}] Waiting for portfolio adoption to complete — skipped`);
-      return;
-    }
-    adoptionDone = true;
+    console.log(`[v2][${label}] Startup sequence not yet complete — skipped`);
+    return;
   }
+  // The freeze check in executeCycleV2 itself will skip the cycle if frozen.
+  // This in-process check is a fast path to avoid even loading config.
 
   runningV2 = true;
   try {
@@ -415,103 +428,112 @@ runCycleV2._modeLogged = false;
  */
 async function reconcile(trigger = 'scheduled') {
   try {
-    const accounts = await require('../lib/upbit').getAccounts().catch(() => []);
-    const { data: openOrders } = await supabase.from('orders')
-      .select('id, identifier, asset, state')
-      .in('state', ['submitted', 'accepted', 'partially_filled'])
-      .catch(() => ({ data: [] }));
-
-    const pendingCount = (openOrders || []).length;
-
-    if (pendingCount > 0) {
-      console.warn(`[reconcile] ${pendingCount} orders in unresolved state — checking exchange`);
-      await supabase.from('bot_events').insert({
-        event_type:   'RECONCILIATION',
-        severity:     pendingCount > 0 ? 'warn' : 'info',
-        subsystem:    'reconciliation',
-        message:      `Reconcile (${trigger}): ${pendingCount} unresolved orders`,
-        context_json: { pendingCount, orders: openOrders?.map((o) => ({ id: o.id, asset: o.asset, state: o.state })) },
-      }).catch(() => {});
+    const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
+    const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
+    const result = await reconEngine.runReconciliation(supabase, coins, trigger);
+    if (!result.passed) {
+      await writeLog('warn', 'reconcile',
+        `Reconciliation (${trigger}) FROZEN: ${result.freezeReasons.join(' | ')}`,
+        { freezeReasons: result.freezeReasons }
+      );
     }
-
-    // Persist latest KRW/coin balances to bot_events for audit
-    await supabase.from('bot_events').insert({
-      event_type:   'RECONCILIATION',
-      severity:     'debug',
-      subsystem:    'reconciliation',
-      message:      `Balance snapshot (${trigger})`,
-      context_json: { balances: accounts.map((a) => ({ currency: a.currency, balance: a.balance, avg_buy_price: a.avg_buy_price })) },
-    }).catch(() => {});
-
   } catch (err) {
     console.error('[reconcile] Error:', err.message);
   }
 }
 
-// ─── First-deployment portfolio adoption ─────────────────────────────────────
+// ─── Formal startup sequence ──────────────────────────────────────────────────
+//
+// Step 1: Portfolio adoption — import pre-existing holdings
+// Step 2: Reconciliation    — verify exchange state vs DB state
+// Step 3: Unfreeze          — enable cycles only if reconciliation passes
+//
+// The system starts FROZEN and only unfreezes after a clean reconciliation.
+// If reconciliation finds discrepancies, the freeze persists and trading is blocked
+// until the operator resolves the issue and triggers a manual clear.
 
 /**
- * Run portfolio adoption once on startup.
- * Reads the live Upbit account, imports supported holdings as 'adopted' positions,
- * records unsupported assets for operator awareness, and blocks v2 cycles until done.
- *
- * Idempotent: if a completed adoption_run already exists this is a no-op.
+ * Full startup sequence: adoption → reconciliation → unfreeze.
+ * Returns after all steps complete (or fail gracefully).
  */
-async function startupAdoption() {
+async function startupSequence() {
+  const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
+  const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
+  const mode  = cfg.mode  ?? 'paper';
+
+  console.log(`\n${'═'.repeat(64)}`);
+  console.log('  STARTUP SEQUENCE');
+  console.log(`  Mode: ${mode.toUpperCase()}   Coins: ${coins.join(', ')}`);
+  console.log(`${'═'.repeat(64)}`);
+
+  // ── Step 1: Load persisted freeze state from DB ──────────────────────────
+  // Restoring from DB ensures a process restart does not silently clear a freeze
+  // that was set in a previous run due to a balance mismatch.
+  await reconEngine.loadFreezeState(supabase);
+  console.log(`[startup] Freeze state loaded — currently ${reconEngine.isSystemFrozen() ? 'FROZEN' : 'clear'}`);
+
+  // ── Step 2: Portfolio adoption ───────────────────────────────────────────
+  let adoptionResult = { alreadyDone: false, adopted: [], unsupported: [], skipped: [], error: null };
   try {
-    const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
-    const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
-    const mode  = cfg.mode  ?? 'paper';
+    adoptionResult = await adopter.runAdoption(supabase, coins, mode);
 
-    console.log(`\n${'═'.repeat(60)}`);
-    console.log('  PORTFOLIO ADOPTION');
-    console.log(`  Coins: ${coins.join(', ')}   Mode: ${mode.toUpperCase()}`);
-    console.log(`${'═'.repeat(60)}`);
-
-    const result = await adopter.runAdoption(supabase, coins, mode);
-
-    if (result.alreadyDone) {
-      console.log('[adoption] Previously completed — skipping re-import');
-    } else if (result.error) {
-      console.error('[adoption] Failed:', result.error);
-      await writeLog('error', 'adoption', `Portfolio adoption failed: ${result.error}`);
-      // Allow cycles to proceed even if adoption fails so the bot isn't permanently blocked
-      adoptionDone = true;
-      return;
+    if (adoptionResult.alreadyDone) {
+      console.log('[startup] Adoption: previously completed — skipping re-import');
+    } else if (adoptionResult.error) {
+      await writeLog('error', 'adoption', `Adoption failed: ${adoptionResult.error}`);
+      console.error('[startup] Adoption failed:', adoptionResult.error);
+      // Adoption failure is noted but does NOT permanently block startup
+      // Reconciliation will catch any resulting state issues
     } else {
-      const adoptedSummary = result.adopted.map((a) =>
-        `${a.currency} qty=${a.qty} avg=₩${Math.round(a.avg_cost_krw).toLocaleString()}`
-      ).join(' | ') || '—';
-
-      const unsupportedSummary = result.unsupported.map((u) => u.currency).join(', ') || 'none';
-
-      console.log(`[adoption] Adopted: ${result.adopted.length} — ${adoptedSummary}`);
-      console.log(`[adoption] Unsupported (not managed): ${unsupportedSummary}`);
-
-      await writeLog('info', 'adoption', `Adoption complete — ${result.adopted.length} adopted, ${result.unsupported.length} unsupported`, {
-        adopted:     result.adopted,
-        unsupported: result.unsupported,
-        skipped:     result.skipped,
-        runId:       result.runId,
-        mode,
-      });
-
-      if (result.unsupported.length > 0) {
+      const adoptedStr  = adoptionResult.adopted.map((a) => `${a.currency}(${a.qty?.toFixed?.(4) ?? a.qty})`).join(' ') || '—';
+      const unsupStr    = adoptionResult.unsupported.map((u) => u.currency).join(', ') || 'none';
+      await writeLog('info', 'adoption',
+        `Adoption complete: ${adoptionResult.adopted.length} adopted, ${adoptionResult.unsupported.length} unsupported`,
+        { adopted: adoptionResult.adopted, unsupported: adoptionResult.unsupported, mode }
+      );
+      if (adoptionResult.unsupported.length > 0) {
         await writeLog('warn', 'adoption',
-          `Unsupported holdings detected (not managed): ${unsupportedSummary}. Review in dashboard.`,
-          { unsupported: result.unsupported });
+          `Unsupported holdings (not managed): ${unsupStr} — visible in dashboard only`,
+          { unsupported: adoptionResult.unsupported }
+        );
       }
+      console.log(`[startup] Adoption complete — adopted: ${adoptedStr}`);
     }
-
-    adoptionDone = true;
-    console.log('[adoption] Done — v2 cycles unblocked');
-
   } catch (err) {
-    console.error('[adoption] Unexpected error:', err.message);
+    console.error('[startup] Adoption unexpected error:', err.message);
     await writeLog('error', 'adoption', `Adoption unexpected error: ${err.message}`);
-    // Unblock anyway to prevent permanent freeze
-    adoptionDone = true;
   }
+
+  adoptionDone = true; // adoption step completed (even if errored)
+
+  // ── Step 3: Startup reconciliation ──────────────────────────────────────
+  console.log('[startup] Running startup reconciliation…');
+  let reconResult = { passed: false, frozen: true, freezeReasons: ['reconciliation_not_run'] };
+  try {
+    reconResult = await reconEngine.runReconciliation(supabase, coins, 'startup');
+  } catch (err) {
+    console.error('[startup] Reconciliation error:', err.message);
+    await reconEngine.setFreeze(supabase, [`reconciliation_error: ${err.message}`]);
+    await writeLog('error', 'reconcile', `Reconciliation failed: ${err.message}`);
+  }
+
+  if (reconResult.passed) {
+    await writeLog('info', 'reconcile', 'Startup reconciliation passed — trading enabled', {
+      checkResults: reconResult.checkResults,
+      reconId:      reconResult.reconId,
+    });
+    console.log(`[startup] ✓ Reconciliation passed — v2 trading enabled (mode=${mode})`);
+  } else {
+    const reasons = reconResult.freezeReasons.join(' | ');
+    await writeLog('warn', 'reconcile',
+      `Startup reconciliation FROZEN: ${reasons}. Trading blocked. Resolve in dashboard.`,
+      { freezeReasons: reconResult.freezeReasons, checkResults: reconResult.checkResults }
+    );
+    console.warn(`[startup] ⛔ FROZEN — ${reasons}`);
+    console.warn('[startup] Resolve freeze in dashboard → Portfolio Adoption section → Clear Freeze');
+  }
+
+  console.log(`${'═'.repeat(64)}\n`);
 }
 
 // ─── Schedules ────────────────────────────────────────────────────────────────
@@ -528,9 +550,10 @@ cron.schedule('0 1 * * *', () => runCycle({ forceDca: false }, 'daily_dca'), { t
 // Hourly performance digest
 cron.schedule('0 * * * *', hourlyDigest, { timezone: 'UTC' });
 
-// Poll manual trigger / kill switch / deploy every 10s
-setInterval(pollTrigger, 10_000);
-setInterval(pollDeploy,  10_000);
+// Poll manual trigger / kill switch / deploy / reconcile every 10s
+setInterval(pollTrigger,          10_000);
+setInterval(pollDeploy,           10_000);
+setInterval(pollReconcileTrigger, 10_000);
 
 // Heartbeat every 5 min
 setInterval(heartbeat, 5 * 60_000);
@@ -545,16 +568,18 @@ cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC
 cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
 
 // Startup sequence:
-//   1. v1 starts immediately (continues trading live)
-//   2. adoption runs and imports pre-existing holdings
-//   3. v2 starts after adoption (blocked by adoptionDone flag until then)
-//   4. reconciliation runs after v2 starts
+//   5s  — v1 continues trading live (existing engine, unaffected)
+//   8s  — full startup sequence: adoption → reconciliation → unfreeze
+//          v2 cycles are blocked (frozen) until reconciliation passes
+//   After startup sequence completes: v2 first cycle runs if not frozen
 setTimeout(() => runCycle({}, 'startup'), 5000);
-// Adoption runs 3s after v1 boot; v2 is blocked until adoption completes
-setTimeout(() => startupAdoption().then(() => runCycleV2({}, 'startup')), 8000);
-setTimeout(() => reconcile('startup'), 20000);
+setTimeout(async () => {
+  await startupSequence();
+  // Run first v2 cycle immediately after startup sequence (freeze state already set)
+  await runCycleV2({}, 'startup');
+}, 8000);
 
-// Load risk engine state from DB
+// Load risk engine state from DB in parallel with other init
 riskEngine.loadState(supabase).catch(() => {});
 
 console.log('[pi-trader] v4.0 started — v1 live + v2 paper running in parallel');

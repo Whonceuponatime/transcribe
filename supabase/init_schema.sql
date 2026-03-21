@@ -719,7 +719,7 @@ INSERT INTO bot_config DEFAULT VALUES ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS positions (
   position_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset           TEXT NOT NULL,
-  strategy_tag    TEXT NOT NULL CHECK (strategy_tag IN ('core','tactical')),
+  strategy_tag    TEXT NOT NULL DEFAULT 'unassigned' CHECK (strategy_tag IN ('core','tactical','unassigned')),
   qty_open        NUMERIC(24,10) NOT NULL DEFAULT 0,
   qty_total       NUMERIC(24,10) NOT NULL DEFAULT 0,
   avg_cost_krw    NUMERIC(20,4)  NOT NULL DEFAULT 0,
@@ -729,12 +729,18 @@ CREATE TABLE IF NOT EXISTS positions (
   atr_at_entry    NUMERIC(20,4),
   spread_estimate NUMERIC(10,6),
   usd_proxy_fx    NUMERIC(12,4),
-  state           TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial','adopted')),
-  adoption_run_id UUID,
-  opened_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  closed_at       TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  state                   TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial','adopted')),
+  origin                  TEXT NOT NULL DEFAULT 'bot_managed' CHECK (origin IN ('bot_managed','adopted_at_startup')),
+  managed                 BOOLEAN NOT NULL DEFAULT true,
+  supported_universe      BOOLEAN NOT NULL DEFAULT true,
+  current_mark_price      NUMERIC(20,4),
+  estimated_market_value  NUMERIC(20,4),
+  adoption_timestamp      TIMESTAMPTZ,
+  adoption_run_id         UUID,
+  opened_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at               TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_positions_asset_state ON positions(asset, state);
 CREATE INDEX IF NOT EXISTS idx_positions_strategy    ON positions(strategy_tag, state);
@@ -858,6 +864,7 @@ CREATE TABLE IF NOT EXISTS adoption_runs (
   unsupported_assets  JSONB,
   adopted_assets      JSONB,
   error_message       TEXT,
+  reconciliation_id   UUID,
   run_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at        TIMESTAMPTZ
 );
@@ -866,3 +873,23 @@ CREATE INDEX IF NOT EXISTS idx_adoption_runs_status ON adoption_runs(status, run
 ALTER TABLE adoption_runs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for service" ON adoption_runs;
 CREATE POLICY "Allow all for service" ON adoption_runs FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS reconciliation_checks (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status               TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending','passed','frozen','failed')),
+  freeze_reasons       JSONB NOT NULL DEFAULT '[]'::jsonb,
+  exchange_balances    JSONB,
+  internal_balances    JSONB,
+  discrepancies        JSONB,
+  open_orders_found    INTEGER NOT NULL DEFAULT 0,
+  checks_run           JSONB,
+  trading_enabled      BOOLEAN NOT NULL DEFAULT false,
+  run_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at          TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_recon_checks_run_at ON reconciliation_checks(run_at DESC);
+
+ALTER TABLE reconciliation_checks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for service" ON reconciliation_checks;
+CREATE POLICY "Allow all for service" ON reconciliation_checks FOR ALL USING (true) WITH CHECK (true);
