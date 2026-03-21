@@ -369,6 +369,126 @@ module.exports = async function handler(req, res) {
         },
       };
 
+      // ── Reconstructed adoption timeline (A) ──────────────────────────────
+      // Built from DB columns regardless of whether bot_events exist.
+      // Answers: which positions were adopted, when, from which run, and whether
+      // evidence is direct (bot_events) or reconstructed (DB columns only).
+      const allAdoptionRuns = adoptionRuns; // all runs, not window-scoped
+      const reconstructedAdoptionTimeline = positions
+        .filter((p) => p.origin === 'adopted_at_startup')
+        .map((p) => {
+          const directImportEvent = (v2ByType['ADOPTION_IMPORT'] || [])
+            .find((e) => e.context_json?.position_id === p.position_id);
+          const replayEvent = (v2ByType['ADOPTION_ALREADY_COMPLETE'] || [])
+            .find((e) => (e.context_json?.current_positions || []).some((cp) => cp.asset === p.asset));
+          // Find which adoption run imported this position
+          const adoptionRun = allAdoptionRuns.find((r) =>
+            (r.adopted_assets || []).some((a) => a.currency === p.asset)
+          );
+          const posOpenedAt   = p.opened_at ? new Date(p.opened_at) : null;
+          const runStartedAt  = adoptionRun?.run_at ? new Date(adoptionRun.run_at) : null;
+          return {
+            asset:                      p.asset,
+            position_id:                p.position_id,
+            first_seen_as_adopted_at:   p.opened_at,
+            adoption_run_id:            p.adoption_run_id ?? adoptionRun?.id ?? null,
+            adoption_run_found_in_records: !!adoptionRun,
+            position_predated_current_run: posOpenedAt && runStartedAt && posOpenedAt < runStartedAt,
+            current_strategy_tag:       p.strategy_tag,
+            current_state:              p.state,
+            operator_classified_at:     p.operator_classified_at ?? null,
+            evidence_source:            directImportEvent ? 'direct_event'
+                                        : replayEvent    ? 'replay_event'
+                                        : 'db_only',
+            evidence_reconstructed:     !directImportEvent,
+            note: !adoptionRun
+              ? 'Position predates export window or adoption_runs was truncated — position data is DB-authoritative.'
+              : null,
+          };
+        });
+
+      // ── Reconstructed classification history (B) ──────────────────────────
+      // For every managed position, show current tag, when it was classified,
+      // and whether a POSITION_CLASSIFIED event exists.
+      const reconstructedClassificationHistory = positions
+        .filter((p) => p.managed)
+        .map((p) => {
+          const classifyEvent = (v2ByType['POSITION_CLASSIFIED'] || [])
+            .find((e) => e.context_json?.position_id === p.position_id);
+          let evidenceSource;
+          if (classifyEvent)                evidenceSource = 'direct_event';
+          else if (p.operator_classified_at) evidenceSource = 'db_only';
+          else if (p.strategy_tag !== 'unassigned') evidenceSource = 'db_only_no_timestamp';
+          else                               evidenceSource = 'unclassified';
+
+          return {
+            position_id:                p.position_id,
+            asset:                      p.asset,
+            current_strategy_tag:       p.strategy_tag,
+            managed:                    p.managed,
+            supported_universe:         p.supported_universe,
+            operator_classified_at:     p.operator_classified_at ?? null,
+            classification_event_present: !!classifyEvent,
+            evidence_source:            evidenceSource,
+            classification_event:       classifyEvent
+              ? {
+                  previous_strategy_tag: classifyEvent.context_json?.previous_strategy_tag,
+                  new_strategy_tag:      classifyEvent.context_json?.new_strategy_tag,
+                  cost_basis_changed:    classifyEvent.context_json?.cost_basis_changed,
+                  operator_note:         classifyEvent.context_json?.operator_note,
+                }
+              : null,
+            note: !classifyEvent && p.strategy_tag !== 'unassigned'
+              ? 'No POSITION_CLASSIFIED event found. Classification likely happened before the logging fix was deployed (API .catch() bug). DB columns are authoritative.'
+              : null,
+          };
+        });
+
+      // ── Audit completeness grade (E) ──────────────────────────────────────
+      const adoptedPositions         = positions.filter((p) => p.origin === 'adopted_at_startup');
+      const corePositions            = positions.filter((p) => p.strategy_tag === 'core');
+      const adoptionEvidenceCount    = (v2ByType['ADOPTION_IMPORT'] || []).length
+                                     + (v2ByType['ADOPTION_ALREADY_COMPLETE'] || []).length;
+      const classificationEventCount = (v2ByType['POSITION_CLASSIFIED'] || []).length;
+      const exitEvalCount            = (v2ByType['EXIT_EVALUATION'] || []).length;
+      const reconEventCount          = (v2ByType['RECONCILIATION'] || []).length
+                                     + (v2ByType['FREEZE_STATE_CHANGED'] || []).length;
+
+      const adoptionHistoryComplete       = adoptedPositions.length === 0 || adoptionEvidenceCount > 0 || reconstructedAdoptionTimeline.length > 0;
+      const classificationHistoryComplete = corePositions.every((p) =>
+        (v2ByType['POSITION_CLASSIFIED'] || []).some((e) => e.context_json?.position_id === p.position_id)
+        || !!p.operator_classified_at
+      );
+      const v2DecisionPathVisible         = exitEvalCount > 0 || (v2ByType['CYCLE_FROZEN'] || []).length > 0;
+      const freezeHistoryVisible          = reconEventCount > 0;
+
+      const grades = [adoptionHistoryComplete, classificationHistoryComplete, v2DecisionPathVisible, freezeHistoryVisible];
+      const gradeScore = grades.filter(Boolean).length;
+      const overallAuditGrade = gradeScore === 4 ? 'A — complete'
+                              : gradeScore === 3 ? 'B — mostly complete, minor gaps'
+                              : gradeScore === 2 ? 'C — partial, key gaps present'
+                              : gradeScore === 1 ? 'D — mostly incomplete'
+                              : 'F — no audit evidence';
+
+      const auditCompleteness = {
+        adoption_history_complete:       adoptionHistoryComplete,
+        classification_history_complete: classificationHistoryComplete,
+        v2_decision_path_visible:        v2DecisionPathVisible,
+        freeze_history_visible:          freezeHistoryVisible,
+        overall_audit_grade:             overallAuditGrade,
+        notes: {
+          adoption:       adoptionEvidenceCount === 0 && adoptedPositions.length > 0
+            ? 'No bot_events for adoption. Positions exist in DB — reconstructed timeline is authoritative. Pull & Restart Pi to generate ADOPTION_ALREADY_COMPLETE event.'
+            : null,
+          classification: classificationEventCount < corePositions.length
+            ? `${corePositions.length - classificationEventCount} of ${corePositions.length} core positions have no POSITION_CLASSIFIED event. Classified via DB only. See reconstructedClassificationHistory.`
+            : null,
+          decisionPath:   !v2DecisionPathVisible
+            ? 'No EXIT_EVALUATION or CYCLE_FROZEN events. Either V2 has not run yet, positions have not been evaluated this window, or bot_events was recently truncated. Pull & Restart Pi to generate fresh evidence.'
+            : null,
+        },
+      };
+
       // ── Summary stats ─────────────────────────────────────────────────────
       const buyCount  = v1Trades.filter((t) => t.side === 'buy').length;
       const sellCount = v1Trades.filter((t) => t.side === 'sell').length;
@@ -394,8 +514,17 @@ module.exports = async function handler(req, res) {
           v1LastCycle:          lastCycleRes.data?.value ?? null,
         },
 
+        // ── Audit completeness grade ──────────────────────────────────────
+        auditCompleteness,
+
         // ── Audit diagnostics (Q4–Q6) ─────────────────────────────────────
         auditDiagnostics,
+
+        // ── Reconstructed adoption timeline (A) ───────────────────────────
+        reconstructedAdoptionTimeline,
+
+        // ── Reconstructed classification history (B) ──────────────────────
+        reconstructedClassificationHistory,
 
         // ── Current positions ─────────────────────────────────────────────
         positions,
