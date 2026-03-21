@@ -84,9 +84,34 @@ function tradeLine(t) {
   return `${side} ${t.coin} ${amt} — ${t.reason}`;
 }
 
+/**
+ * Returns true when V1 should be suppressed.
+ * V1 is disabled when V2 is in live mode to prevent double-trading:
+ *   - Both engines target the same Upbit account
+ *   - V1 fills are not tracked in V2's positions table
+ *   - V1 live trades would cause V2 reconciliation balance mismatches
+ *   - Concurrent V1+V2 live orders on the same coin would be uncoordinated
+ */
+async function isV1Suppressed() {
+  try {
+    const cfg = await traderV2.getV2Config(supabase);
+    return (cfg.mode ?? 'paper') === 'live';
+  } catch (_) {
+    return false; // if we can't read config, let V1 run (fail open for V1)
+  }
+}
+
 async function runCycle(opts = {}, label = 'auto') {
   if (await isKilled()) { console.log(`[${label}] Kill switch ON — skipped`); return; }
   if (running) { console.log(`[${label}] Busy — skipped`); return; }
+
+  // Suppress V1 when V2 is live to prevent concurrent trading on the same account.
+  if (await isV1Suppressed()) {
+    if (label === 'startup') {
+      console.log(`[v1][${label}] V2 is in live mode — V1 suppressed to prevent double-trading`);
+    }
+    return;
+  }
 
   running = true;
   snapshotCount++;

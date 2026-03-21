@@ -366,19 +366,37 @@ module.exports = async function handler(req, res) {
     }
 
     // ── POST manual clear freeze ──────────────────────────────────────────────
+    // IMPORTANT: this action does NOT directly write frozen=false to the DB.
+    // Directly unfreezing without a reconciliation check could allow trading
+    // while a balance mismatch or unresolved order still exists.
+    //
+    // Instead, this action:
+    //   1. Records the operator's intent in bot_events
+    //   2. Queues a reconciliation trigger
+    //   3. The Pi polls for reconcile_trigger within 10s, runs all checks,
+    //      and clears the freeze ONLY if every check passes
+    //
+    // If the underlying issue has not been resolved, reconciliation will
+    // re-freeze the system and the dashboard will show the updated reasons.
     if (action === 'clear-freeze' && req.method === 'POST') {
       const note = req.body?.note ?? 'operator_manual_clear';
-      // Persist the clear — the Pi process will pick it up on next reconciliation read
+
+      await supabase.from('bot_events').insert({
+        event_type: 'FREEZE_CLEAR_REQUESTED', severity: 'warn', subsystem: 'api',
+        message: `Operator requested freeze clear: ${note}. Queuing reconciliation.`,
+      }).catch(() => {});
+
+      // Queue reconciliation — Pi picks this up within 10s via pollReconcileTrigger
       await supabase.from('app_settings').upsert({
-        key:   'system_freeze',
-        value: { frozen: false, reasons: [], updatedAt: new Date().toISOString(), clearedBy: note },
+        key:        'reconcile_trigger',
+        value:      { pending: true, requestedAt: new Date().toISOString(), requestedBy: note },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
-      await supabase.from('bot_events').insert({
-        event_type: 'FREEZE_CLEARED', severity: 'warn', subsystem: 'api',
-        message: `Freeze manually cleared via dashboard: ${note}`,
-      }).catch(() => {});
-      return res.status(200).json({ ok: true, message: 'Freeze cleared. Reconciliation will run on next startup or manual trigger.' });
+
+      return res.status(200).json({
+        ok:      true,
+        message: 'Reconciliation queued. The Pi will re-run all checks within 10 seconds. Freeze clears automatically if all checks pass. If the underlying issue persists, the system will remain frozen.',
+      });
     }
 
     // ── POST run reconciliation now ────────────────────────────────────────────
