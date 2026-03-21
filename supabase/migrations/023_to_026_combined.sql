@@ -119,7 +119,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_asset_state ON orders(asset, state);
 CREATE INDEX IF NOT EXISTS idx_orders_identifier  ON orders(identifier);
 CREATE INDEX IF NOT EXISTS idx_orders_created     ON orders(created_at DESC);
 
-CREATE TABLE IF NOT EXISTS fills (
+-- v2_fills avoids conflict with the existing live-trading 'fills' table
+-- which uses order_request_id (different schema).
+CREATE TABLE IF NOT EXISTS v2_fills (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id        UUID NOT NULL REFERENCES orders(id),
   position_id     UUID REFERENCES positions(position_id),
@@ -138,8 +140,8 @@ CREATE TABLE IF NOT EXISTS fills (
   executed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_fills_order_id   ON fills(order_id);
-CREATE INDEX IF NOT EXISTS idx_fills_asset_time ON fills(asset, executed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_v2_fills_order_id   ON v2_fills(order_id);
+CREATE INDEX IF NOT EXISTS idx_v2_fills_asset_time ON v2_fills(asset, executed_at DESC);
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots_v2 (
   id              BIGSERIAL PRIMARY KEY,
@@ -285,7 +287,7 @@ ALTER TABLE positions ADD  CONSTRAINT positions_adopted_has_timestamp
 ALTER TABLE bot_config             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE positions              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders                 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE fills                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_fills               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_snapshots_v2 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bot_events             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE adoption_runs          ENABLE ROW LEVEL SECURITY;
@@ -297,8 +299,8 @@ DROP POLICY IF EXISTS "Allow all for service" ON positions;
 CREATE POLICY "Allow all for service" ON positions              FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow all for service" ON orders;
 CREATE POLICY "Allow all for service" ON orders                 FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow all for service" ON fills;
-CREATE POLICY "Allow all for service" ON fills                  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON v2_fills;
+CREATE POLICY "Allow all for service" ON v2_fills               FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow all for service" ON portfolio_snapshots_v2;
 CREATE POLICY "Allow all for service" ON portfolio_snapshots_v2 FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow all for service" ON bot_events;
