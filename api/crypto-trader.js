@@ -333,9 +333,9 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'classification must be core or unmanaged' });
       }
 
-      // Verify position exists and is classifiable
+      // Fetch full position row so we can record previous values in the audit log
       const { data: pos, error: fetchErr } = await supabase.from('positions')
-        .select('position_id, asset, origin, strategy_tag, state, managed')
+        .select('position_id, asset, origin, strategy_tag, state, managed, supported_universe, avg_cost_krw, operator_classified_at')
         .eq('position_id', position_id).single();
       if (fetchErr || !pos) {
         return res.status(404).json({ error: 'Position not found' });
@@ -369,14 +369,29 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: updateErr.message });
       }
 
-      // Log the operator action (non-fatal — don't let a log failure break the classify response)
+      // Log the operator action — full audit record with before/after fields
       try {
         await supabase.from('bot_events').insert({
           event_type:   'POSITION_CLASSIFIED',
           severity:     'info',
           subsystem:    'api',
-          message:      `Operator classified ${pos.asset} position as ${classification}${avg_cost_krw ? ` with cost basis ₩${Math.round(avg_cost_krw).toLocaleString()}` : ''}`,
-          context_json: { position_id, asset: pos.asset, classification, avg_cost_krw: patch.avg_cost_krw ?? null, operator_note },
+          message:      `Operator classified ${pos.asset} as ${classification}: ${pos.strategy_tag} → ${patch.strategy_tag}${patch.avg_cost_krw ? ` | cost basis set ₩${Math.round(patch.avg_cost_krw).toLocaleString()}` : ''}`,
+          context_json: {
+            position_id,
+            symbol:                pos.asset,
+            previous_strategy_tag: pos.strategy_tag,
+            new_strategy_tag:      patch.strategy_tag,
+            previous_managed:      pos.managed,
+            new_managed:           patch.managed,
+            supported_universe:    pos.supported_universe,
+            avg_cost_krw:          patch.avg_cost_krw ?? pos.avg_cost_krw ?? null,
+            cost_basis_changed:    patch.avg_cost_krw != null,
+            origin:                pos.origin,
+            state_before:          pos.state,
+            state_after:           patch.state ?? pos.state,
+            operator_note:         operator_note ?? null,
+            operator_classified_at: patch.operator_classified_at,
+          },
         });
       } catch (_) {}
 

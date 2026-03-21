@@ -511,25 +511,47 @@ async function startupSequence() {
 
     if (adoptionResult.alreadyDone) {
       console.log('[startup] Adoption: previously completed — skipping re-import');
+      await writeLog('info', 'adoption', 'Adoption previously completed — skipping re-import', {
+        adoption_completed: true, skipped_reason: 'already_done',
+      });
     } else if (adoptionResult.error) {
-      await writeLog('error', 'adoption', `Adoption failed: ${adoptionResult.error}`);
+      await writeLog('error', 'adoption', `Adoption failed: ${adoptionResult.error}`, {
+        adoption_completed: false, error: adoptionResult.error,
+      });
       console.error('[startup] Adoption failed:', adoptionResult.error);
-      // Adoption failure is noted but does NOT permanently block startup
-      // Reconciliation will catch any resulting state issues
     } else {
-      const adoptedStr  = adoptionResult.adopted.map((a) => `${a.currency}(${a.qty?.toFixed?.(4) ?? a.qty})`).join(' ') || '—';
-      const unsupStr    = adoptionResult.unsupported.map((u) => u.currency).join(', ') || 'none';
+      // Count protected (unassigned) vs classified-adopted
+      const protectedCount = (adoptionResult.adopted || []).filter((a) => a.strategy_tag === 'unassigned').length;
+      const classifiedCount = (adoptionResult.adopted || []).filter((a) => a.strategy_tag !== 'unassigned').length;
+      const adoptedStr     = adoptionResult.adopted.map((a) => `${a.currency}(${a.qty?.toFixed?.(4) ?? a.qty})`).join(' ') || '—';
+      const unsupStr       = adoptionResult.unsupported.map((u) => u.currency).join(', ') || 'none';
+      const invalidCount   = (adoptionResult.skipped || []).filter((s) => s.reason === 'symbol_normalization_failed').length;
+
       await writeLog('info', 'adoption',
-        `Adoption complete: ${adoptionResult.adopted.length} adopted, ${adoptionResult.unsupported.length} unsupported`,
-        { adopted: adoptionResult.adopted, unsupported: adoptionResult.unsupported, mode }
+        `Adoption complete — ${adoptionResult.adopted.length} supported adopted, ${adoptionResult.unsupported.length} excluded, ${protectedCount} need classification`,
+        {
+          adoption_completed:   true,
+          mode,
+          supported_managed:    adoptionResult.adopted.length,
+          protected_unassigned: protectedCount,
+          classified_adopted:   classifiedCount,
+          excluded_unsupported: adoptionResult.unsupported.length,
+          invalid_symbols:      invalidCount,
+          krw_cash:             adoptionResult.krwBalance ?? null,
+          adopted_assets:       adoptionResult.adopted.map((a) => ({
+            currency: a.currency, qty: a.qty, avg_cost_krw: a.avg_cost_krw,
+            strategy_tag: a.strategy_tag ?? 'unassigned',
+          })),
+          excluded_assets: adoptionResult.unsupported.map((u) => ({ currency: u.currency, approx_value_krw: u.approx_value_krw })),
+        }
       );
       if (adoptionResult.unsupported.length > 0) {
         await writeLog('warn', 'adoption',
-          `Unsupported holdings (not managed): ${unsupStr} — visible in dashboard only`,
+          `Excluded holdings (not managed by bot): ${unsupStr}`,
           { unsupported: adoptionResult.unsupported }
         );
       }
-      console.log(`[startup] Adoption complete — adopted: ${adoptedStr}`);
+      console.log(`[startup] Adoption complete — adopted: ${adoptedStr} | excluded: ${unsupStr}`);
     }
   } catch (err) {
     console.error('[startup] Adoption unexpected error:', err.message);
@@ -549,17 +571,43 @@ async function startupSequence() {
     await writeLog('error', 'reconcile', `Reconciliation failed: ${err.message}`);
   }
 
+  // Build concise per-check summary for crypto_bot_logs
+  const cr = reconResult.checkResults ?? {};
+  const checkSummary = [
+    `adoption=${cr.adoption_complete?.passed     ? 'PASS' : 'FAIL'}`,
+    `orders=${cr.no_unresolved_orders?.passed    ? 'PASS' : 'FAIL'}`,
+    `balance=${cr.balance_match?.passed          ? 'PASS' : 'FAIL'}`,
+    `ownership=${cr.ownership_clarity?.passed    ? 'PASS' : 'FAIL'}`,
+    `integrity=${cr.position_integrity?.passed   ? 'PASS' : 'FAIL'}`,
+  ].join(' | ');
+
   if (reconResult.passed) {
-    await writeLog('info', 'reconcile', 'Startup reconciliation passed — trading enabled', {
-      checkResults: reconResult.checkResults,
-      reconId:      reconResult.reconId,
-    });
+    await writeLog('info', 'reconcile',
+      `Startup reconciliation PASSED — trading enabled | ${checkSummary}`,
+      {
+        trading_enabled: true,
+        frozen:          false,
+        trigger:         'startup',
+        mode,
+        recon_id:        reconResult.reconId,
+        checks:          checkSummary,
+        freeze_reasons:  [],
+      }
+    );
     console.log(`[startup] ✓ Reconciliation passed — v2 trading enabled (mode=${mode})`);
   } else {
     const reasons = reconResult.freezeReasons.join(' | ');
     await writeLog('warn', 'reconcile',
-      `Startup reconciliation FROZEN: ${reasons}. Trading blocked. Resolve in dashboard.`,
-      { freezeReasons: reconResult.freezeReasons, checkResults: reconResult.checkResults }
+      `Startup reconciliation FROZEN | ${checkSummary} | reasons: ${reasons}`,
+      {
+        trading_enabled: false,
+        frozen:          true,
+        trigger:         'startup',
+        mode,
+        recon_id:        reconResult.reconId,
+        checks:          checkSummary,
+        freeze_reasons:  reconResult.freezeReasons,
+      }
     );
     console.warn(`[startup] ⛔ FROZEN — ${reasons}`);
     console.warn('[startup] Resolve freeze in dashboard → Portfolio Adoption section → Clear Freeze');
