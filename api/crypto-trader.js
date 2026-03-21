@@ -274,8 +274,9 @@ module.exports = async function handler(req, res) {
 
     // ── GET v2 regime (EMA50/200/ADX + current classification) ─────────────
     if (action === 'regime' && req.method === 'GET') {
-      const { data } = await supabase.from('app_settings').select('value').eq('key', 'current_regime').single().catch(() => ({ data: null }));
-      return res.status(200).json({ regime: data?.value ?? null });
+      let regimeData = null;
+      try { const { data } = await supabase.from('app_settings').select('value').eq('key', 'current_regime').single(); regimeData = data; } catch (_) {}
+      return res.status(200).json({ regime: regimeData?.value ?? null });
     }
 
     // ── GET v2 positions (open, adopted, partial — all managed states) ──────────
@@ -289,7 +290,8 @@ module.exports = async function handler(req, res) {
       if (posErr) return res.status(500).json({ error: posErr.message });
 
       // Enrich with current price from latest portfolio snapshot
-      const { data: snap } = await supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single().catch(() => ({ data: null }));
+      let snap = null;
+      try { const { data: _s } = await supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single(); snap = _s; } catch (_) {}
       const enriched = (positions || []).map((p) => {
         const priceKey = p.asset.toLowerCase();
         const valueKrw = snap?.value?.[`${priceKey}_value_krw`];
@@ -410,8 +412,9 @@ module.exports = async function handler(req, res) {
 
     // ── GET v2 circuit breaker status ────────────────────────────────────────
     if (action === 'circuit-breakers' && req.method === 'GET') {
-      const { data } = await supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single().catch(() => ({ data: null }));
-      return res.status(200).json({ circuitBreakers: data?.value ?? null });
+      let cbData = null;
+      try { const { data } = await supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single(); cbData = data; } catch (_) {}
+      return res.status(200).json({ circuitBreakers: cbData?.value ?? null });
     }
 
     // ── POST v2 config (mode + thresholds) ───────────────────────────────────
@@ -435,21 +438,22 @@ module.exports = async function handler(req, res) {
 
     // ── GET adoption + reconciliation status ─────────────────────────────────
     if (action === 'adoption' && req.method === 'GET') {
+      const safe = async (query) => { try { const r = await query; return r; } catch (_) { return { data: null }; } };
       const [adoptionRow, reconRow, freezeRow, latestRunRow, latestReconRow] = await Promise.all([
-        supabase.from('app_settings').select('value').eq('key', 'adoption_status').single().catch(() => ({ data: null })),
-        supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single().catch(() => ({ data: null })),
-        supabase.from('app_settings').select('value').eq('key', 'system_freeze').single().catch(() => ({ data: null })),
-        supabase.from('adoption_runs').select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null })),
-        supabase.from('reconciliation_checks').select('*').order('run_at', { ascending: false }).limit(1).single().catch(() => ({ data: null })),
+        safe(supabase.from('app_settings').select('value').eq('key', 'adoption_status').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
+        safe(supabase.from('adoption_runs').select('*').order('run_at', { ascending: false }).limit(1).single()),
+        safe(supabase.from('reconciliation_checks').select('*').order('run_at', { ascending: false }).limit(1).single()),
       ]);
 
       return res.status(200).json({
-        adoption:            adoptionRow.data?.value   ?? null,
-        latestRun:           latestRunRow.data         ?? null,
-        reconciliation:      reconRow.data?.value      ?? null,
-        latestReconciliation: latestReconRow.data      ?? null,
-        systemFreeze:        freezeRow.data?.value     ?? null,
-        tradingEnabled:      !(freezeRow.data?.value?.frozen ?? true),
+        adoption:             adoptionRow.data?.value   ?? null,
+        latestRun:            latestRunRow.data         ?? null,
+        reconciliation:       reconRow.data?.value      ?? null,
+        latestReconciliation: latestReconRow.data       ?? null,
+        systemFreeze:         freezeRow.data?.value     ?? null,
+        tradingEnabled:       !(freezeRow.data?.value?.frozen ?? true),
       });
     }
 
