@@ -369,14 +369,16 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: updateErr.message });
       }
 
-      // Log the operator action
-      await supabase.from('bot_events').insert({
-        event_type:   'POSITION_CLASSIFIED',
-        severity:     'info',
-        subsystem:    'api',
-        message:      `Operator classified ${pos.asset} position as ${classification}${avg_cost_krw ? ` with cost basis ₩${Math.round(avg_cost_krw).toLocaleString()}` : ''}`,
-        context_json: { position_id, asset: pos.asset, classification, avg_cost_krw: patch.avg_cost_krw ?? null, operator_note },
-      }).catch(() => {});
+      // Log the operator action (non-fatal — don't let a log failure break the classify response)
+      try {
+        await supabase.from('bot_events').insert({
+          event_type:   'POSITION_CLASSIFIED',
+          severity:     'info',
+          subsystem:    'api',
+          message:      `Operator classified ${pos.asset} position as ${classification}${avg_cost_krw ? ` with cost basis ₩${Math.round(avg_cost_krw).toLocaleString()}` : ''}`,
+          context_json: { position_id, asset: pos.asset, classification, avg_cost_krw: patch.avg_cost_krw ?? null, operator_note },
+        });
+      } catch (_) {}
 
       return res.status(200).json({
         ok:             true,
@@ -473,10 +475,12 @@ module.exports = async function handler(req, res) {
     if (action === 'clear-freeze' && req.method === 'POST') {
       const note = req.body?.note ?? 'operator_manual_clear';
 
-      await supabase.from('bot_events').insert({
-        event_type: 'FREEZE_CLEAR_REQUESTED', severity: 'warn', subsystem: 'api',
-        message: `Operator requested freeze clear: ${note}. Queuing reconciliation.`,
-      }).catch(() => {});
+      try {
+        await supabase.from('bot_events').insert({
+          event_type: 'FREEZE_CLEAR_REQUESTED', severity: 'warn', subsystem: 'api',
+          message: `Operator requested freeze clear: ${note}. Queuing reconciliation.`,
+        });
+      } catch (_) {}
 
       // Queue reconciliation — Pi picks this up within 10s via pollReconcileTrigger
       await supabase.from('app_settings').upsert({
