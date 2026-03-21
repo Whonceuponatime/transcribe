@@ -204,68 +204,167 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ diagnostics: diags || [] });
     }
 
-    // ── GET full log export (last 7 days, all levels & tags) ───────────────
-    // Returns structured JSON you can paste into an AI for analysis and improvements.
+    // ── GET full log export ────────────────────────────────────────────────
+    // Covers all logging tables: crypto_bot_logs, bot_events,
+    // reconciliation_checks, adoption_runs, positions, v1 trade log,
+    // and key app_settings snapshots.
+    // Paste the downloaded JSON into an AI for full analysis.
     if (action === 'export' && req.method === 'GET') {
       const days  = Math.min(Number(req.query.days) || 7, 30);
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const safe  = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
 
-      const [logsRes, tradesRes, snapRes, portfolioRes] = await Promise.all([
-        // All bot logs: trade, active, hourly, sell_diag, snapshot, errors
+      const [
+        botLogsRes, botEventsRes, tradesRes,
+        reconRes, adoptionRes, positionsRes,
+        lastCycleRes, portfolioRes, freezeRes, reconStatusRes,
+      ] = await Promise.all([
+        // V1 cycle logs (all tags and levels)
         supabase.from('crypto_bot_logs')
           .select('level, tag, message, meta, created_at')
           .gte('created_at', since)
           .order('created_at', { ascending: false })
-          .limit(2000),
-        // All trades in window
+          .limit(1000),
+        // V2 structured events (all types)
+        supabase.from('bot_events')
+          .select('event_type, severity, subsystem, message, context_json, regime, mode, created_at')
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
+          .limit(1000),
+        // V1 trade history
         supabase.from('crypto_trade_log')
-          .select('*')
+          .select('coin, side, krw_amount, coin_amount, price_krw, reason, signal_score, executed_at')
           .gte('executed_at', since)
           .order('executed_at', { ascending: false })
           .limit(500),
-        // Latest cycle detail (indicators + portfolio)
-        supabase.from('app_settings').select('value').eq('key', 'last_cycle_detail').single(),
-        // Latest portfolio snapshot
-        supabase.from('app_settings').select('value').eq('key', 'crypto_portfolio_snapshot').single(),
+        // Reconciliation run records
+        supabase.from('reconciliation_checks')
+          .select('status, freeze_reasons, checks_run, trading_enabled, open_orders_found, discrepancies, run_at')
+          .gte('run_at', since)
+          .order('run_at', { ascending: false })
+          .limit(50),
+        // Adoption run records
+        supabase.from('adoption_runs')
+          .select('status, adopted_count, skipped_count, unsupported_count, adopted_assets, unsupported_assets, error_message, run_at, completed_at')
+          .order('run_at', { ascending: false })
+          .limit(10),
+        // Current position state
+        supabase.from('positions')
+          .select('asset, strategy_tag, state, origin, managed, supported_universe, qty_open, avg_cost_krw, operator_classified_at, operator_note, opened_at, updated_at'),
+        // Latest V1 cycle detail
+        safe(supabase.from('app_settings').select('value').eq('key', 'last_cycle_detail').single()),
+        // Latest V2 portfolio snapshot
+        safe(supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single()),
+        // Current freeze state
+        safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
+        // Latest reconciliation summary
+        safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
       ]);
 
-      const logs      = logsRes.data    || [];
-      const trades    = tradesRes.data  || [];
-      const lastCycle = snapRes.data?.value ?? null;
-      const portfolio = portfolioRes.data?.value ?? null;
+      const botLogs      = botLogsRes.data    || [];
+      const botEvents    = botEventsRes.data   || [];
+      const trades       = tradesRes.data      || [];
+      const reconRuns    = reconRes.data        || [];
+      const adoptionRuns = adoptionRes.data     || [];
+      const positions    = positionsRes.data    || [];
 
-      // Compute summary stats
-      const tradeLogs   = logs.filter((l) => l.tag === 'trade');
-      const hourlyLogs  = logs.filter((l) => l.tag === 'hourly');
-      const snapshots   = logs.filter((l) => l.tag === 'snapshot');
-      const sellDiags   = logs.filter((l) => l.tag === 'sell_diag');
-      const errors      = logs.filter((l) => l.level === 'error');
+      // ── V1 log slices by tag ──────────────────────────────────────────────
+      const v1ByTag = {};
+      for (const log of botLogs) {
+        if (!v1ByTag[log.tag]) v1ByTag[log.tag] = [];
+        v1ByTag[log.tag].push(log);
+      }
 
-      const totalPnlDelta = hourlyLogs.reduce((s, l) => s + (l.meta?.pnlDelta ?? 0), 0);
+      // ── V2 event slices by type ───────────────────────────────────────────
+      const v2ByType = {};
+      for (const ev of botEvents) {
+        if (!v2ByType[ev.event_type]) v2ByType[ev.event_type] = [];
+        v2ByType[ev.event_type].push(ev);
+      }
+
+      // ── Summary stats ─────────────────────────────────────────────────────
       const buyCount  = trades.filter((t) => t.side === 'buy').length;
       const sellCount = trades.filter((t) => t.side === 'sell').length;
+      const hourlyLogs = v1ByTag['hourly'] || [];
+      const totalPnlDelta = hourlyLogs.reduce((s, l) => s + (l.meta?.pnlDelta ?? 0), 0);
+      const lastRecon = reconRuns[0] ?? null;
+      const lastAdoption = adoptionRuns[0] ?? null;
 
       const summary = {
-        exportedAt:   new Date().toISOString(),
-        windowDays:   days,
+        exportedAt:  new Date().toISOString(),
+        windowDays:  days,
         since,
-        stats: {
-          totalTrades:    trades.length,
-          buys:           buyCount,
-          sells:          sellCount,
-          errorCount:     errors.length,
-          snapshotCount:  snapshots.length,
-          hourlyDigests:  hourlyLogs.length,
-          approxPnlDeltaKrw: Math.round(totalPnlDelta),
+
+        // ── Top-level system state ──────────────────────────────────────────
+        systemState: {
+          freezeState:          freezeRes.data?.value ?? null,
+          latestReconciliation: reconStatusRes.data?.value ?? null,
+          v2Portfolio:          portfolioRes.data?.value ?? null,
+          v1LastCycle:          lastCycleRes.data?.value ?? null,
         },
-        currentPortfolio: portfolio,
-        lastCycleDetail:  lastCycle,
-        recentTrades:     trades.slice(0, 50),
-        hourlyDigests:    hourlyLogs,
-        snapshots:        snapshots.slice(0, 50),
-        sellDiagnostics:  sellDiags.slice(0, 100),
-        errors,
-        allLogs:          logs.filter((l) => l.level !== 'debug').slice(0, 500),
+
+        // ── Current positions (source of truth for holdings) ───────────────
+        positions,
+
+        // ── Stats ──────────────────────────────────────────────────────────
+        stats: {
+          v1Trades:             trades.length,
+          v1Buys:               buyCount,
+          v1Sells:              sellCount,
+          v1ErrorLogs:          (v1ByTag['error'] || []).length,
+          v1HourlyPnlDeltaKrw:  Math.round(totalPnlDelta),
+          v2EventCount:         botEvents.length,
+          reconRuns:            reconRuns.length,
+          lastReconPassed:      lastRecon?.trading_enabled ?? null,
+          lastReconFreezeCount: lastRecon?.freeze_reasons?.length ?? 0,
+          adoptionRuns:         adoptionRuns.length,
+          lastAdoptionStatus:   lastAdoption?.status ?? null,
+          protectedPositions:   positions.filter((p) => p.origin === 'adopted_at_startup' && p.strategy_tag === 'unassigned').length,
+          managedPositions:     positions.filter((p) => p.managed).length,
+        },
+
+        // ── V2 bot_events by type (decision-proof audit trail) ─────────────
+        v2Events: {
+          RECONCILIATION:        v2ByType['RECONCILIATION']        || [],
+          FREEZE_STATE_CHANGED:  v2ByType['FREEZE_STATE_CHANGED']  || [],
+          FREEZE_CLEARED:        v2ByType['FREEZE_CLEARED']        || [],
+          FREEZE_CLEAR_REQUESTED:v2ByType['FREEZE_CLEAR_REQUESTED']|| [],
+          REGIME_SWITCH:         v2ByType['REGIME_SWITCH']         || [],
+          ADOPTION_IMPORT:       v2ByType['ADOPTION_IMPORT']       || [],
+          ADOPTION_UNSUPPORTED:  v2ByType['ADOPTION_UNSUPPORTED']  || [],
+          POSITION_CLASSIFIED:   v2ByType['POSITION_CLASSIFIED']   || [],
+          POSITION_SKIP_PROTECTED: v2ByType['POSITION_SKIP_PROTECTED'] || [],
+          EXIT_EVALUATION:       v2ByType['EXIT_EVALUATION']       || [],
+          EXECUTION:             v2ByType['EXECUTION']             || [],
+          CYCLE_ERROR:           v2ByType['CYCLE_ERROR']           || [],
+          // Any other event types not listed above
+          other: botEvents.filter((e) => ![
+            'RECONCILIATION','FREEZE_STATE_CHANGED','FREEZE_CLEARED','FREEZE_CLEAR_REQUESTED',
+            'REGIME_SWITCH','ADOPTION_IMPORT','ADOPTION_UNSUPPORTED','POSITION_CLASSIFIED',
+            'POSITION_SKIP_PROTECTED','EXIT_EVALUATION','EXECUTION','CYCLE_ERROR','RESEARCH_INDICATORS',
+          ].includes(e.event_type)),
+        },
+
+        // ── Reconciliation history ─────────────────────────────────────────
+        reconciliationRuns: reconRuns,
+
+        // ── Adoption history ───────────────────────────────────────────────
+        adoptionRuns,
+
+        // ── V1 trades ──────────────────────────────────────────────────────
+        v1Trades: trades,
+
+        // ── V1 logs by tag ─────────────────────────────────────────────────
+        v1Logs: {
+          adoption:   v1ByTag['adoption']   || [],
+          reconcile:  v1ByTag['reconcile']  || [],
+          trade:      v1ByTag['trade']      || [],
+          active:     v1ByTag['active']     || [],
+          hourly:     v1ByTag['hourly']     || [],
+          snapshot:   (v1ByTag['snapshot']  || []).slice(0, 20), // cap snapshots
+          sell_diag:  v1ByTag['sell_diag']  || [],
+          error:      v1ByTag['error']      || [],
+        },
       };
 
       res.setHeader('Content-Disposition', `attachment; filename="bot-logs-${days}d.json"`);
