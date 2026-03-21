@@ -272,7 +272,80 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(summary);
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|kill-switch|logs|diagnostics|export' });
+    // ── GET v2 regime (EMA50/200/ADX + current classification) ─────────────
+    if (action === 'regime' && req.method === 'GET') {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'current_regime').single().catch(() => ({ data: null }));
+      return res.status(200).json({ regime: data?.value ?? null });
+    }
+
+    // ── GET v2 open positions (tactical sleeve with cost basis + unrealized PnL) ─
+    if (action === 'positions' && req.method === 'GET') {
+      const { data: positions, error: posErr } = await supabase.from('positions')
+        .select('*').eq('state', 'open').order('opened_at', { ascending: false });
+      if (posErr) return res.status(500).json({ error: posErr.message });
+
+      // Enrich with current price from latest portfolio snapshot
+      const { data: snap } = await supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single().catch(() => ({ data: null }));
+      const enriched = (positions || []).map((p) => {
+        const priceKey  = p.asset.toLowerCase();
+        const valueKrw  = snap?.value?.[`${priceKey}_value_krw`];
+        const navKrw    = snap?.value?.nav_krw;
+        // Approximate current price from holdings value / qty_open
+        const curPrice  = p.qty_open > 0 && valueKrw ? valueKrw / p.qty_open : null;
+        const gainPct   = curPrice && p.avg_cost_krw > 0 ? ((curPrice - p.avg_cost_krw) / p.avg_cost_krw) * 100 : null;
+        return { ...p, current_price_krw: curPrice, unrealized_pnl_pct: gainPct };
+      });
+
+      return res.status(200).json({ positions: enriched });
+    }
+
+    // ── GET v2 recent orders with state classification ───────────────────────
+    if (action === 'orders' && req.method === 'GET') {
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const { data: orders, error: ordErr } = await supabase.from('orders')
+        .select('id, identifier, asset, side, state, reason, krw_requested, qty_requested, regime_at_order, mode, retry_count, error_message, created_at, updated_at')
+        .order('created_at', { ascending: false }).limit(limit);
+      if (ordErr) return res.status(500).json({ error: ordErr.message });
+      return res.status(200).json({ orders: orders || [] });
+    }
+
+    // ── GET v2 NAV time series (for USD-proxy chart) ─────────────────────────
+    if (action === 'nav' && req.method === 'GET') {
+      const days = Math.min(Number(req.query.days) || 7, 30);
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const { data: snaps, error: navErr } = await supabase.from('portfolio_snapshots_v2')
+        .select('nav_krw, nav_usd_proxy, krw_pct, regime, circuit_breakers, created_at')
+        .gte('created_at', since).order('created_at', { ascending: true }).limit(2000);
+      if (navErr) return res.status(500).json({ error: navErr.message });
+      return res.status(200).json({ snapshots: snaps || [] });
+    }
+
+    // ── GET v2 circuit breaker status ────────────────────────────────────────
+    if (action === 'circuit-breakers' && req.method === 'GET') {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single().catch(() => ({ data: null }));
+      return res.status(200).json({ circuitBreakers: data?.value ?? null });
+    }
+
+    // ── POST v2 config (mode + thresholds) ───────────────────────────────────
+    if (action === 'v2-config' && req.method === 'POST') {
+      const body = req.body ?? {};
+      const allowed = ['mode', 'enabled', 'max_btc_pct', 'max_eth_pct', 'max_sol_pct',
+        'max_risk_per_signal_pct', 'max_entries_per_coin_24h', 'daily_turnover_cap_pct',
+        'loss_streak_limit', 'drawdown_7d_threshold', 'stop_loss_pct',
+        'entry_bb_pct_uptrend', 'entry_rsi_min_uptrend', 'entry_rsi_max_uptrend',
+        'exit_atr_trim1', 'exit_atr_trim2', 'exit_atr_trailing', 'exit_time_stop_hours'];
+      const patch = {};
+      for (const key of allowed) {
+        if (body[key] !== undefined) patch[key] = body[key];
+      }
+      if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'No valid fields' });
+      patch.updated_at = new Date().toISOString();
+      const { error: cfgErr } = await supabase.from('bot_config').update(patch).not('id', 'is', null);
+      if (cfgErr) return res.status(500).json({ error: cfgErr.message });
+      return res.status(200).json({ ok: true, updated: patch });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|orders|nav|circuit-breakers' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

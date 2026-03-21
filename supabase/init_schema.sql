@@ -674,4 +674,172 @@ DROP POLICY IF EXISTS "Allow all for service" ON crypto_bot_logs;
 CREATE POLICY "Allow all for service" ON crypto_bot_logs         FOR ALL USING (true) WITH CHECK (true);
 
 
+-- ================================================================
+-- 023_v2_schema.sql
+-- ================================================================
+-- Bot v2: bot_config, positions, orders, fills, portfolio_snapshots_v2, bot_events
 
+CREATE TABLE IF NOT EXISTS bot_config (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mode                     TEXT NOT NULL DEFAULT 'paper' CHECK (mode IN ('paper','shadow','live')),
+  enabled                  BOOLEAN NOT NULL DEFAULT true,
+  coins                    JSONB NOT NULL DEFAULT '["BTC","ETH","SOL"]'::jsonb,
+  core_target_pct          NUMERIC(5,2) NOT NULL DEFAULT 30,
+  tactical_target_pct      NUMERIC(5,2) NOT NULL DEFAULT 15,
+  krw_min_reserve_pct      NUMERIC(5,2) NOT NULL DEFAULT 12,
+  entry_bb_pct_uptrend     NUMERIC(5,3) NOT NULL DEFAULT 0.25,
+  entry_rsi_min_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 35,
+  entry_rsi_max_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 45,
+  entry_bb_pct_range       NUMERIC(5,3) NOT NULL DEFAULT 0.10,
+  entry_rsi_max_range      NUMERIC(5,2) NOT NULL DEFAULT 35,
+  entry_bb_pct_downtrend   NUMERIC(5,3) NOT NULL DEFAULT 0.05,
+  entry_rsi_max_downtrend  NUMERIC(5,2) NOT NULL DEFAULT 28,
+  ob_imbalance_min         NUMERIC(5,3) NOT NULL DEFAULT -0.30,
+  exit_atr_trim1           NUMERIC(5,2) NOT NULL DEFAULT 1.20,
+  exit_atr_trim2           NUMERIC(5,2) NOT NULL DEFAULT 2.00,
+  exit_atr_trailing        NUMERIC(5,2) NOT NULL DEFAULT 1.50,
+  exit_time_stop_hours     NUMERIC(6,1) NOT NULL DEFAULT 30,
+  regime_adx_uptrend       NUMERIC(5,2) NOT NULL DEFAULT 20,
+  regime_adx_range_exit    NUMERIC(5,2) NOT NULL DEFAULT 25,
+  regime_ema_range_pct     NUMERIC(5,3) NOT NULL DEFAULT 0.02,
+  max_btc_pct              NUMERIC(5,2) NOT NULL DEFAULT 35,
+  max_eth_pct              NUMERIC(5,2) NOT NULL DEFAULT 25,
+  max_sol_pct              NUMERIC(5,2) NOT NULL DEFAULT 10,
+  max_risk_per_signal_pct  NUMERIC(5,2) NOT NULL DEFAULT 2,
+  max_entries_per_coin_24h INTEGER      NOT NULL DEFAULT 3,
+  daily_turnover_cap_pct   NUMERIC(5,2) NOT NULL DEFAULT 35,
+  loss_streak_limit        INTEGER      NOT NULL DEFAULT 5,
+  drawdown_7d_threshold    NUMERIC(5,2) NOT NULL DEFAULT -4,
+  stop_loss_pct            NUMERIC(5,2) NOT NULL DEFAULT 0,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO bot_config DEFAULT VALUES ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS positions (
+  position_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset           TEXT NOT NULL,
+  strategy_tag    TEXT NOT NULL CHECK (strategy_tag IN ('core','tactical')),
+  qty_open        NUMERIC(24,10) NOT NULL DEFAULT 0,
+  qty_total       NUMERIC(24,10) NOT NULL DEFAULT 0,
+  avg_cost_krw    NUMERIC(20,4)  NOT NULL DEFAULT 0,
+  realized_pnl    NUMERIC(20,4)  NOT NULL DEFAULT 0,
+  entry_regime    TEXT CHECK (entry_regime IN ('UPTREND','RANGE','DOWNTREND')),
+  entry_reason    TEXT,
+  atr_at_entry    NUMERIC(20,4),
+  spread_estimate NUMERIC(10,6),
+  usd_proxy_fx    NUMERIC(12,4),
+  state           TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed','partial')),
+  opened_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at       TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_positions_asset_state ON positions(asset, state);
+CREATE INDEX IF NOT EXISTS idx_positions_strategy    ON positions(strategy_tag, state);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identifier      UUID NOT NULL UNIQUE,
+  exchange_uuid   TEXT,
+  asset           TEXT NOT NULL,
+  side            TEXT NOT NULL CHECK (side IN ('buy','sell')),
+  order_type      TEXT NOT NULL DEFAULT 'market',
+  qty_requested   NUMERIC(24,10),
+  krw_requested   NUMERIC(20,4),
+  price_submitted NUMERIC(20,4),
+  strategy_tag    TEXT CHECK (strategy_tag IN ('core','tactical')),
+  position_id     UUID REFERENCES positions(position_id),
+  regime_at_order TEXT CHECK (regime_at_order IN ('UPTREND','RANGE','DOWNTREND')),
+  reason          TEXT,
+  state           TEXT NOT NULL DEFAULT 'intent_created' CHECK (state IN (
+    'intent_created','submitted','accepted','partially_filled',
+    'filled','dust_refunded_and_filled','cancelled_by_rule',
+    'failed_transient','failed_terminal'
+  )),
+  raw_response    JSONB,
+  mode            TEXT NOT NULL DEFAULT 'paper' CHECK (mode IN ('paper','shadow','live')),
+  retry_count     INTEGER NOT NULL DEFAULT 0,
+  error_message   TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_orders_asset_state ON orders(asset, state);
+CREATE INDEX IF NOT EXISTS idx_orders_identifier  ON orders(identifier);
+CREATE INDEX IF NOT EXISTS idx_orders_created     ON orders(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS fills (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id        UUID NOT NULL REFERENCES orders(id),
+  position_id     UUID REFERENCES positions(position_id),
+  asset           TEXT NOT NULL,
+  side            TEXT NOT NULL CHECK (side IN ('buy','sell')),
+  price_krw       NUMERIC(20,4)  NOT NULL,
+  qty             NUMERIC(24,10) NOT NULL,
+  fee_krw         NUMERIC(20,4)  NOT NULL DEFAULT 0,
+  fee_rate        NUMERIC(8,6)   NOT NULL DEFAULT 0.0025,
+  strategy_tag    TEXT CHECK (strategy_tag IN ('core','tactical')),
+  entry_regime    TEXT,
+  entry_reason    TEXT,
+  atr_at_entry    NUMERIC(20,4),
+  spread_estimate NUMERIC(10,6),
+  usd_proxy_fx    NUMERIC(12,4),
+  executed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fills_order_id   ON fills(order_id);
+CREATE INDEX IF NOT EXISTS idx_fills_asset_time ON fills(asset, executed_at DESC);
+
+CREATE TABLE IF NOT EXISTS portfolio_snapshots_v2 (
+  id              BIGSERIAL PRIMARY KEY,
+  nav_krw         NUMERIC(20,4) NOT NULL,
+  nav_usd_proxy   NUMERIC(20,4),
+  usdt_krw_rate   NUMERIC(12,4),
+  krw_balance     NUMERIC(20,4),
+  krw_pct         NUMERIC(6,2),
+  btc_value_krw   NUMERIC(20,4),
+  btc_pct         NUMERIC(6,2),
+  eth_value_krw   NUMERIC(20,4),
+  eth_pct         NUMERIC(6,2),
+  sol_value_krw   NUMERIC(20,4),
+  sol_pct         NUMERIC(6,2),
+  regime          TEXT CHECK (regime IN ('UPTREND','RANGE','DOWNTREND')),
+  alpha_vs_btc    NUMERIC(10,4),
+  circuit_breakers JSONB,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_snapshots_v2_created ON portfolio_snapshots_v2(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS bot_events (
+  id           BIGSERIAL PRIMARY KEY,
+  event_type   TEXT NOT NULL,
+  severity     TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('debug','info','warn','error','critical')),
+  subsystem    TEXT NOT NULL,
+  message      TEXT NOT NULL,
+  context_json JSONB,
+  regime       TEXT,
+  mode         TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bot_events_created  ON bot_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bot_events_type_sev ON bot_events(event_type, severity);
+
+ALTER TABLE bot_config             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE positions              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fills                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE portfolio_snapshots_v2 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bot_events             ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all for service" ON bot_config;
+CREATE POLICY "Allow all for service" ON bot_config             FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON positions;
+CREATE POLICY "Allow all for service" ON positions              FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON orders;
+CREATE POLICY "Allow all for service" ON orders                 FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON fills;
+CREATE POLICY "Allow all for service" ON fills                  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON portfolio_snapshots_v2;
+CREATE POLICY "Allow all for service" ON portfolio_snapshots_v2 FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all for service" ON bot_events;
+CREATE POLICY "Allow all for service" ON bot_events             FOR ALL USING (true) WITH CHECK (true);

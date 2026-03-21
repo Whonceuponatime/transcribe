@@ -52,6 +52,13 @@ export default function CryptoTraderDashboard() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
 
+  // V2 state
+  const [v2Regime, setV2Regime]               = useState(null);
+  const [v2Positions, setV2Positions]         = useState([]);
+  const [v2CircuitBreakers, setV2CircuitBreakers] = useState(null);
+  const [v2Mode, setV2Mode]                   = useState('paper');
+  const [v2SavingMode, setV2SavingMode]       = useState(false);
+
   // Config form state (synced from status)
   const [cfg, setCfg] = useState({
     dca_enabled: true,
@@ -102,7 +109,40 @@ export default function CryptoTraderDashboard() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+  // Fetch v2 data (regime, positions, circuit breakers, mode)
+  const fetchV2Data = useCallback(async () => {
+    try {
+      const [regimeRes, posRes, cbRes] = await Promise.all([
+        fetch(`${API}/api/crypto-trader?action=regime`),
+        fetch(`${API}/api/crypto-trader?action=positions`),
+        fetch(`${API}/api/crypto-trader?action=circuit-breakers`),
+      ]);
+      if (regimeRes.ok) { const d = await regimeRes.json(); setV2Regime(d.regime); }
+      if (posRes.ok)    { const d = await posRes.json();    setV2Positions(d.positions || []); }
+      if (cbRes.ok)     { const d = await cbRes.json();     setV2CircuitBreakers(d.circuitBreakers); }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    fetchV2Data();
+  }, [fetchStatus, fetchV2Data]);
+
+  // Save v2 mode
+  const saveV2Mode = useCallback(async (newMode) => {
+    setV2SavingMode(true);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=v2-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      const j = await res.json();
+      if (j.ok) { setV2Mode(newMode); setMsg(`V2 mode set to ${newMode.toUpperCase()}`); await fetchV2Data(); }
+      else setError(j.error);
+    } catch (e) { setError(e.message); }
+    setV2SavingMode(false);
+  }, [fetchV2Data]);
 
   const execute = useCallback(async (forceDca = false) => {
     if (!window.confirm(forceDca
@@ -644,6 +684,92 @@ export default function CryptoTraderDashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ═══ V2 ENGINE STATUS ═══ */}
+      <div className="ct__section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.8rem' }}>
+          <h3 className="ct__section-title" style={{ margin: 0 }}>Engine v2</h3>
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            {['paper','shadow','live'].map((m) => (
+              <button key={m}
+                disabled={v2SavingMode}
+                onClick={() => { if (m === 'live' && !window.confirm('Switch to LIVE mode? Real money will be traded by the v2 engine.')) return; saveV2Mode(m); }}
+                style={{
+                  padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', border: 'none',
+                  background: v2Mode === m
+                    ? m === 'live' ? '#ef4444' : m === 'shadow' ? '#f59e0b' : '#22c55e'
+                    : 'rgba(255,255,255,0.06)',
+                  color: v2Mode === m ? '#fff' : '#888',
+                  fontWeight: v2Mode === m ? 700 : 400,
+                }}>
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Regime badge */}
+        {v2Regime && (
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.8rem', alignItems: 'center' }}>
+            <span style={{
+              padding: '0.3rem 0.8rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem',
+              background: v2Regime.regime === 'UPTREND' ? 'rgba(34,197,94,0.15)' : v2Regime.regime === 'DOWNTREND' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+              color:      v2Regime.regime === 'UPTREND' ? '#22c55e'              : v2Regime.regime === 'DOWNTREND' ? '#ef4444'              : '#f59e0b',
+            }}>
+              {v2Regime.regime === 'UPTREND' ? '▲' : v2Regime.regime === 'DOWNTREND' ? '▼' : '◆'} {v2Regime.regime ?? '—'}
+            </span>
+            <span className="ct__muted" style={{ fontSize: '0.78rem' }}>
+              EMA50: {v2Regime.ema50 ? `₩${Number(v2Regime.ema50).toLocaleString()}` : '—'}
+            </span>
+            <span className="ct__muted" style={{ fontSize: '0.78rem' }}>
+              EMA200: {v2Regime.ema200 ? `₩${Number(v2Regime.ema200).toLocaleString()}` : '—'}
+            </span>
+            <span className="ct__muted" style={{ fontSize: '0.78rem' }}>
+              ADX: {v2Regime.adxVal ?? '—'}
+            </span>
+            {v2Regime.fromCache && <span className="ct__muted" style={{ fontSize: '0.7rem' }}>(cached)</span>}
+          </div>
+        )}
+
+        {/* Circuit breakers */}
+        {v2CircuitBreakers?.anyActive && (
+          <div style={{ marginBottom: '0.8rem' }}>
+            {v2CircuitBreakers.breakers.map((b, i) => (
+              <div key={i} style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', borderRadius: '4px', padding: '0.4rem 0.7rem', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                ⛔ {b.type}: {b.detail}
+              </div>
+            ))}
+          </div>
+        )}
+        {v2CircuitBreakers && !v2CircuitBreakers.anyActive && (
+          <div style={{ fontSize: '0.78rem', color: '#22c55e', marginBottom: '0.6rem' }}>✓ No circuit breakers active</div>
+        )}
+
+        {/* Open tactical positions */}
+        {v2Positions.length > 0 && (
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Open Tactical Positions</div>
+            {v2Positions.map((p) => (
+              <div key={p.position_id} style={{ display: 'flex', gap: '1rem', fontSize: '0.82rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, minWidth: '3rem' }}>{p.asset}</span>
+                <span className="ct__muted">qty: {Number(p.qty_open).toFixed(6)}</span>
+                <span className="ct__muted">avg: ₩{Math.round(p.avg_cost_krw).toLocaleString()}</span>
+                {p.unrealized_pnl_pct != null && (
+                  <span style={{ color: p.unrealized_pnl_pct >= 0 ? '#22c55e' : '#ef4444' }}>
+                    {p.unrealized_pnl_pct >= 0 ? '+' : ''}{p.unrealized_pnl_pct.toFixed(2)}%
+                  </span>
+                )}
+                <span className="ct__muted" style={{ fontSize: '0.72rem' }}>regime@entry: {p.entry_regime ?? '—'}</span>
+                <span className="ct__muted" style={{ fontSize: '0.72rem' }}>{p.entry_reason ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {v2Positions.length === 0 && (
+          <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No open tactical positions</div>
+        )}
       </div>
 
       {/* ═══ BOT LOGS ═══ */}

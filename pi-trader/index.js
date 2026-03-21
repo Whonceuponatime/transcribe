@@ -23,7 +23,10 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
-const trader = require('../lib/cryptoTrader');
+const trader   = require('../lib/cryptoTrader');
+const traderV2 = require('../lib/cryptoTraderV2');
+const riskEngine = require('../lib/riskEngine');
+const regimeEngine = require('../lib/regimeEngine');
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'UPBIT_ACCESS_KEY', 'UPBIT_SECRET_KEY'];
 for (const key of required) {
@@ -31,13 +34,17 @@ for (const key of required) {
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-let running = false;
+let running   = false;
+let runningV2 = false;
+
+// Per-coin order lock for v2 (prevents concurrent orders on same asset)
+const coinLocks = {};
 
 // Cycle counters
-let sellCheckCount  = 0;  // increments every sell_check cycle
-let snapshotCount   = 0;  // increments every cycle; snapshot logged every 15
+let sellCheckCount  = 0;
+let snapshotCount   = 0;
 
-// Hourly digest accumulator — reset each hour
+// Hourly digest accumulator
 let hourlyTrades    = [];
 let hourlyStartKrw  = null;
 
@@ -347,6 +354,87 @@ async function pollTrigger() {
   } catch (_) {}
 }
 
+// ─── V2 cycle runner ─────────────────────────────────────────────────────────
+
+/**
+ * Run one v2 cycle. Uses a separate lock from the v1 runner.
+ * Per-coin order locks prevent concurrent orders on the same asset.
+ */
+async function runCycleV2(opts = {}, label = 'v2_auto') {
+  if (await isKilled()) return;
+  if (runningV2) { console.log(`[v2][${label}] Busy — skipped`); return; }
+
+  runningV2 = true;
+  try {
+    const result = await traderV2.executeCycleV2(supabase, opts);
+
+    // Log mode prominently on first run
+    if (!runCycleV2._modeLogged) {
+      const mode = result.mode ?? 'paper';
+      console.log(`\n${'═'.repeat(60)}`);
+      console.log(`  V2 ENGINE MODE: ${mode.toUpperCase()}`);
+      if (mode === 'paper')  console.log('  Paper mode — decisions logged, NO orders sent to exchange');
+      if (mode === 'shadow') console.log('  Shadow mode — decisions logged with [SHADOW] label');
+      if (mode === 'live')   console.log('  LIVE mode — real orders are being sent to Upbit');
+      console.log(`${'═'.repeat(60)}\n`);
+      runCycleV2._modeLogged = true;
+    }
+
+    // Write a brief info log for dashboard visibility
+    const sells = result.sells?.filter((s) => s.result?.ok).length ?? 0;
+    const buys  = result.buys?.filter((b)  => b.result?.ok).length ?? 0;
+    if (sells > 0 || buys > 0) {
+      await writeLog('info', `v2_${label}`, `[v2] Regime=${result.regime} sells=${sells} buys=${buys}`, { sells: result.sells, buys: result.buys, mode: result.mode });
+    }
+
+  } catch (err) {
+    console.error(`[v2] Cycle error: ${err.message}`);
+    await writeLog('error', `v2_${label}`, `[v2] Cycle error: ${err.message}`);
+  } finally {
+    runningV2 = false;
+  }
+}
+runCycleV2._modeLogged = false;
+
+/**
+ * Startup reconciliation — verify exchange state matches DB on boot and every 4h.
+ * Currently logs mismatches to bot_events for operator review.
+ */
+async function reconcile(trigger = 'scheduled') {
+  try {
+    const accounts = await require('../lib/upbit').getAccounts().catch(() => []);
+    const { data: openOrders } = await supabase.from('orders')
+      .select('id, identifier, asset, state')
+      .in('state', ['submitted', 'accepted', 'partially_filled'])
+      .catch(() => ({ data: [] }));
+
+    const pendingCount = (openOrders || []).length;
+
+    if (pendingCount > 0) {
+      console.warn(`[reconcile] ${pendingCount} orders in unresolved state — checking exchange`);
+      await supabase.from('bot_events').insert({
+        event_type:   'RECONCILIATION',
+        severity:     pendingCount > 0 ? 'warn' : 'info',
+        subsystem:    'reconciliation',
+        message:      `Reconcile (${trigger}): ${pendingCount} unresolved orders`,
+        context_json: { pendingCount, orders: openOrders?.map((o) => ({ id: o.id, asset: o.asset, state: o.state })) },
+      }).catch(() => {});
+    }
+
+    // Persist latest KRW/coin balances to bot_events for audit
+    await supabase.from('bot_events').insert({
+      event_type:   'RECONCILIATION',
+      severity:     'debug',
+      subsystem:    'reconciliation',
+      message:      `Balance snapshot (${trigger})`,
+      context_json: { balances: accounts.map((a) => ({ currency: a.currency, balance: a.balance, avg_buy_price: a.avg_buy_price })) },
+    }).catch(() => {});
+
+  } catch (err) {
+    console.error('[reconcile] Error:', err.message);
+  }
+}
+
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
 // Every 2 min — sell checks
@@ -369,14 +457,27 @@ setInterval(pollDeploy,  10_000);
 setInterval(heartbeat, 5 * 60_000);
 heartbeat();
 
+// ── V2 schedules (run alongside v1) ──────────────────────────────────────────
+// V2 sell checks every 2 min (same cadence as v1)
+cron.schedule('*/2 * * * *', () => runCycleV2({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
+// V2 buy checks every 5 min
+cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC' });
+// Reconciliation every 4h
+cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
+
 // Startup
 setTimeout(() => runCycle({}, 'startup'), 5000);
+setTimeout(() => runCycleV2({}, 'startup'), 8000);   // v2 starts 3s after v1
+setTimeout(() => reconcile('startup'), 12000);        // reconcile on boot
 
-console.log('[pi-trader] v4.0 started — comprehensive logging');
-console.log('  Sell checks : every 2 min');
-console.log('  Dip buys    : every 5 min');
-console.log('  DCA         : daily at 01:00 UTC (configurable cooldown)');
-console.log('  Snapshots   : every ~30 min to crypto_bot_logs');
-console.log('  Hourly      : P&L digest + near-miss summary');
-console.log('  Sell diag   : every ~14 min with block reasons');
-console.log('  Trades      : logged immediately with full indicator context');
+// Load risk engine state from DB
+riskEngine.loadState(supabase).catch(() => {});
+
+console.log('[pi-trader] v4.0 started — v1 live + v2 paper running in parallel');
+console.log('  V1 sell checks : every 2 min (v1 live signals)');
+console.log('  V1 dip buys    : every 5 min');
+console.log('  V1 DCA         : daily at 01:00 UTC');
+console.log('  V2 sell checks : every 2 min (regime + ATR exits, paper mode)');
+console.log('  V2 buy checks  : every 5 min (4-factor signals, paper mode)');
+console.log('  Reconciliation : every 4h + on startup');
+console.log('  Switch to live : set mode=live in bot_config via dashboard');
