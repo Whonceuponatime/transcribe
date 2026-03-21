@@ -355,10 +355,17 @@ async function pollDeploy() {
       console.log('[deploy] Running git pull…');
 
       const { execSync } = require('child_process');
-      execSync('git pull', { cwd: require('path').resolve(__dirname, '..'), stdio: 'inherit' });
+      const root = require('path').resolve(__dirname, '..');
 
-      await writeLog('info', 'deploy', 'git pull complete — exiting so PM2 restarts with new code');
-      console.log('[deploy] git pull done — exiting for PM2 restart');
+      execSync('git pull', { cwd: root, stdio: 'inherit' });
+
+      // Install any new npm packages added since the last deploy.
+      // This ensures executionEngine (uuid), etc. are always available.
+      console.log('[deploy] Running npm install…');
+      execSync('npm install --omit=dev', { cwd: root, stdio: 'inherit' });
+
+      await writeLog('info', 'deploy', 'git pull + npm install complete — exiting so PM2 restarts with new code');
+      console.log('[deploy] Done — exiting for PM2 restart');
       setTimeout(() => process.exit(0), 500);
     }
   } catch (err) {
