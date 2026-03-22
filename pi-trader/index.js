@@ -23,10 +23,9 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
-const trader      = require('../lib/cryptoTrader');
+// V1 (cryptoTrader.js) is fully removed. V2 is the only engine.
 const traderV2    = require('../lib/cryptoTraderV2');
 const riskEngine  = require('../lib/riskEngine');
-const regimeEngine= require('../lib/regimeEngine');
 const adopter     = require('../lib/portfolioAdopter');
 const reconEngine = require('../lib/reconciliationEngine');
 
@@ -84,161 +83,16 @@ function tradeLine(t) {
   return `${side} ${t.coin} ${amt} — ${t.reason}`;
 }
 
-/**
- * Returns true when V1 should be suppressed.
- * V1 is disabled when V2 is in live mode to prevent double-trading:
- *   - Both engines target the same Upbit account
- *   - V1 fills are not tracked in V2's positions table
- *   - V1 live trades would cause V2 reconciliation balance mismatches
- *   - Concurrent V1+V2 live orders on the same coin would be uncoordinated
- */
-async function isV1Suppressed() {
-  try {
-    const cfg = await traderV2.getV2Config(supabase);
-    return (cfg.mode ?? 'paper') === 'live';
-  } catch (_) {
-    return false; // if we can't read config, let V1 run (fail open for V1)
-  }
-}
+// V1 runCycle and isV1Suppressed have been removed.
+// V2 is the only engine allowed to place orders.
 
 async function runCycle(opts = {}, label = 'auto') {
-  if (await isKilled()) { console.log(`[${label}] Kill switch ON — skipped`); return; }
-  if (running) { console.log(`[${label}] Busy — skipped`); return; }
-
-  // Suppress V1 when V2 is live to prevent concurrent trading on the same account.
-  if (await isV1Suppressed()) {
-    if (label === 'startup') {
-      console.log(`[v1][${label}] V2 is in live mode — V1 suppressed to prevent double-trading`);
-    }
-    return;
-  }
-
-  running = true;
-  snapshotCount++;
-  const startedAt = new Date().toISOString();
-  console.log(`\n[${label}] ── Start at ${startedAt}`);
-
-  try {
-    const result = await trader.executeCycle(supabase, opts);
-
-    const allTrades = [
-      ...(result.sells    || []).filter((t) => t.ok),
-      ...(result.dca      || []).filter((t) => t.ok),
-      ...(result.dipBuys  || []).filter((t) => t.ok),
-    ];
-    const completedAt = new Date().toISOString();
-
-    // ── Accumulate trades for hourly digest ─────────────────────────────────
-    hourlyTrades.push(...allTrades.map((t) => ({ ...t, cycleLabel: label, ts: completedAt })));
-
-    // ── Log every trade with full indicator context ──────────────────────────
-    for (const t of allTrades) {
-      const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
-      const indicators = result.cycleIndicators?.[t.coin] ?? null;
-      await writeLog('info', 'trade', tradeLine(t), {
-        side:       isBuy ? 'buy' : 'sell',
-        coin:       t.coin,
-        reason:     t.reason,
-        krwAmount:  t.krwAmount   ?? null,
-        soldAmount: t.soldAmount  ?? null,
-        grossKrw:   t.grossKrw    ?? null,
-        gainPct:    t.gainPct     ?? null,
-        priceKrw:   t.priceKrw    ?? null,
-        cycleLabel: label,
-        indicators,
-      });
-    }
-
-    // ── Log no-trade cycles ──────────────────────────────────────────────────
-    if (allTrades.length === 0) {
-      if (label === 'sell_check') sellCheckCount++;
-      const skipMsg = result.skipped?.join(' | ') || 'no triggers fired';
-
-      if (label !== 'sell_check') {
-        await writeLog('info', label, `No trades — ${skipMsg}`);
-      } else if (sellCheckCount % 5 === 0) {
-        // Brief "Active" log every ~10 min with sell-block summary
-        const diagSummary = (result.sellDiag || []).map((d) => {
-          if (d.atProfit) return `${d.coin} ✓ profitable`;
-          const needs = d.needsPctForProfit ? `+${d.needsPctForProfit}% to sell` : 'blocked';
-          return `${d.coin} ${d.gainPct ?? '?'}% (needs ${needs})`;
-        }).join(' | ');
-        await writeLog('info', 'active', `Sell check — ${diagSummary || skipMsg}`);
-      }
-    } else {
-      const lines = allTrades.map(tradeLine).join(' · ');
-      console.log(`[${label}] ${lines}`);
-      if (result.errors?.length) console.error(`[${label}] Errors:`, result.errors);
-    }
-
-    // ── Sell diagnostics every ~14 min (every 7 sell_check cycles) ──────────
-    if (label === 'sell_check') sellCheckCount++;
-    const isDiagCycle = label !== 'sell_check' || sellCheckCount % 7 === 0;
-    if (isDiagCycle && (result.sellDiag || []).length > 0) {
-      const diagLines = result.sellDiag.map((d) => {
-        const base  = `${d.coin}: gain=${d.gainPct ?? '?'}% net=${d.netGainPct ?? '?'}%`;
-        const block = d.blockedBy ? ` | BLOCKED: ${d.blockedBy}` : (d.signalsMet.length ? ` | SIGNALS: ${d.signalsMet.join(',')}` : ' | no signals');
-        const ind   = ` | RSI=${d.indicators?.rsi} StochRSI=${d.indicators?.stochRsi} VWAP=${d.indicators?.vwapDev}% WR=${d.indicators?.williamsR} CCI=${d.indicators?.cci}`;
-        return base + block + ind;
-      });
-      await writeLog('debug', 'sell_diag', diagLines.join('  ·  '), {
-        sellDiag: result.sellDiag,
-        skipped:  result.skipped,
-        cycleLabel: label,
-      });
-    }
-
-    // ── Full snapshot every ~30 min (every 15 cycles across all types) ──────
-    // Snapshot captures everything needed for post-mortem analysis:
-    // indicators, portfolio, sell decisions, dip signal evaluations, skipped reasons
-    if (snapshotCount % 15 === 0) {
-      const { data: snapRow } = await Promise.resolve(
-        supabase.from('app_settings').select('value')
-          .eq('key', 'last_cycle_detail').single()
-      ).catch(() => ({ data: null }));
-      const cycleDetail = snapRow?.value ?? null;
-      if (cycleDetail) {
-        const snapMsg = [
-          `F&G=${cycleDetail.fearGreed?.value ?? '?'}`,
-          `KRW=${cycleDetail.portfolio?.krwBalance != null ? Math.round(cycleDetail.portfolio.krwBalance / 1000) + 'K' : '?'}`,
-          ...(cycleDetail.portfolio?.positions ?? []).map((p) =>
-            `${p.coin}=${p.gainPct != null ? (p.gainPct >= 0 ? '+' : '') + p.gainPct.toFixed(1) + '%' : '?'} RSI=${cycleDetail.indicators?.[p.coin]?.rsi?.toFixed(1) ?? '?'}`
-          ),
-          `sells=${allTrades.filter((t) => !t.reason?.startsWith('DIP') && !t.reason?.startsWith('DCA')).length}`,
-          `buys=${allTrades.filter((t) => t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA')).length}`,
-        ].join(' | ');
-
-        await writeLog('debug', 'snapshot', snapMsg, cycleDetail);
-      }
-    }
-
-    // ── Persist last_cycle_result for status display ─────────────────────────
-    try {
-      await supabase.from('app_settings').upsert({
-        key: 'last_cycle_result',
-        value: { result, label, startedAt, completedAt, ok: true },
-        updated_at: completedAt,
-      }, { onConflict: 'key' });
-    } catch (_) {}
-
-    if (result.errors?.length) {
-      await writeLog('warn', label, `Cycle errors: ${result.errors.join('; ')}`);
-    }
-
-  } catch (err) {
-    console.error(`[pi-trader] Cycle error: ${err.message}`);
-    await writeLog('error', label, `Cycle error: ${err.message}`, { stack: err.stack?.slice(0, 500) });
-    try {
-      await supabase.from('app_settings').upsert({
-        key: 'last_cycle_result',
-        value: { error: err.message, label, startedAt, ok: false },
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
-    } catch (_) {}
-  } finally {
-    running = false;
-  }
+  // V1 placeholder — kept to avoid reference errors in setTimeout calls below.
+  // Does nothing. Will be removed in a future cleanup.
+  void opts; void label;
 }
+
+// V1 cycle body removed — see git history if needed.
 
 /**
  * Hourly digest — fires every hour.
@@ -316,28 +170,15 @@ async function heartbeat() {
   try {
     await supabase.from('app_settings').upsert({
       key: 'pi_heartbeat',
-      value: { lastSeen: new Date().toISOString(), version: '4.0' },
+      value: { lastSeen: new Date().toISOString(), version: '5.0', engine: 'V2_live_only' },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'key' });
   } catch (_) {}
 
+  // V2 saves its own portfolio snapshot every cycle.
+  // V1 portfolio snapshot (trader.savePortfolioSnapshot) has been removed.
   try {
-    const upbit  = require('../lib/upbit');
-    const config = await trader.getConfig(supabase);
-    const coins  = config.coins || ['BTC', 'ETH', 'SOL'];
-
-    const [accounts, tickers] = await Promise.all([
-      upbit.getAccounts().catch(() => []),
-      upbit.getTicker(coins.map((c) => `KRW-${c}`)).catch(() => []),
-    ]);
-
-    const priceMap = {};
-    for (const t of tickers) priceMap[t.market.split('-')[1]] = t.trade_price;
-
-    const { data: fxRow } = await supabase.from('app_settings').select('value').eq('key', 'usd_krw_rate').single();
-    const usdKrw = fxRow?.value?.rate ?? null;
-
-    await trader.savePortfolioSnapshot(supabase, { accounts, priceMap, usdKrw, coins, config });
+    // no-op placeholder so the try/catch structure is clear
   } catch (_) {}
 }
 
@@ -491,11 +332,10 @@ async function reconcile(trigger = 'scheduled') {
 async function startupSequence() {
   const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
   const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
-  const mode  = cfg.mode  ?? 'paper';
 
   console.log(`\n${'═'.repeat(64)}`);
-  console.log('  STARTUP SEQUENCE');
-  console.log(`  Mode: ${mode.toUpperCase()}   Coins: ${coins.join(', ')}`);
+  console.log('  STARTUP SEQUENCE — V2 LIVE ENGINE');
+  console.log(`  Coins: ${coins.join(', ')}   execution_mode: live`);
   console.log(`${'═'.repeat(64)}`);
 
   // ── Step 1: Load persisted freeze state from DB ──────────────────────────
@@ -507,7 +347,7 @@ async function startupSequence() {
   // ── Step 2: Portfolio adoption ───────────────────────────────────────────
   let adoptionResult = { alreadyDone: false, adopted: [], unsupported: [], skipped: [], error: null };
   try {
-    adoptionResult = await adopter.runAdoption(supabase, coins, mode);
+    adoptionResult = await adopter.runAdoption(supabase, coins, 'live');
 
     if (adoptionResult.alreadyDone) {
       console.log('[startup] Adoption: previously completed — skipping re-import');
@@ -531,7 +371,7 @@ async function startupSequence() {
         `Adoption complete — ${adoptionResult.adopted.length} supported adopted, ${adoptionResult.unsupported.length} excluded, ${protectedCount} need classification`,
         {
           adoption_completed:   true,
-          mode,
+          execution_mode:       'live',
           supported_managed:    adoptionResult.adopted.length,
           protected_unassigned: protectedCount,
           classified_adopted:   classifiedCount,
@@ -588,13 +428,13 @@ async function startupSequence() {
         trading_enabled: true,
         frozen:          false,
         trigger:         'startup',
-        mode,
+        execution_mode:  'live',
         recon_id:        reconResult.reconId,
         checks:          checkSummary,
         freeze_reasons:  [],
       }
     );
-    console.log(`[startup] ✓ Reconciliation passed — v2 trading enabled (mode=${mode})`);
+    console.log('[startup] ✓ Reconciliation passed — V2 live engine trading enabled');
   } else {
     const reasons = reconResult.freezeReasons.join(' | ');
     await writeLog('warn', 'reconcile',
@@ -603,7 +443,7 @@ async function startupSequence() {
         trading_enabled: false,
         frozen:          true,
         trigger:         'startup',
-        mode,
+        execution_mode:  'live',
         recon_id:        reconResult.reconId,
         checks:          checkSummary,
         freeze_reasons:  reconResult.freezeReasons,
@@ -616,17 +456,14 @@ async function startupSequence() {
   console.log(`${'═'.repeat(64)}\n`);
 }
 
-// ─── Schedules ────────────────────────────────────────────────────────────────
+// ─── Schedules (V2 live engine only) ─────────────────────────────────────────
 
-// Every 2 min — sell checks
-cron.schedule('*/2 * * * *', () => runCycle({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
-
-// Every 5 min — dip-buy checks
-cron.schedule('*/5 * * * *', () => runCycle({}, 'dip_check'), { timezone: 'UTC' });
-
-// Daily DCA at 01:00 UTC
-cron.schedule('0 1 * * *', () => runCycle({ forceDca: false }, 'daily_dca'), { timezone: 'UTC' });
-
+// V2 sell checks every 2 min
+cron.schedule('*/2 * * * *', () => runCycleV2({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
+// V2 buy checks every 5 min
+cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC' });
+// Reconciliation every 4h
+cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
 // Hourly performance digest
 cron.schedule('0 * * * *', hourlyDigest, { timezone: 'UTC' });
 
@@ -639,34 +476,18 @@ setInterval(pollReconcileTrigger, 10_000);
 setInterval(heartbeat, 5 * 60_000);
 heartbeat();
 
-// ── V2 schedules (run alongside v1) ──────────────────────────────────────────
-// V2 sell checks every 2 min (same cadence as v1)
-cron.schedule('*/2 * * * *', () => runCycleV2({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
-// V2 buy checks every 5 min
-cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC' });
-// Reconciliation every 4h
-cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
-
-// Startup sequence:
-//   5s  — v1 continues trading live (existing engine, unaffected)
-//   8s  — full startup sequence: adoption → reconciliation → unfreeze
-//          v2 cycles are blocked (frozen) until reconciliation passes
-//   After startup sequence completes: v2 first cycle runs if not frozen
-setTimeout(() => runCycle({}, 'startup'), 5000);
+// Startup: adoption → reconciliation → first V2 cycle
 setTimeout(async () => {
   await startupSequence();
-  // Run first v2 cycle immediately after startup sequence (freeze state already set)
   await runCycleV2({}, 'startup');
-}, 8000);
+}, 5000);
 
-// Load risk engine state from DB in parallel with other init
+// Load risk engine state from DB
 riskEngine.loadState(supabase).catch(() => {});
 
-console.log('[pi-trader] v4.0 started — v1 live + v2 paper running in parallel');
-console.log('  V1 sell checks : every 2 min (v1 live signals)');
-console.log('  V1 dip buys    : every 5 min');
-console.log('  V1 DCA         : daily at 01:00 UTC');
-console.log('  V2 sell checks : every 2 min (regime + ATR exits, paper mode)');
-console.log('  V2 buy checks  : every 5 min (4-factor signals, paper mode)');
-console.log('  Reconciliation : every 4h + on startup');
-console.log('  Switch to live : set mode=live in bot_config via dashboard');
+console.log('[pi-trader] v5.0 — V2 live engine only (V1 removed)');
+console.log('  engine         : V2 (live)');
+console.log('  sell checks    : every 2 min (regime + ATR exits)');
+console.log('  buy checks     : every 5 min (4-factor signals)');
+console.log('  reconciliation : every 4h + on startup');
+console.log('  controls       : trading_enabled / buys_enabled / sells_enabled in dashboard');

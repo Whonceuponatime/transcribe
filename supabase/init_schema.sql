@@ -711,6 +711,10 @@ CREATE TABLE IF NOT EXISTS bot_config (
   loss_streak_limit        INTEGER      NOT NULL DEFAULT 5,
   drawdown_7d_threshold    NUMERIC(5,2) NOT NULL DEFAULT -4,
   stop_loss_pct            NUMERIC(5,2) NOT NULL DEFAULT 0,
+  -- Live-only trading controls (mode is always 'live' in production)
+  trading_enabled          BOOLEAN NOT NULL DEFAULT true,
+  buys_enabled             BOOLEAN NOT NULL DEFAULT true,
+  sells_enabled            BOOLEAN NOT NULL DEFAULT true,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );

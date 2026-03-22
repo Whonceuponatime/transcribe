@@ -266,8 +266,8 @@ module.exports = async function handler(req, res) {
         safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
         // Latest reconciliation summary
         safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
-        // V2 bot_config (for current mode)
-        safe(supabase.from('bot_config').select('mode, enabled, coins').limit(1).single()),
+        // V2 bot_config (trading controls)
+        safe(supabase.from('bot_config').select('mode, enabled, coins, trading_enabled, buys_enabled, sells_enabled').limit(1).single()),
       ]);
 
       const botLogs      = botLogsRes.data    || [];
@@ -277,7 +277,10 @@ module.exports = async function handler(req, res) {
       const adoptionRuns = adoptionRes.data     || [];
       const positions    = positionsRes.data    || [];
       const v2Orders     = v2OrdersRes.data     || [];
-      const v2CurrentMode = v2ConfigRes.data?.mode ?? 'unknown';
+      const v2CurrentMode     = 'live'; // always live in production
+      const v2TradingEnabled  = v2ConfigRes.data?.trading_enabled ?? true;
+      const v2BuysEnabled     = v2ConfigRes.data?.buys_enabled    ?? true;
+      const v2SellsEnabled    = v2ConfigRes.data?.sells_enabled   ?? true;
 
       // ── Index by tag / type ──────────────────────────────────────────────
       const v1ByTag  = {};
@@ -587,24 +590,25 @@ module.exports = async function handler(req, res) {
         windowDays:  days,
         since,
 
-        // ── Q1, Q2, Q3, Q7: Engine source + mode + mutations ─────────────
+        // ── Engine + mutation summary ─────────────────────────────────────
+        // V2 is the only engine. V1 is removed. execution_mode is always live.
+        engine:               'V2',
+        execution_mode:       'live',
         orderSourceSummary,
         liveAccountMutationsDetected: liveMutationsDetected,
-        mixedModeRisk,
-
-        // ── Mode coherence (DB vs historical events) ──────────────────────
-        modeCoherence,
-
-        // ── V1 suppression analysis ───────────────────────────────────────
-        v1SuppressionAnalysis,
+        // mixedModeRisk is no longer applicable — V1 is removed
+        mixedModeRisk:        false,
+        v1Status:             v1HasTrades ? 'V1_TRADES_FOUND_IN_WINDOW — investigate if unexpected' : 'no_v1_trades',
 
         // ── Current system state ──────────────────────────────────────────
         systemState: {
-          v2Mode:               v2CurrentMode,
+          execution_mode:       v2CurrentMode,
+          trading_enabled:      v2TradingEnabled,
+          buys_enabled:         v2BuysEnabled,
+          sells_enabled:        v2SellsEnabled,
           freezeState:          freezeRes.data?.value ?? null,
           latestReconciliation: reconStatusRes.data?.value ?? null,
           v2Portfolio:          portfolioRes.data?.value ?? null,
-          v1LastCycle:          lastCycleRes.data?.value ?? null,
         },
 
         // ── Audit completeness grade ──────────────────────────────────────
@@ -860,14 +864,21 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ circuitBreakers: cbData?.value ?? null });
     }
 
-    // ── POST v2 config (mode + thresholds) ───────────────────────────────────
+    // ── POST v2 config (live-only controls + thresholds) ─────────────────────
+    // 'mode' is not settable — always 'live' in production.
     if (action === 'v2-config' && req.method === 'POST') {
       const body = req.body ?? {};
-      const allowed = ['mode', 'enabled', 'max_btc_pct', 'max_eth_pct', 'max_sol_pct',
+      const allowed = [
+        // Live trading controls (granular on/off without paper mode)
+        'trading_enabled', 'buys_enabled', 'sells_enabled',
+        // Exposure limits
+        'max_btc_pct', 'max_eth_pct', 'max_sol_pct',
         'max_risk_per_signal_pct', 'max_entries_per_coin_24h', 'daily_turnover_cap_pct',
         'loss_streak_limit', 'drawdown_7d_threshold', 'stop_loss_pct',
+        // Signal thresholds
         'entry_bb_pct_uptrend', 'entry_rsi_min_uptrend', 'entry_rsi_max_uptrend',
-        'exit_atr_trim1', 'exit_atr_trim2', 'exit_atr_trailing', 'exit_time_stop_hours'];
+        'exit_atr_trim1', 'exit_atr_trim2', 'exit_atr_trailing', 'exit_time_stop_hours',
+      ];
       const patch = {};
       for (const key of allowed) {
         if (body[key] !== undefined) patch[key] = body[key];

@@ -56,8 +56,11 @@ export default function CryptoTraderDashboard() {
   const [v2Regime, setV2Regime]               = useState(null);
   const [v2Positions, setV2Positions]         = useState([]);
   const [v2CircuitBreakers, setV2CircuitBreakers] = useState(null);
-  const [v2Mode, setV2Mode]                   = useState('paper');
-  const [v2SavingMode, setV2SavingMode]       = useState(false);
+  // Live-only controls (replaces mode toggle)
+  const [v2TradingEnabled, setV2TradingEnabled] = useState(true);
+  const [v2BuysEnabled, setV2BuysEnabled]       = useState(true);
+  const [v2SellsEnabled, setV2SellsEnabled]     = useState(true);
+  const [v2SavingControl, setV2SavingControl]   = useState(false);
 
   // Adoption + reconciliation state
   const [adoption, setAdoption]           = useState(null);
@@ -139,6 +142,11 @@ export default function CryptoTraderDashboard() {
         setReconStatus(d.reconciliation);
         setTradingEnabled(d.tradingEnabled ?? false);
       }
+      // Read trading controls from systemState (set by export/status API)
+      try {
+        const cfgRes = await fetch(`${API}/api/crypto-trader?action=v2-config`);
+        // v2-config is write-only; controls come from systemState in adoption response
+      } catch (_) {}
     } catch (_) {}
   }, []);
 
@@ -190,20 +198,25 @@ export default function CryptoTraderDashboard() {
     fetchV2Data();
   }, [fetchStatus, fetchV2Data]);
 
-  // Save v2 mode
-  const saveV2Mode = useCallback(async (newMode) => {
-    setV2SavingMode(true);
+  // Save live trading controls (replaces mode toggle)
+  const saveV2Control = useCallback(async (patch) => {
+    setV2SavingControl(true); setError(null); setMsg(null);
     try {
       const res = await fetch(`${API}/api/crypto-trader?action=v2-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode }),
+        body: JSON.stringify(patch),
       });
       const j = await res.json();
-      if (j.ok) { setV2Mode(newMode); setMsg(`V2 mode set to ${newMode.toUpperCase()}`); await fetchV2Data(); }
-      else setError(j.error);
+      if (j.ok) {
+        if (patch.trading_enabled !== undefined) setV2TradingEnabled(patch.trading_enabled);
+        if (patch.buys_enabled    !== undefined) setV2BuysEnabled(patch.buys_enabled);
+        if (patch.sells_enabled   !== undefined) setV2SellsEnabled(patch.sells_enabled);
+        setMsg('Trading control updated');
+        await fetchV2Data();
+      } else setError(j.error);
     } catch (e) { setError(e.message); }
-    setV2SavingMode(false);
+    setV2SavingControl(false);
   }, [fetchV2Data]);
 
   const execute = useCallback(async (forceDca = false) => {
@@ -819,22 +832,35 @@ export default function CryptoTraderDashboard() {
       {/* ═══ V2 ENGINE STATUS ═══ */}
       <div className="ct__section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.8rem' }}>
-          <h3 className="ct__section-title" style={{ margin: 0 }}>Engine v2</h3>
-          {/* Mode toggle */}
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            {['paper','shadow','live'].map((m) => (
-              <button key={m}
-                disabled={v2SavingMode}
-                onClick={() => { if (m === 'live' && !window.confirm('Switch to LIVE mode? Real money will be traded by the v2 engine.')) return; saveV2Mode(m); }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h3 className="ct__section-title" style={{ margin: 0 }}>Engine v2</h3>
+            <span style={{ fontSize: '0.7rem', background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '0.15rem 0.55rem', borderRadius: '4px', fontWeight: 700 }}>
+              LIVE
+            </span>
+          </div>
+          {/* Granular trading controls */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {[
+              { key: 'trading_enabled', label: 'Trading', val: v2TradingEnabled, set: setV2TradingEnabled, danger: true },
+              { key: 'buys_enabled',    label: 'Buys',    val: v2BuysEnabled,    set: setV2BuysEnabled },
+              { key: 'sells_enabled',   label: 'Sells',   val: v2SellsEnabled,   set: setV2SellsEnabled },
+            ].map(({ key, label, val, danger }) => (
+              <button key={key}
+                disabled={v2SavingControl}
+                onClick={() => {
+                  if (!val && danger && !window.confirm(`Enable ${label}? This will resume live trading.`)) return;
+                  if (val && danger && !window.confirm(`Disable ${label}? This will stop all V2 trading immediately.`)) return;
+                  saveV2Control({ [key]: !val });
+                }}
+                title={val ? `Click to disable ${label}` : `Click to enable ${label}`}
                 style={{
-                  padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', border: 'none',
-                  background: v2Mode === m
-                    ? m === 'live' ? '#ef4444' : m === 'shadow' ? '#f59e0b' : '#22c55e'
-                    : 'rgba(255,255,255,0.06)',
-                  color: v2Mode === m ? '#fff' : '#888',
-                  fontWeight: v2Mode === m ? 700 : 400,
+                  padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px',
+                  cursor: 'pointer', border: 'none',
+                  background: val ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)',
+                  color:      val ? '#22c55e'              : '#f87171',
+                  fontWeight: 700,
                 }}>
-                {m.toUpperCase()}
+                {label}: {val ? 'ON' : 'OFF'}
               </button>
             ))}
           </div>
