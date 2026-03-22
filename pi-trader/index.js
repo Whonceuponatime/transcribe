@@ -35,20 +35,12 @@ for (const key of required) {
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-let running         = false;
-let runningV2       = false;
-let adoptionDone    = false; // set to true once first-deployment adoption completes
+let runningV2    = false;
+let adoptionDone = false; // set true after startup adoption completes
 
-// Per-coin order lock for v2 (prevents concurrent orders on same asset)
-const coinLocks = {};
-
-// Cycle counters
-let sellCheckCount  = 0;
-let snapshotCount   = 0;
-
-// Hourly digest accumulator
-let hourlyTrades    = [];
-let hourlyStartKrw  = null;
+// Hourly digest accumulator (V2 fills, not V1 trades)
+let hourlyTrades   = [];
+let hourlyStartKrw = null;
 
 /** Write one structured log row. Prunes entries older than 30 days for info+, 7 days for debug. */
 async function writeLog(level, tag, message, meta = null) {
@@ -69,30 +61,7 @@ async function isKilled() {
   } catch (_) { return false; }
 }
 
-/** Format a trade line for a human-readable log message. */
-function tradeLine(t) {
-  const isBuy = t.reason?.startsWith('DIP') || t.reason?.startsWith('DCA');
-  const side  = isBuy ? 'BUY' : 'SELL';
-  if (isBuy) {
-    return `${side} ${t.coin} ₩${Math.round(t.krwAmount || 0).toLocaleString()} — ${t.reason}`;
-  }
-  const krwVal = t.grossKrw ?? (t.soldAmount && t.priceKrw ? Math.round(t.soldAmount * t.priceKrw) : null);
-  const amt = krwVal
-    ? `${(+t.soldAmount).toFixed(6)} ${t.coin} (≈₩${krwVal.toLocaleString()})`
-    : `${t.soldAmount} ${t.coin}`;
-  return `${side} ${t.coin} ${amt} — ${t.reason}`;
-}
-
-// V1 runCycle and isV1Suppressed have been removed.
-// V2 is the only engine allowed to place orders.
-
-async function runCycle(opts = {}, label = 'auto') {
-  // V1 placeholder — kept to avoid reference errors in setTimeout calls below.
-  // Does nothing. Will be removed in a future cleanup.
-  void opts; void label;
-}
-
-// V1 cycle body removed — see git history if needed.
+// V1 runCycle and tradeLine fully removed. V2 is the only engine.
 
 /**
  * Hourly digest — fires every hour.
@@ -238,8 +207,8 @@ async function pollTrigger() {
         value: { pending: false, clearedAt: new Date().toISOString() },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
-      const forceDca = data.value.forceDca === true;
-      await runCycle({ forceDca }, 'manual_trigger');
+      // V1 runCycle removed — manual trigger now fires a V2 cycle directly
+      await runCycleV2({}, 'manual_trigger');
     }
   } catch (_) {}
 }

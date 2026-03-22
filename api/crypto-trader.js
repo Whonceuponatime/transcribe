@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
-const trader = require('../lib/cryptoTrader');
+// V1 (cryptoTrader.js) import removed. V2 is the only engine.
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -17,136 +17,134 @@ module.exports = async function handler(req, res) {
   if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
 
   try {
-    // ── GET status / portfolio ──────────────────────────────────────────────
+    // ── GET status — V2 live engine only ───────────────────────────────────
+    // All state read from V2 sources: bot_config, v2_portfolio_snapshot,
+    // positions table, system_freeze, current_regime, risk_engine_state.
+    // V1 sources (crypto_trader_config, crypto_portfolio_snapshot,
+    // last_cycle_result, fx_signal_runs, fear_greed) are not read.
     if (action === 'status' && req.method === 'GET') {
-      const config = await trader.getConfig(supabase);
+      const safe = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
 
-      // Latest signal score
-      const { data: sigData } = await supabase
-        .from('fx_signal_runs')
-        .select('score, decision')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      const [
+        v2CfgRes, heartbeatRes, ksRes, triggerRes,
+        v2SnapRes, freezeRes, regimeRes, reconRes, riskRes,
+        positionsRes, recentTradesRes,
+      ] = await Promise.all([
+        supabase.from('bot_config').select('*').limit(1).single(),
+        safe(supabase.from('app_settings').select('value,updated_at').eq('key', 'pi_heartbeat').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'kill_switch').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'crypto_manual_trigger').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'v2_portfolio_snapshot').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'current_regime').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single()),
+        supabase.from('positions').select('asset,strategy_tag,state,origin,managed,qty_open,avg_cost_krw,operator_classified_at').in('state', ['open','adopted','partial']),
+        supabase.from('v2_fills').select('asset,side,price_krw,qty,fee_krw,executed_at').order('executed_at', { ascending: false }).limit(20),
+      ]);
 
-      // Recent trades
-      const { data: recentTrades } = await supabase
-        .from('crypto_trade_log')
-        .select('*')
-        .order('executed_at', { ascending: false })
-        .limit(20);
+      const v2Cfg    = v2CfgRes.data      ?? {};
+      const snap     = v2SnapRes.data?.value ?? {};
+      const freeze   = freezeRes.data?.value ?? {};
+      const regime   = regimeRes.data?.value ?? {};
+      const recon    = reconRes.data?.value  ?? {};
+      const riskSt   = riskRes.data?.value   ?? {};
+      const hb       = heartbeatRes.data;
 
-      // Last cycle result
-      const { data: lastCycle } = await supabase
-        .from('app_settings')
-        .select('value, updated_at')
-        .eq('key', 'last_cycle_result')
-        .single();
+      const piLastSeen  = hb?.value?.lastSeen ?? null;
+      const piOnline    = piLastSeen ? (Date.now() - new Date(piLastSeen).getTime()) < 10 * 60 * 1000 : false;
 
-      // Pi heartbeat — determine if Pi is online (seen in last 10 min)
-      const { data: heartbeat } = await supabase
-        .from('app_settings')
-        .select('value, updated_at')
-        .eq('key', 'pi_heartbeat')
-        .single();
-
-      const piLastSeen = heartbeat?.value?.lastSeen ?? null;
-      const piOnline = piLastSeen
-        ? (Date.now() - new Date(piLastSeen).getTime()) < 10 * 60 * 1000
-        : false;
-
-      // Manual trigger pending?
-      const { data: triggerRow } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'crypto_manual_trigger')
-        .single();
-      const triggerPending = triggerRow?.value?.pending === true;
-
-      // Kill switch
-      const { data: ks } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'kill_switch')
-        .single();
-
-      // Portfolio snapshot — saved by Pi each cycle (Pi has Upbit keys, Vercel doesn't)
-      const { data: snapshotRow } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'crypto_portfolio_snapshot')
-        .single();
-
-      const { data: fgRow } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'fear_greed')
-        .single();
-
-      const snap = snapshotRow?.value ?? {};
+      // Build position array from V2 positions table + v2_portfolio_snapshot prices
+      const positions = (positionsRes.data || []).map((p) => {
+        const priceKey    = p.asset.toLowerCase();
+        const valueKrw    = snap[`${priceKey}_value_krw`] ?? null;
+        const currentPrice = p.qty_open > 0 && valueKrw ? valueKrw / p.qty_open : null;
+        const gainPct     = currentPrice && p.avg_cost_krw > 0
+          ? ((currentPrice - p.avg_cost_krw) / p.avg_cost_krw) * 100 : null;
+        return {
+          coin:           p.asset,
+          balance:        Number(p.qty_open),
+          avgBuyKrw:      p.avg_cost_krw ?? null,
+          currentPrice,
+          currentValueKrw: valueKrw,
+          gainPct:        gainPct != null ? +gainPct.toFixed(2) : null,
+          strategy_tag:   p.strategy_tag,
+          state:          p.state,
+          origin:         p.origin,
+          managed:        p.managed,
+        };
+      });
 
       return res.status(200).json({
-        config,
-        signalScore:      sigData?.score ?? null,
-        signalDecision:   sigData?.decision ?? null,
-        recentTrades:     recentTrades || [],
-        lastCycle:        lastCycle?.value ?? null,
+        // Engine identity
+        engine:           'V2',
+        execution_mode:   'live',
+        // Pi state
         piOnline,
         piLastSeen,
-        triggerPending,
-        killSwitch:       ks?.value?.enabled ?? false,
-        // Portfolio data from Pi snapshot
-        krwBalance:       snap.krwBalance ?? 0,
-        krwBalanceUsd:    snap.krwBalanceUsd ?? null,
-        usdKrw:           snap.usdKrw ?? null,
-        positions:        snap.positions ?? [],
-        totalValueKrw:    snap.totalValueKrw ?? null,
-        totalValueUsd:    snap.totalValueUsd ?? null,
-        effectiveDcaBudget: snap.effectiveDcaBudget ?? null,
-        effectiveDipBudget: snap.effectiveDipBudget ?? null,
-        fearGreed:        fgRow?.value ?? null,
-        snapshotAge:      snap.updatedAt ? Math.round((Date.now() - new Date(snap.updatedAt).getTime()) / 1000) : null,
+        triggerPending:   triggerRes.data?.value?.pending === true,
+        killSwitch:       ksRes.data?.value?.enabled ?? false,
+        // V2 trading controls
+        tradingEnabled:   v2Cfg.trading_enabled ?? true,
+        buysEnabled:      v2Cfg.buys_enabled    ?? true,
+        sellsEnabled:     v2Cfg.sells_enabled   ?? true,
+        // System safety state
+        systemFrozen:     freeze.frozen ?? true,
+        freezeReasons:    freeze.reasons ?? [],
+        // Regime
+        currentRegime:    regime.regime ?? null,
+        regimeEma50:      regime.ema50  ?? null,
+        regimeEma200:     regime.ema200 ?? null,
+        regimeAdx:        regime.adxVal ?? null,
+        // Portfolio (V2 sources)
+        krwBalance:       snap.krw_balance  ?? 0,
+        krwPct:           snap.krw_pct      ?? null,
+        totalValueKrw:    snap.nav_krw      ?? null,
+        totalValueUsd:    snap.nav_usd_proxy ?? null,
+        positions,
+        snapshotAge:      snap.created_at
+          ? Math.round((Date.now() - new Date(snap.created_at).getTime()) / 1000) : null,
+        // Reconciliation
+        latestReconciliation: recon,
+        riskEngineState:  riskSt,
+        // Recent V2 fills
+        recentTrades: (recentTradesRes.data || []).map((f) => ({
+          coin:       f.asset,
+          side:       f.side,
+          krw_amount: f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null,
+          coin_amount: f.qty,
+          price_krw:  f.price_krw,
+          executed_at: f.executed_at,
+          engine:     'V2',
+        })),
+        // V1-era fields explicitly nulled so dashboard knows to ignore them
+        config:        null, // retired — use bot_config via v2-config endpoint
+        signalScore:   null, // retired
+        signalDecision:null, // retired
+        lastCycle:     null, // retired — V2 cycle state is in bot_events
+        fearGreed:     null, // retired from status — use bot_events for context
       });
     }
 
-    // ── POST send trigger to Pi ─────────────────────────────────────────────
-    // Vercel does NOT call Upbit directly — Pi has the allowlisted home IP.
-    // We write a flag to Supabase; Pi picks it up within 10 seconds.
+    // ── POST trigger V2 cycle manually ──────────────────────────────────────
+    // Writes to crypto_manual_trigger; Pi polls and calls runCycleV2.
     if (action === 'execute' && req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const forceDca = body.forceDca === true;
-
       await supabase.from('app_settings').upsert({
         key: 'crypto_manual_trigger',
-        value: { pending: true, forceDca, requestedAt: new Date().toISOString() },
+        value: { pending: true, requestedAt: new Date().toISOString() },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
-
-      return res.status(200).json({
-        ok: true,
-        message: 'Trigger sent — Pi trader will execute within 10 seconds',
-        forceDca,
-      });
+      return res.status(200).json({ ok: true, message: 'V2 cycle triggered — Pi will execute within 10 seconds' });
     }
 
-    // ── POST update config ──────────────────────────────────────────────────
+    // ── POST config — V1 retired ─────────────────────────────────────────────
+    // The V1 crypto_trader_config table is no longer active.
+    // V2 controls (trading_enabled, buys_enabled, sells_enabled) are at ?action=v2-config.
     if (action === 'config' && req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const allowed = [
-        'dca_enabled', 'weekly_budget_krw', 'dip_buy_enabled', 'dip_budget_krw',
-        'coins', 'split', 'profit_take_enabled', 'signal_sell_enabled',
-        'signal_buy_enabled', 'signal_boost_enabled', 'fear_greed_gate_enabled',
-        'trailing_stop_enabled', 'trailing_stop_pct', 'bear_market_pause_enabled',
-        'min_signal_score', 'capital_pct_mode', 'dca_pct_of_krw', 'dip_pct_of_krw',
-        'max_dca_krw', 'max_dip_krw', 'dca_cooldown_days', 'stop_loss_pct',
-      ];
-      const updates = {};
-      for (const key of allowed) {
-        if (body[key] !== undefined) updates[key] = body[key];
-      }
-      await trader.saveConfig(supabase, updates);
-      const config = await trader.getConfig(supabase);
-      return res.status(200).json({ ok: true, config });
+      return res.status(410).json({
+        error: 'V1 config endpoint retired. Use ?action=v2-config to update V2 trading controls.',
+        v2_controls: ['trading_enabled', 'buys_enabled', 'sells_enabled', 'stop_loss_pct', 'max_btc_pct', 'max_eth_pct', 'max_sol_pct'],
+      });
     }
 
     // ── POST kill switch ────────────────────────────────────────────────────

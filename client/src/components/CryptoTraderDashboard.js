@@ -44,7 +44,7 @@ export default function CryptoTraderDashboard() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [executing, setExecuting] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // saving/cfg removed — V1 Bot Settings panel retired
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const [triggerPending, setTriggerPending] = useState(false);
@@ -73,23 +73,7 @@ export default function CryptoTraderDashboard() {
   const [classifyingId, setClassifyingId] = useState(null);   // position_id currently being classified
   const [classifyForm, setClassifyForm]   = useState({});     // { [position_id]: { costBasis, note } }
 
-  // Config form state (synced from status)
-  const [cfg, setCfg] = useState({
-    dca_enabled: true,
-    profit_take_enabled: true,
-    signal_boost_enabled: true,
-    fear_greed_gate_enabled: true,
-    trailing_stop_enabled: true,
-    bear_market_pause_enabled: true,
-    min_signal_score: 0,
-    capital_pct_mode: true,
-    dca_pct_of_krw: 20,
-    dca_cooldown_days: 1,
-    dip_pct_of_krw: 10,
-    max_dca_krw: 0,
-    max_dip_krw: 0,
-    stop_loss_pct: 0,
-  });
+  // V1 cfg state removed. V2 controls are in v2TradingEnabled/v2BuysEnabled/v2SellsEnabled.
 
   const fetchStatus = useCallback(async () => {
     setLoading(true); setError(null);
@@ -99,22 +83,10 @@ export default function CryptoTraderDashboard() {
         const d = await res.json();
         setStatus(d);
         setTriggerPending(d.triggerPending ?? false);
-        setCfg({
-          dca_enabled:              d.config?.dca_enabled ?? true,
-          profit_take_enabled:      d.config?.profit_take_enabled ?? true,
-          signal_boost_enabled:     d.config?.signal_boost_enabled ?? true,
-          fear_greed_gate_enabled:  d.config?.fear_greed_gate_enabled ?? true,
-          trailing_stop_enabled:    d.config?.trailing_stop_enabled ?? true,
-          bear_market_pause_enabled:d.config?.bear_market_pause_enabled ?? true,
-          min_signal_score:         d.config?.min_signal_score ?? 0,
-          capital_pct_mode:         true, // always % mode — budget = live Upbit balance
-          dca_pct_of_krw:           d.config?.dca_pct_of_krw ?? 20,
-          dca_cooldown_days:        d.config?.dca_cooldown_days ?? 1,
-          dip_pct_of_krw:           d.config?.dip_pct_of_krw ?? 10,
-          max_dca_krw:              d.config?.max_dca_krw ?? 0,
-          max_dip_krw:              d.config?.max_dip_krw ?? 0,
-          stop_loss_pct:            d.config?.stop_loss_pct ?? 0,
-        });
+        // Sync V2 trading controls from status
+        if (d.tradingEnabled !== undefined) setV2TradingEnabled(d.tradingEnabled);
+        if (d.buysEnabled    !== undefined) setV2BuysEnabled(d.buysEnabled);
+        if (d.sellsEnabled   !== undefined) setV2SellsEnabled(d.sellsEnabled);
       } else {
         const e = await res.json();
         setError(e.error || 'Failed to load status');
@@ -216,49 +188,29 @@ export default function CryptoTraderDashboard() {
     setV2SavingControl(false);
   }, [fetchV2Data]);
 
-  const execute = useCallback(async (forceDca = false) => {
-    if (!window.confirm(forceDca
-      ? 'Force a DCA buy NOW regardless of schedule? Real money will be spent.'
-      : 'Run one trade cycle (profit-take check + DCA if due)?')) return;
+  // Trigger a V2 cycle manually (replaces V1 execute/forceDca logic)
+  const execute = useCallback(async () => {
+    if (!window.confirm('Trigger a V2 evaluation cycle now? The bot will check all positions for exits and entries.')) return;
     setExecuting(true); setError(null); setMsg(null);
     try {
-      const res = await fetch(`${API}/api/crypto-trader?action=execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forceDca }),
-      });
+      const res = await fetch(`${API}/api/crypto-trader?action=execute`, { method: 'POST' });
       const j = await res.json();
       if (j.ok) {
         setTriggerPending(true);
-        setMsg('Trigger sent — Pi trader will execute within 10 seconds. Refresh to see results.');
-        // Poll for result: refresh every 5s for up to 30s
+        setMsg('V2 cycle triggered — Pi will execute within 10 seconds.');
         let polls = 0;
         const poll = setInterval(async () => {
           polls++;
           await fetchStatus();
           if (polls >= 6) clearInterval(poll);
         }, 5000);
-      } else {
-        setError(j.error);
-      }
+      } else setError(j.error);
     } catch (e) { setError(e.message); }
     setExecuting(false);
   }, [fetchStatus]);
 
-  const saveConfig = useCallback(async () => {
-    setSaving(true); setError(null); setMsg(null);
-    try {
-      const res = await fetch(`${API}/api/crypto-trader?action=config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cfg),
-      });
-      const j = await res.json();
-      if (j.ok) { setMsg('Config saved'); await fetchStatus(); }
-      else setError(j.error);
-    } catch (e) { setError(e.message); }
-    setSaving(false);
-  }, [cfg, fetchStatus]);
+  // saveConfig removed — V1 config endpoint retired.
+  // V2 controls are saved via saveV2Control (trading_enabled/buys_enabled/sells_enabled).
 
   const toggleKillSwitch = useCallback(async () => {
     const isOn = !!(status?.killSwitch);
@@ -385,8 +337,9 @@ export default function CryptoTraderDashboard() {
   const totalValueUsd  = status?.totalValueUsd ?? null;
   const piOnline       = status?.piOnline ?? false;
   const piLastSeen     = status?.piLastSeen ?? null;
-  const lastCycle      = status?.lastCycle ?? null;
-  const fearGreed      = status?.fearGreed ?? null;
+  // lastCycle and fearGreed are V1 fields — retired, always null from V2 status
+  const lastCycle      = null;
+  const fearGreed      = null;
 
   // Total cost basis across all coins
   const totalCostKrw = positions.reduce((s, p) => s + (p.avgBuyKrw > 0 ? p.avgBuyKrw * p.balance : 0), 0);
@@ -411,7 +364,8 @@ export default function CryptoTraderDashboard() {
         </div>
         <div className="ct__badges">
           {killSwitch && <span className="ct__badge ct__badge--kill">KILL SWITCH ON</span>}
-          <span className={`ct__badge ${cfg.dca_enabled ? 'ct__badge--on' : 'ct__badge--off'}`}>DCA {cfg.dca_enabled ? 'ON' : 'OFF'}</span>
+          <span className="ct__badge ct__badge--on">V2 LIVE</span>
+          {!v2TradingEnabled && <span className="ct__badge ct__badge--off">TRADING PAUSED</span>}
           {triggerPending && <span className="ct__badge ct__badge--signal">Pending…</span>}
         </div>
         <div className="ct__actions">
@@ -474,15 +428,7 @@ export default function CryptoTraderDashboard() {
               <span className="ct__meta-val">₩{fmt(usdKrw)}</span>
             </div>
           )}
-          {status?.config?.last_dca_run && (
-            <>
-              <div className="ct__meta-sep" />
-              <div className="ct__meta-item">
-                <span className="ct__meta-label">Last DCA</span>
-                <span className="ct__meta-sub">{new Date(status.config.last_dca_run).toLocaleDateString()}</span>
-              </div>
-            </>
-          )}
+          {/* Last DCA field removed — V1 crypto_trader_config retired */}
           <div className="ct__meta-sep" />
           <div className="ct__meta-item">
             <span className="ct__meta-label">Pi Status</span>
@@ -503,15 +449,8 @@ export default function CryptoTraderDashboard() {
           <div className="ct__krw-card-value">₩{fmt(krwBalance)}</div>
           {usdKrw && <div className="ct__krw-card-usd">{fmtUsd(krwBalance / usdKrw, 0)}</div>}
           <div className="ct__krw-card-sub" style={{ marginTop: '0.4rem' }}>
-            {status?.effectiveDcaBudget != null
-              ? `Next DCA: ₩${fmt(status.effectiveDcaBudget)}`
-              : cfg.weekly_budget_krw > 0 && krwBalance > 0
-                ? `~${Math.floor(krwBalance / cfg.weekly_budget_krw)}w DCA remaining`
-                : 'Set budget in settings'}
+            {v2TradingEnabled ? 'V2 live — signal-driven entries' : 'Trading paused'}
           </div>
-          {status?.effectiveDipBudget != null && (
-            <div className="ct__krw-card-sub">Dip budget: ₩{fmt(status.effectiveDipBudget)}</div>
-          )}
         </div>
 
         {/* Crypto coin cards */}
@@ -1049,116 +988,7 @@ export default function CryptoTraderDashboard() {
         )}
       </div>
 
-      {/* ═══ BOT SETTINGS ═══ */}
-      <div className="ct__section">
-        <h3 className="ct__section-title">Bot Settings</h3>
-
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">DCA Enabled</div><div className="ct__toggle-sub">Buy weekly on schedule</div></div>
-          <Toggle checked={cfg.dca_enabled} onChange={(v) => setCfg((c) => ({ ...c, dca_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Signal Boost</div><div className="ct__toggle-sub">Spend 50% extra when macro score ≥ 5</div></div>
-          <Toggle checked={cfg.signal_boost_enabled} onChange={(v) => setCfg((c) => ({ ...c, signal_boost_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Profit-Take</div><div className="ct__toggle-sub">Sell 10/15/20/25% at +10/20/40/80% gain (12/24/48/96h cooldown)</div></div>
-          <Toggle checked={cfg.profit_take_enabled} onChange={(v) => setCfg((c) => ({ ...c, profit_take_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Signal Sells</div><div className="ct__toggle-sub">RSI OB, VWAP high, Williams OB, CCI OB, Kimchi high, MACD bear…</div></div>
-          <Toggle checked={cfg.signal_sell_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, signal_sell_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Dip Buys</div><div className="ct__toggle-sub">RSI/BB/VWAP/Williams/CCI/StochRSI/ROC oversold signals — hourly</div></div>
-          <Toggle checked={cfg.dip_buy_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, dip_buy_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Trailing Stop</div><div className="ct__toggle-sub">Sell 40% if price drops 30% from 14-day high (only while profitable)</div></div>
-          <Toggle checked={cfg.trailing_stop_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, trailing_stop_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Fear & Greed Gate</div><div className="ct__toggle-sub">Skip DCA on Extreme Greed · Double on Extreme Fear</div></div>
-          <Toggle checked={cfg.fear_greed_gate_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, fear_greed_gate_enabled: v }))} />
-        </div>
-        <div className="ct__toggle-row">
-          <div><div className="ct__toggle-label">Bear Market Pause</div><div className="ct__toggle-sub">Halve budget if BTC is 30%+ below 90-day high</div></div>
-          <Toggle checked={cfg.bear_market_pause_enabled ?? true} onChange={(v) => setCfg((c) => ({ ...c, bear_market_pause_enabled: v }))} />
-        </div>
-
-        {/* Budget — always % of live Upbit KRW balance */}
-        <div style={{ marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'rgba(34,197,94,0.04)', border: '1px solid #22c55e22' }}>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <div className="ct__toggle-label" style={{ color: '#22c55e' }}>Budget — % of your Upbit KRW balance</div>
-            <div className="ct__toggle-sub">The bot automatically uses whatever KRW you have. Add more funds to Upbit and the bot scales up.</div>
-          </div>
-          <div className="ct__config-grid">
-            <div className="ct__field">
-              <label>DCA frequency (days between buys)</label>
-              <input type="number" min="0.25" max="30" step="0.25" value={cfg.dca_cooldown_days}
-                onChange={(e) => setCfg((c) => ({ ...c, dca_cooldown_days: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {cfg.dca_cooldown_days < 1
-                  ? `Every ${Math.round(cfg.dca_cooldown_days * 24)}h`
-                  : cfg.dca_cooldown_days === 1 ? 'Daily DCA (recommended)'
-                  : `Every ${cfg.dca_cooldown_days} days`}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>DCA % per buy cycle</label>
-              <input type="number" min="1" max="100" step="1" value={cfg.dca_pct_of_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, dca_pct_of_krw: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {status?.krwBalance > 0
-                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dca_pct_of_krw / 100))} at current balance`
-                  : 'e.g. 20% of ₩500,000 = ₩100,000'}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>Dip buy % per signal</label>
-              <input type="number" min="1" max="100" step="1" value={cfg.dip_pct_of_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, dip_pct_of_krw: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
-                {status?.krwBalance > 0
-                  ? `≈ ₩${fmt(Math.round(status.krwBalance * cfg.dip_pct_of_krw / 100))} at current balance`
-                  : 'e.g. 10% of ₩500,000 = ₩50,000'}
-              </span>
-            </div>
-            <div className="ct__field">
-              <label>Max DCA cap (₩, 0 = no cap)</label>
-              <input type="number" min="0" step="10000" value={cfg.max_dca_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, max_dca_krw: Number(e.target.value) }))} />
-            </div>
-            <div className="ct__field">
-              <label>Max dip-buy cap (₩, 0 = no cap)</label>
-              <input type="number" min="0" step="10000" value={cfg.max_dip_krw}
-                onChange={(e) => setCfg((c) => ({ ...c, max_dip_krw: Number(e.target.value) }))} />
-            </div>
-            <div className="ct__field" style={{ gridColumn: '1 / -1', borderTop: '1px solid #1a1a2e', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
-              <label style={{ color: '#f87171' }}>⛔ Stop-Loss % (0 = disabled)</label>
-              <input type="number" min="0" max="20" step="0.5" value={cfg.stop_loss_pct}
-                onChange={(e) => setCfg((c) => ({ ...c, stop_loss_pct: Number(e.target.value) }))} />
-              <span style={{ fontSize: '0.7rem', color: cfg.stop_loss_pct > 0 ? '#f87171' : '#555' }}>
-                {cfg.stop_loss_pct > 0
-                  ? `Sell 50% if any position drops >${cfg.stop_loss_pct}% and held >24h`
-                  : 'Disabled — bot holds losing positions until recovery'}
-              </span>
-            </div>
-          </div>
-          {status?.effectiveDcaBudget != null && (
-            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#555', display: 'flex', gap: '1rem' }}>
-              <span>Next DCA: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDcaBudget)}</strong></span>
-              <span>Next dip: <strong style={{ color: '#22c55e' }}>₩{fmt(status.effectiveDipBudget)}</strong></span>
-            </div>
-          )}
-        </div>
-
-        <div className="ct__config-footer">
-          <button className="ct__btn ct__btn--primary" onClick={saveConfig} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Settings'}
-          </button>
-        </div>
-      </div>
+      {/* V1 Bot Settings panel removed — V2 controls are in the Engine v2 section above */}
 
       {/* ═══ RECENT TRADES ═══ */}
       <div className="ct__section">
