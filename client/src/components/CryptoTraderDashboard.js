@@ -31,14 +31,7 @@ const rsiColor = (v) => v == null ? '#666' : v > 70 ? '#ef4444' : v < 30 ? '#22c
 const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#888' : v > 25 ? '#22c55e' : '#00e5ff';
 const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
 
-function Toggle({ checked, onChange }) {
-  return (
-    <label className="ct__toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="ct__toggle-slider" />
-    </label>
-  );
-}
+// Toggle component removed — was used only by the retired V1 Bot Settings panel.
 
 export default function CryptoTraderDashboard() {
   const [status, setStatus] = useState(null);
