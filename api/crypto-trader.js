@@ -958,7 +958,327 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'Reconciliation triggered — Pi will run within 10s' });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    // ── GET diagnostic export — missed-trade decision audit ───────────────────
+    // Clean per-symbol per-cycle decision rows for BTC, ETH, SOL.
+    // Shows exactly why each buy or sell was blocked or executed.
+    if (action === 'diagnostic-export' && req.method === 'GET') {
+      const hours  = Math.min(Number(req.query.hours) || 24, 72);
+      const since  = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+      const COINS  = ['BTC', 'ETH', 'SOL'];
+      const safe   = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
+
+      const [
+        buyDecisionsRes, exitEvalsRes, skipProtRes,
+        ordersRes, snapshotsRes,
+        reconEventsRes, freezeEventsRes,
+        systemFreezeRes, regimeRes, riskStateRes,
+        botCfgRes,
+      ] = await Promise.all([
+        supabase.from('bot_events').select('event_type, message, context_json, regime, created_at')
+          .eq('event_type', 'BUY_DECISION').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(2000),
+        supabase.from('bot_events').select('event_type, message, context_json, regime, created_at')
+          .eq('event_type', 'EXIT_EVALUATION').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(2000),
+        supabase.from('bot_events').select('event_type, message, context_json, regime, created_at')
+          .eq('event_type', 'POSITION_SKIP_PROTECTED').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(500),
+        supabase.from('orders').select('id, asset, side, state, reason, krw_requested, qty_requested, error_message, created_at')
+          .in('asset', COINS).gte('created_at', since).order('created_at', { ascending: true }).limit(500),
+        supabase.from('portfolio_snapshots_v2')
+          .select('nav_krw, nav_usd_proxy, krw_balance, krw_pct, btc_value_krw, eth_value_krw, sol_value_krw, regime, circuit_breakers, created_at')
+          .gte('created_at', since).order('created_at', { ascending: true }).limit(500),
+        supabase.from('bot_events').select('event_type, message, context_json, created_at')
+          .eq('event_type', 'RECONCILIATION').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(100),
+        supabase.from('bot_events').select('event_type, message, context_json, created_at')
+          .in('event_type', ['FREEZE_STATE_CHANGED', 'FREEZE_CLEARED', 'FREEZE_CLEAR_REQUESTED'])
+          .gte('created_at', since).order('created_at', { ascending: true }).limit(100),
+        safe(supabase.from('app_settings').select('value').eq('key', 'system_freeze').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'current_regime').single()),
+        safe(supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single()),
+        safe(supabase.from('bot_config').select('trading_enabled, buys_enabled, sells_enabled, coins').limit(1).single()),
+      ]);
+
+      const buyDecisions  = buyDecisionsRes.data   || [];
+      const exitEvals     = exitEvalsRes.data       || [];
+      const skipProt      = skipProtRes.data        || [];
+      const orders        = ordersRes.data          || [];
+      const snapshots     = snapshotsRes.data       || [];
+      const reconEvents   = reconEventsRes.data     || [];
+      const freezeEvents  = freezeEventsRes.data    || [];
+
+      const freeze       = systemFreezeRes.data?.value   ?? null;
+      const regime       = regimeRes.data?.value         ?? null;
+      const riskState    = riskStateRes.data?.value      ?? null;
+      const botCfg       = botCfgRes.data                ?? {};
+
+      // ── 1. System state ────────────────────────────────────────────────────
+      const systemState = {
+        window_hours:     hours,
+        since,
+        execution_mode:   'live',
+        engine:           'V2',
+        trading_enabled:  botCfg.trading_enabled ?? true,
+        buys_enabled:     botCfg.buys_enabled    ?? true,
+        sells_enabled:    botCfg.sells_enabled   ?? true,
+        system_frozen:    freeze?.frozen ?? true,
+        freeze_reasons:   freeze?.reasons ?? [],
+        current_regime:   regime?.regime ?? null,
+        regime_ema50:     regime?.ema50  ?? null,
+        regime_ema200:    regime?.ema200 ?? null,
+        regime_adx:       regime?.adxVal ?? null,
+        risk_engine: {
+          loss_streak:          riskState?.lossStreak         ?? 0,
+          streak_paused_until:  riskState?.streakPausedUntil  ?? null,
+          drawdown_halved:      riskState?.drawdownHalved      ?? false,
+          daily_turnover_krw:   riskState?.dailyTurnoverKrw   ?? 0,
+        },
+      };
+
+      // ── 2. Portfolio snapshots ─────────────────────────────────────────────
+      const portfolioSnapshots = snapshots.map((s) => ({
+        timestamp:          s.created_at,
+        nav_krw:            s.nav_krw,
+        nav_usd_proxy:      s.nav_usd_proxy,
+        krw_free_cash:      s.krw_balance,
+        reserve_pct:        s.krw_pct,
+        btc_value_krw:      s.btc_value_krw,
+        eth_value_krw:      s.eth_value_krw,
+        sol_value_krw:      s.sol_value_krw,
+        regime:             s.regime,
+        drawdown_state:     s.circuit_breakers?.find?.(b => b.type === 'DRAWDOWN') ?? null,
+        loss_streak_state:  s.circuit_breakers?.find?.(b => b.type === 'LOSS_STREAK') ?? null,
+      }));
+
+      // ── 3. Decision rows — combine BUY_DECISION + EXIT_EVALUATION ──────────
+      // Build per-symbol per-timestamp rows. BUY_DECISION and EXIT_EVALUATION
+      // have different cadences; we bucket them by time proximity (5-min windows).
+      const decisionMap = new Map(); // key = `${symbol}_${bucket}` → row
+
+      const timeBucket = (ts) => Math.floor(new Date(ts).getTime() / (5 * 60 * 1000));
+
+      for (const ev of [...buyDecisions, ...skipProt]) {
+        const cx  = ev.context_json ?? {};
+        const sym = cx.symbol ?? cx.asset;
+        if (!sym || !COINS.includes(sym)) continue;
+        const key = `${sym}_${timeBucket(ev.created_at)}`;
+        if (!decisionMap.has(key)) decisionMap.set(key, { timestamp: ev.created_at, symbol: sym });
+        const row = decisionMap.get(key);
+
+        if (ev.event_type === 'BUY_DECISION') {
+          row.price        = cx.price ?? null;
+          row.regime       = ev.regime ?? cx.regime ?? null;
+          row.protected    = cx.existing_position?.state === 'adopted' && !cx.final_buy_eligible;
+          row.buy_checks   = cx.buy_checks ?? null;
+          row.buy_eligible = cx.final_buy_eligible ?? false;
+          row.buy_blocker  = cx.final_buy_blocker  ?? null;
+        } else if (ev.event_type === 'POSITION_SKIP_PROTECTED') {
+          row.protected    = true;
+          row.qty_open     = cx.qty_open;
+          row.avg_cost_krw = cx.avg_cost_krw;
+          row.buy_checks   = { buys_enabled: true, system_frozen: false, existing_position: true };
+          row.sell_checks  = { sells_enabled: true, system_frozen: false, protected: true, final_sell_eligible: false, final_sell_blocker: 'protected_unassigned' };
+          row.buy_eligible  = false;
+          row.sell_eligible = false;
+          row.final_action  = 'NO_ACTION';
+          row.final_reason  = 'protected_unassigned';
+        }
+      }
+
+      for (const ev of exitEvals) {
+        const cx  = ev.context_json ?? {};
+        const sym = cx.symbol;
+        if (!sym || !COINS.includes(sym)) continue;
+        const key = `${sym}_${timeBucket(ev.created_at)}`;
+        if (!decisionMap.has(key)) decisionMap.set(key, { timestamp: ev.created_at, symbol: sym });
+        const row = decisionMap.get(key);
+
+        row.price        = row.price ?? cx.indicators?.price ?? null;
+        row.regime       = row.regime ?? ev.regime ?? null;
+        row.qty_open     = row.qty_open ?? null;
+        row.avg_cost_krw = row.avg_cost_krw ?? null;
+        row.pnl_percent  = cx.pnl_pct     != null ? +cx.pnl_pct     : null;
+        row.protected    = cx.protected    ?? false;
+        row.sell_checks  = {
+          sells_enabled:        true,
+          system_frozen:        false,
+          qty_ok:               true,
+          protected:            cx.protected ?? false,
+          required_edge_pct:    cx.required_edge_pct  != null ? +cx.required_edge_pct : null,
+          pnl_pct:              cx.pnl_pct             != null ? +cx.pnl_pct : null,
+          net_pnl_pct:          cx.net_pnl_pct         != null ? +cx.net_pnl_pct : null,
+          above_edge:           cx.above_edge           ?? false,
+          exits_triggered:      cx.exits_triggered      ?? [],
+          rsi:                  cx.indicators?.rsi      ?? null,
+          bb_pctB:              cx.indicators?.bb_pctB  ?? null,
+          atr_pct:              cx.indicators?.atr_pct  ?? null,
+          final_sell_eligible:  cx.eligible             ?? false,
+          final_sell_blocker:   cx.blocker_summary      ?? null,
+        };
+        row.sell_eligible = cx.eligible ?? false;
+        row.sell_blocker  = cx.blocker_summary ?? null;
+      }
+
+      // Attach order attempts to relevant rows
+      for (const ord of orders) {
+        if (!COINS.includes(ord.asset)) continue;
+        const key = `${ord.asset}_${timeBucket(ord.created_at)}`;
+        const row = decisionMap.get(key);
+        if (row) {
+          if (!row.order_attempt) row.order_attempt = [];
+          row.order_attempt.push({
+            side: ord.side, state: ord.state, reason: ord.reason,
+            krw: ord.krw_requested, error: ord.error_message ?? null,
+          });
+        }
+      }
+
+      // Finalise each row
+      const decisionRows = [...decisionMap.values()]
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .map((row) => ({
+          timestamp:        row.timestamp,
+          symbol:           row.symbol,
+          price:            row.price,
+          regime:           row.regime,
+          qty_open:         row.qty_open    ?? null,
+          avg_cost_krw:     row.avg_cost_krw ?? null,
+          pnl_percent:      row.pnl_percent  ?? null,
+          protected:        row.protected    ?? false,
+          buy_checks:       row.buy_checks   ?? null,
+          buy_eligible:     row.buy_eligible  ?? null,
+          buy_blocker:      row.buy_blocker   ?? null,
+          sell_checks:      row.sell_checks   ?? null,
+          sell_eligible:    row.sell_eligible  ?? null,
+          sell_blocker:     row.sell_blocker   ?? null,
+          order_attempt:    row.order_attempt  ?? null,
+          final_action: row.order_attempt?.length
+            ? (row.order_attempt[0].side === 'buy' ? 'BUY_SUBMITTED' : 'SELL_SUBMITTED')
+            : ((row.buy_eligible || row.sell_eligible) ? 'ELIGIBLE_PENDING' : 'NO_ACTION'),
+          final_reason: row.order_attempt?.length
+            ? `order_${row.order_attempt[0].state}`
+            : (row.buy_blocker && row.sell_blocker)
+              ? `buy:${row.buy_blocker} | sell:${row.sell_blocker}`
+              : row.buy_blocker ?? row.sell_blocker ?? 'no_evaluation_data',
+        }));
+
+      // ── 4. Order attempts ─────────────────────────────────────────────────
+      const orderAttempts = orders.map((ord) => ({
+        timestamp:      ord.created_at,
+        symbol:         ord.asset,
+        side:           ord.side,
+        intent_state:   ord.state === 'intent_created' ? 'INTENT_CREATED'
+                        : ['filled', 'dust_refunded_and_filled'].includes(ord.state) ? 'ORDER_FILLED'
+                        : ord.state === 'cancelled_by_rule' ? 'INTENT_BLOCKED'
+                        : ['submitted', 'accepted'].includes(ord.state) ? 'ORDER_SUBMITTED'
+                        : 'ORDER_REJECTED',
+        reason:         ord.reason,
+        krw_amount:     ord.krw_requested,
+        final_state:    ord.state,
+        rejection_detail: ['failed_transient', 'failed_terminal'].includes(ord.state)
+          ? ord.error_message : null,
+      }));
+
+      // ── 5. Reconciliation and freeze ──────────────────────────────────────
+      const reconAndFreeze = {
+        reconciliation_events: reconEvents.map((e) => ({
+          timestamp:       e.created_at,
+          status:          e.context_json?.trading_enabled ? 'passed' : 'frozen',
+          trading_enabled: e.context_json?.trading_enabled,
+          freeze_reasons:  e.context_json?.freeze_reasons ?? [],
+          checks:          e.context_json?.checks ?? null,
+        })),
+        freeze_events: freezeEvents.map((e) => ({
+          timestamp:       e.created_at,
+          event_type:      e.event_type,
+          message:         e.message,
+          previous_frozen: e.context_json?.previous_frozen ?? null,
+          new_frozen:      e.context_json?.new_frozen ?? null,
+          reasons:         e.context_json?.reasons ?? [],
+        })),
+      };
+
+      // ── Summary ───────────────────────────────────────────────────────────
+      const allDecisionsBySymbol = {};
+      for (const sym of COINS) {
+        const symRows = decisionRows.filter((r) => r.symbol === sym);
+        allDecisionsBySymbol[sym] = {
+          total_evaluations:       symRows.length,
+          buy_eligible_count:      symRows.filter((r) => r.buy_eligible).length,
+          sell_eligible_count:     symRows.filter((r) => r.sell_eligible).length,
+          protected_count:         symRows.filter((r) => r.protected).length,
+          blocked_by_existing_pos: symRows.filter((r) => r.buy_blocker?.startsWith('existing_position')).length,
+          blocked_by_signal:       symRows.filter((r) => r.buy_blocker?.startsWith('signal_not_met')).length,
+          blocked_by_below_edge:   symRows.filter((r) => r.sell_blocker?.startsWith('below_required_edge')).length,
+          blocked_by_risk_cap:     symRows.filter((r) => r.buy_blocker && !r.buy_blocker.startsWith('signal') && !r.buy_blocker.startsWith('existing') && !r.buy_blocker.startsWith('buys')).length,
+        };
+      }
+
+      // Count top blockers across all symbols
+      const blockerCounts = {};
+      for (const row of decisionRows) {
+        for (const b of [row.buy_blocker, row.sell_blocker]) {
+          if (!b) continue;
+          // Normalise blocker key (remove numeric values for grouping)
+          const key = b.replace(/=[0-9.\-]+/g, '=N').replace(/\d+h/, 'Nh');
+          blockerCounts[key] = (blockerCounts[key] ?? 0) + 1;
+        }
+      }
+      const topBlockers = Object.entries(blockerCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([reason, count]) => ({ reason, count }));
+
+      const totalRows     = decisionRows.length;
+      const frozenRows    = reconAndFreeze.freeze_events.filter((e) => e.new_frozen === true).length;
+
+      const diagnosticExport = {
+        exported_at:    new Date().toISOString(),
+        window_hours:   hours,
+        since,
+        coins:          COINS,
+
+        // ── 1. System state ─────────────────────────────────────────────────
+        system_state:  systemState,
+
+        // ── 2. Portfolio snapshots ───────────────────────────────────────────
+        portfolio_snapshots: portfolioSnapshots,
+
+        // ── 3. Decision rows ─────────────────────────────────────────────────
+        decision_rows: decisionRows,
+
+        // ── 4. Order attempts ────────────────────────────────────────────────
+        order_attempts: orderAttempts,
+
+        // ── 5. Reconciliation and freeze ─────────────────────────────────────
+        reconciliation_and_freeze: reconAndFreeze,
+
+        // ── Summary ──────────────────────────────────────────────────────────
+        summary: {
+          total_decision_rows:          totalRows,
+          by_symbol:                    allDecisionsBySymbol,
+          total_orders_submitted:       orderAttempts.filter((o) => o.intent_state === 'ORDER_SUBMITTED').length,
+          total_orders_filled:          orderAttempts.filter((o) => o.intent_state === 'ORDER_FILLED').length,
+          total_blocked_by_freeze:      reconAndFreeze.freeze_events.filter((e) => e.new_frozen).length,
+          total_portfolio_snapshots:    portfolioSnapshots.length,
+          top_5_blockers_by_frequency:  topBlockers,
+          data_completeness: {
+            buy_decisions_logged:   buyDecisions.length,
+            exit_evaluations_logged: exitEvals.length,
+            protected_skips_logged:  skipProt.length,
+            note: buyDecisions.length === 0
+              ? 'No BUY_DECISION events found. Pi may not have pulled the latest code yet. Pull & Restart the Pi to generate these events.'
+              : 'Decision data present.',
+          },
+        },
+      };
+
+      res.setHeader('Content-Disposition', `attachment; filename="diagnostic-export-${hours}h.json"`);
+      return res.status(200).json(diagnosticExport);
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

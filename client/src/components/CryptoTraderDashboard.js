@@ -329,6 +329,22 @@ export default function CryptoTraderDashboard() {
     setExporting(false);
   }, []);
 
+  const [exportingDiag, setExportingDiag] = useState(false);
+  const exportDiagnostic = useCallback(async (hours = 24) => {
+    setExportingDiag(true); setError(null);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=diagnostic-export&hours=${hours}`);
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `diagnostic-${hours}h.json`; a.click();
+      URL.revokeObjectURL(url);
+      setMsg(`Diagnostic export (${hours}h) downloaded — share diagnostic-${hours}h.json for missed-trade analysis.`);
+    } catch (e) { setError(e.message); }
+    setExportingDiag(false);
+  }, []);
+
   const [deploying, setDeploying] = useState(false);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
@@ -600,6 +616,11 @@ export default function CryptoTraderDashboard() {
               onClick={exportLogs} disabled={exporting}
               title="Download last 7 days of bot logs as JSON for AI analysis">
               {exporting ? 'Exporting…' : '⬇ Export Logs'}
+            </button>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(234,179,8,0.12)', color: '#facc15' }}
+              onClick={() => exportDiagnostic(24)} disabled={exportingDiag}
+              title="Download 24h missed-trade decision audit (BTC/ETH/SOL)">
+              {exportingDiag ? 'Exporting…' : '🔍 Diagnostic (24h)'}
             </button>
           </div>
         </div>
