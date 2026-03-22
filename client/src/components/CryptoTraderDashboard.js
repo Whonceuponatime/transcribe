@@ -142,11 +142,8 @@ export default function CryptoTraderDashboard() {
         setReconStatus(d.reconciliation);
         setTradingEnabled(d.tradingEnabled ?? false);
       }
-      // Read trading controls from systemState (set by export/status API)
-      try {
-        const cfgRes = await fetch(`${API}/api/crypto-trader?action=v2-config`);
-        // v2-config is write-only; controls come from systemState in adoption response
-      } catch (_) {}
+      // Trading controls (trading_enabled, buys_enabled, sells_enabled) are read
+      // from the adoption endpoint's systemState — no separate fetch needed here.
     } catch (_) {}
   }, []);
 
