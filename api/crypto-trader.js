@@ -968,15 +968,17 @@ module.exports = async function handler(req, res) {
       const safe   = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
 
       const [
-        buyDecisionsRes, exitEvalsRes, skipProtRes,
+        decisionCyclesRes, exitEvalsRes, skipProtRes,
         ordersRes, snapshotsRes,
         reconEventsRes, freezeEventsRes,
         systemFreezeRes, regimeRes, riskStateRes,
         botCfgRes,
       ] = await Promise.all([
+        // DECISION_CYCLE: one row per symbol per cycle — the primary audit source
         supabase.from('bot_events').select('event_type, message, context_json, regime, created_at')
-          .eq('event_type', 'BUY_DECISION').gte('created_at', since)
-          .order('created_at', { ascending: true }).limit(2000),
+          .eq('event_type', 'DECISION_CYCLE').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(5000),
+        // EXIT_EVALUATION: legacy sell-side log (supplementary)
         supabase.from('bot_events').select('event_type, message, context_json, regime, created_at')
           .eq('event_type', 'EXIT_EVALUATION').gte('created_at', since)
           .order('created_at', { ascending: true }).limit(2000),
@@ -1000,8 +1002,8 @@ module.exports = async function handler(req, res) {
         safe(supabase.from('bot_config').select('trading_enabled, buys_enabled, sells_enabled, coins').limit(1).single()),
       ]);
 
-      const buyDecisions  = buyDecisionsRes.data   || [];
-      const exitEvals     = exitEvalsRes.data       || [];
+      const decisionCycles = decisionCyclesRes.data || [];
+      const exitEvals      = exitEvalsRes.data      || [];
       const skipProt      = skipProtRes.data        || [];
       const orders        = ordersRes.data          || [];
       const snapshots     = snapshotsRes.data       || [];
@@ -1051,117 +1053,75 @@ module.exports = async function handler(req, res) {
         loss_streak_state:  s.circuit_breakers?.find?.(b => b.type === 'LOSS_STREAK') ?? null,
       }));
 
-      // ── 3. Decision rows — combine BUY_DECISION + EXIT_EVALUATION ──────────
-      // Build per-symbol per-timestamp rows. BUY_DECISION and EXIT_EVALUATION
-      // have different cadences; we bucket them by time proximity (5-min windows).
-      const decisionMap = new Map(); // key = `${symbol}_${bucket}` → row
-
-      const timeBucket = (ts) => Math.floor(new Date(ts).getTime() / (5 * 60 * 1000));
-
-      for (const ev of [...buyDecisions, ...skipProt]) {
-        const cx  = ev.context_json ?? {};
-        const sym = cx.symbol ?? cx.asset;
-        if (!sym || !COINS.includes(sym)) continue;
-        const key = `${sym}_${timeBucket(ev.created_at)}`;
-        if (!decisionMap.has(key)) decisionMap.set(key, { timestamp: ev.created_at, symbol: sym });
-        const row = decisionMap.get(key);
-
-        if (ev.event_type === 'BUY_DECISION') {
-          row.price        = cx.price ?? null;
-          row.regime       = ev.regime ?? cx.regime ?? null;
-          row.protected    = cx.existing_position?.state === 'adopted' && !cx.final_buy_eligible;
-          row.buy_checks   = cx.buy_checks ?? null;
-          row.buy_eligible = cx.final_buy_eligible ?? false;
-          row.buy_blocker  = cx.final_buy_blocker  ?? null;
-        } else if (ev.event_type === 'POSITION_SKIP_PROTECTED') {
-          row.protected    = true;
-          row.qty_open     = cx.qty_open;
-          row.avg_cost_krw = cx.avg_cost_krw;
-          row.buy_checks   = { buys_enabled: true, system_frozen: false, existing_position: true };
-          row.sell_checks  = { sells_enabled: true, system_frozen: false, protected: true, final_sell_eligible: false, final_sell_blocker: 'protected_unassigned' };
-          row.buy_eligible  = false;
-          row.sell_eligible = false;
-          row.final_action  = 'NO_ACTION';
-          row.final_reason  = 'protected_unassigned';
-        }
-      }
-
-      for (const ev of exitEvals) {
-        const cx  = ev.context_json ?? {};
-        const sym = cx.symbol;
-        if (!sym || !COINS.includes(sym)) continue;
-        const key = `${sym}_${timeBucket(ev.created_at)}`;
-        if (!decisionMap.has(key)) decisionMap.set(key, { timestamp: ev.created_at, symbol: sym });
-        const row = decisionMap.get(key);
-
-        row.price        = row.price ?? cx.indicators?.price ?? null;
-        row.regime       = row.regime ?? ev.regime ?? null;
-        row.qty_open     = row.qty_open ?? null;
-        row.avg_cost_krw = row.avg_cost_krw ?? null;
-        row.pnl_percent  = cx.pnl_pct     != null ? +cx.pnl_pct     : null;
-        row.protected    = cx.protected    ?? false;
-        row.sell_checks  = {
-          sells_enabled:        true,
-          system_frozen:        false,
-          qty_ok:               true,
-          protected:            cx.protected ?? false,
-          required_edge_pct:    cx.required_edge_pct  != null ? +cx.required_edge_pct : null,
-          pnl_pct:              cx.pnl_pct             != null ? +cx.pnl_pct : null,
-          net_pnl_pct:          cx.net_pnl_pct         != null ? +cx.net_pnl_pct : null,
-          above_edge:           cx.above_edge           ?? false,
-          exits_triggered:      cx.exits_triggered      ?? [],
-          rsi:                  cx.indicators?.rsi      ?? null,
-          bb_pctB:              cx.indicators?.bb_pctB  ?? null,
-          atr_pct:              cx.indicators?.atr_pct  ?? null,
-          final_sell_eligible:  cx.eligible             ?? false,
-          final_sell_blocker:   cx.blocker_summary      ?? null,
-        };
-        row.sell_eligible = cx.eligible ?? false;
-        row.sell_blocker  = cx.blocker_summary ?? null;
-      }
-
-      // Attach order attempts to relevant rows
-      for (const ord of orders) {
-        if (!COINS.includes(ord.asset)) continue;
-        const key = `${ord.asset}_${timeBucket(ord.created_at)}`;
-        const row = decisionMap.get(key);
-        if (row) {
-          if (!row.order_attempt) row.order_attempt = [];
-          row.order_attempt.push({
+      // ── 3. Decision rows — directly from DECISION_CYCLE events ──────────────
+      // Each DECISION_CYCLE event is one row: both buy and sell checks combined.
+      // Attach matching order attempts by symbol + nearest timestamp (±3 min).
+      const decisionRows = decisionCycles
+        .filter((ev) => {
+          const sym = ev.context_json?.symbol;
+          return sym && COINS.includes(sym);
+        })
+        .map((ev) => {
+          const cx  = ev.context_json ?? {};
+          const sym = cx.symbol;
+          // Find order attempts within ±3 min of this decision row
+          const ts     = new Date(ev.created_at).getTime();
+          const nearby = orders.filter((ord) =>
+            ord.asset === sym && Math.abs(new Date(ord.created_at).getTime() - ts) <= 3 * 60 * 1000
+          );
+          const orderAttempt = nearby.length ? nearby.map((ord) => ({
             side: ord.side, state: ord.state, reason: ord.reason,
             krw: ord.krw_requested, error: ord.error_message ?? null,
-          });
-        }
-      }
+          })) : null;
 
-      // Finalise each row
-      const decisionRows = [...decisionMap.values()]
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-        .map((row) => ({
-          timestamp:        row.timestamp,
-          symbol:           row.symbol,
-          price:            row.price,
-          regime:           row.regime,
-          qty_open:         row.qty_open    ?? null,
-          avg_cost_krw:     row.avg_cost_krw ?? null,
-          pnl_percent:      row.pnl_percent  ?? null,
-          protected:        row.protected    ?? false,
-          buy_checks:       row.buy_checks   ?? null,
-          buy_eligible:     row.buy_eligible  ?? null,
-          buy_blocker:      row.buy_blocker   ?? null,
-          sell_checks:      row.sell_checks   ?? null,
-          sell_eligible:    row.sell_eligible  ?? null,
-          sell_blocker:     row.sell_blocker   ?? null,
-          order_attempt:    row.order_attempt  ?? null,
-          final_action: row.order_attempt?.length
-            ? (row.order_attempt[0].side === 'buy' ? 'BUY_SUBMITTED' : 'SELL_SUBMITTED')
-            : ((row.buy_eligible || row.sell_eligible) ? 'ELIGIBLE_PENDING' : 'NO_ACTION'),
-          final_reason: row.order_attempt?.length
-            ? `order_${row.order_attempt[0].state}`
-            : (row.buy_blocker && row.sell_blocker)
-              ? `buy:${row.buy_blocker} | sell:${row.sell_blocker}`
-              : row.buy_blocker ?? row.sell_blocker ?? 'no_evaluation_data',
-        }));
+          return {
+            timestamp:         ev.created_at,
+            symbol:            sym,
+            price:             cx.price,
+            regime:            cx.regime ?? ev.regime,
+            qty_open:          cx.qty_open,
+            avg_cost_krw:      cx.avg_cost_krw,
+            pnl_percent:       cx.pnl_percent,
+            protected:         cx.protected ?? false,
+            cooldown_remaining: cx.cooldown_remaining ?? null,
+            buy_checks:        cx.buy_checks  ?? null,
+            sell_checks:       cx.sell_checks ?? null,
+            final_action:      cx.final_action,
+            final_reason:      cx.final_reason,
+            order_attempt:     orderAttempt,
+          };
+        });
+
+      // Fall back to EXIT_EVALUATION if DECISION_CYCLE is empty
+      // (Pi may be running old code without DECISION_CYCLE support)
+      const exitEvalRows = decisionCycles.length === 0 ? exitEvals
+        .filter((ev) => COINS.includes(ev.context_json?.symbol))
+        .map((ev) => {
+          const cx = ev.context_json ?? {};
+          return {
+            timestamp:    ev.created_at,
+            symbol:       cx.symbol,
+            price:        null,
+            regime:       ev.regime,
+            qty_open:     null,
+            avg_cost_krw: null,
+            pnl_percent:  cx.pnl_pct != null ? +cx.pnl_pct : null,
+            protected:    cx.protected ?? false,
+            buy_checks:   null,
+            sell_checks: {
+              required_edge_pct:   cx.required_edge_pct != null ? +cx.required_edge_pct : null,
+              pnl_pct:             cx.pnl_pct           != null ? +cx.pnl_pct           : null,
+              net_pnl_pct:         cx.net_pnl_pct       != null ? +cx.net_pnl_pct       : null,
+              above_edge:          cx.above_edge ?? false,
+              exits_triggered:     cx.exits_triggered ?? [],
+              final_sell_eligible: cx.eligible ?? false,
+              final_sell_blocker:  cx.blocker_summary ?? null,
+            },
+            final_action:  cx.eligible ? 'SELL_TRIGGERED' : 'NO_ACTION',
+            final_reason:  cx.blocker_summary ?? ev.message,
+            order_attempt: null,
+          };
+        }) : [];
 
       // ── 4. Order attempts ─────────────────────────────────────────────────
       const orderAttempts = orders.map((ord) => ({
@@ -1200,9 +1160,10 @@ module.exports = async function handler(req, res) {
       };
 
       // ── Summary ───────────────────────────────────────────────────────────
+      const allRows = decisionRows.length ? decisionRows : exitEvalRows;
       const allDecisionsBySymbol = {};
       for (const sym of COINS) {
-        const symRows = decisionRows.filter((r) => r.symbol === sym);
+        const symRows = allRows.filter((r) => r.symbol === sym);
         allDecisionsBySymbol[sym] = {
           total_evaluations:       symRows.length,
           buy_eligible_count:      symRows.filter((r) => r.buy_eligible).length,
@@ -1217,7 +1178,7 @@ module.exports = async function handler(req, res) {
 
       // Count top blockers across all symbols
       const blockerCounts = {};
-      for (const row of decisionRows) {
+      for (const row of allRows) {
         for (const b of [row.buy_blocker, row.sell_blocker]) {
           if (!b) continue;
           // Normalise blocker key (remove numeric values for grouping)
@@ -1230,7 +1191,7 @@ module.exports = async function handler(req, res) {
         .slice(0, 5)
         .map(([reason, count]) => ({ reason, count }));
 
-      const totalRows     = decisionRows.length;
+      const totalRows     = allRows.length;
       const frozenRows    = reconAndFreeze.freeze_events.filter((e) => e.new_frozen === true).length;
 
       const diagnosticExport = {
@@ -1246,7 +1207,10 @@ module.exports = async function handler(req, res) {
         portfolio_snapshots: portfolioSnapshots,
 
         // ── 3. Decision rows ─────────────────────────────────────────────────
-        decision_rows: decisionRows,
+        // Primary: DECISION_CYCLE events (one per symbol per cycle, all blockers)
+        // Fallback: EXIT_EVALUATION events (sell-side only, if Pi is on old code)
+        decision_rows: allRows,
+        decision_source: decisionRows.length > 0 ? 'DECISION_CYCLE' : exitEvalRows.length > 0 ? 'EXIT_EVALUATION_fallback' : 'empty',
 
         // ── 4. Order attempts ────────────────────────────────────────────────
         order_attempts: orderAttempts,
@@ -1264,12 +1228,13 @@ module.exports = async function handler(req, res) {
           total_portfolio_snapshots:    portfolioSnapshots.length,
           top_5_blockers_by_frequency:  topBlockers,
           data_completeness: {
-            buy_decisions_logged:   buyDecisions.length,
-            exit_evaluations_logged: exitEvals.length,
-            protected_skips_logged:  skipProt.length,
-            note: buyDecisions.length === 0
-              ? 'No BUY_DECISION events found. Pi may not have pulled the latest code yet. Pull & Restart the Pi to generate these events.'
-              : 'Decision data present.',
+            decision_cycle_events:   decisionCycles.length,
+            exit_evaluation_events:  exitEvals.length,
+            protected_skips:         skipProt.length,
+            data_source:             decisionRows.length > 0 ? 'DECISION_CYCLE' : 'EXIT_EVALUATION_fallback',
+            note: decisionCycles.length === 0
+              ? 'DECISION_CYCLE events not found. Pi must Pull & Restart to activate per-cycle decision logging. Once restarted, every BTC/ETH/SOL evaluation will emit one row unconditionally.'
+              : `${decisionCycles.length} DECISION_CYCLE events (${(decisionCycles.length / hours / 3).toFixed(1)} per symbol per hour).`,
           },
         },
       };
