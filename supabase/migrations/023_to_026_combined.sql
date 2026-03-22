@@ -12,7 +12,7 @@
 
 CREATE TABLE IF NOT EXISTS bot_config (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  mode                     TEXT NOT NULL DEFAULT 'paper' CHECK (mode IN ('paper','shadow','live')),
+  mode                     TEXT NOT NULL DEFAULT 'live' CHECK (mode IN ('paper','shadow','live')),
   enabled                  BOOLEAN NOT NULL DEFAULT true,
   coins                    JSONB NOT NULL DEFAULT '["BTC","ETH","SOL"]'::jsonb,
   core_target_pct          NUMERIC(5,2) NOT NULL DEFAULT 30,
