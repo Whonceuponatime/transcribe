@@ -1243,7 +1243,446 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(diagnosticExport);
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    // ── GET real-trade verification report ───────────────────────────────────
+    // Proves whether each Upbit fill has a matching decision trail in the DB.
+    // Uses Korea Standard Time (UTC+9) for all displayed timestamps.
+    if (action === 'trade-verification' && req.method === 'GET') {
+      const hours = Math.min(Number(req.query.hours) || 24, 168);
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+      const COINS = (req.query.coins ? req.query.coins.split(',') : ['BTC', 'ETH', 'SOL']).map((c) => c.toUpperCase());
+      const safe  = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
+
+      // KST helper — all displayed times in Korea Standard Time
+      const kst = (iso) => {
+        if (!iso) return null;
+        const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
+        return d.toISOString().replace('T', ' ').replace('Z', '') + ' KST';
+      };
+
+      const [
+        v1TradesRes, v2FillsRes, ordersRes,
+        decisionCyclesRes, executionEventsRes,
+        reconciliationsRes, reconEventsRes, freezeEventsRes,
+        snapshotsRes, positionsRes,
+      ] = await Promise.all([
+        // V1 fills — from crypto_trade_log (always live, no engine tag)
+        supabase.from('crypto_trade_log')
+          .select('id, coin, side, krw_amount, coin_amount, price_krw, reason, executed_at')
+          .in('coin', COINS).gte('executed_at', since)
+          .order('executed_at', { ascending: true }),
+        // V2 fills — from v2_fills table
+        supabase.from('v2_fills')
+          .select('id, order_id, asset, side, price_krw, qty, fee_krw, fee_rate, strategy_tag, executed_at')
+          .in('asset', COINS).gte('executed_at', since)
+          .order('executed_at', { ascending: true }),
+        // All V2 orders in window (all states)
+        supabase.from('orders')
+          .select('id, identifier, asset, side, state, reason, krw_requested, qty_requested, strategy_tag, regime_at_order, retry_count, error_message, raw_response, created_at, updated_at')
+          .in('asset', COINS).gte('created_at', since)
+          .order('created_at', { ascending: true }),
+        // DECISION_CYCLE events (buy + sell checks per symbol per cycle)
+        supabase.from('bot_events')
+          .select('event_type, message, context_json, regime, created_at')
+          .eq('event_type', 'DECISION_CYCLE').gte('created_at', since)
+          .order('created_at', { ascending: true }).limit(5000),
+        // EXECUTION events
+        supabase.from('bot_events')
+          .select('event_type, message, context_json, regime, created_at')
+          .eq('event_type', 'EXECUTION').gte('created_at', since)
+          .order('created_at', { ascending: true }),
+        // reconciliation_checks table
+        supabase.from('reconciliation_checks')
+          .select('status, freeze_reasons, checks_run, trading_enabled, open_orders_found, discrepancies, run_at')
+          .gte('run_at', since).order('run_at', { ascending: true }),
+        // RECONCILIATION bot_events
+        supabase.from('bot_events')
+          .select('event_type, message, context_json, created_at')
+          .eq('event_type', 'RECONCILIATION').gte('created_at', since)
+          .order('created_at', { ascending: true }),
+        // Freeze state changes
+        supabase.from('bot_events')
+          .select('event_type, message, context_json, created_at')
+          .in('event_type', ['FREEZE_STATE_CHANGED', 'FREEZE_CLEARED'])
+          .gte('created_at', since).order('created_at', { ascending: true }),
+        // Portfolio snapshots (need first + last for balance_before_after)
+        supabase.from('portfolio_snapshots_v2')
+          .select('nav_krw, krw_balance, btc_value_krw, eth_value_krw, sol_value_krw, regime, created_at')
+          .order('created_at', { ascending: true }).limit(1000),
+        // Current positions
+        supabase.from('positions')
+          .select('asset, strategy_tag, state, qty_open, avg_cost_krw, opened_at, updated_at')
+          .in('asset', COINS).in('state', ['open', 'adopted', 'partial']),
+      ]);
+
+      const v1Trades     = v1TradesRes.data    || [];
+      const v2Fills      = v2FillsRes.data     || [];
+      const orders       = ordersRes.data      || [];
+      const decisions    = decisionCyclesRes.data || [];
+      const execEvents   = executionEventsRes.data || [];
+      const reconRuns    = reconciliationsRes.data || [];
+      const reconEvents  = reconEventsRes.data || [];
+      const freezeEvents = freezeEventsRes.data || [];
+      const allSnapshots = snapshotsRes.data   || [];
+      const positions    = positionsRes.data   || [];
+
+      // Snapshots in-window
+      const windowSnaps   = allSnapshots.filter((s) => s.created_at >= since);
+      const snapBefore    = allSnapshots.filter((s) => s.created_at < since).slice(-1)[0] ?? windowSnaps[0] ?? null;
+      const snapAfter     = windowSnaps[windowSnaps.length - 1] ?? null;
+
+      // ── 1. Exchange fills ─────────────────────────────────────────────────
+      // V1 fills = crypto_trade_log (always live, engine=V1)
+      const v1ExchangeFills = v1Trades.map((t) => ({
+        timestamp_kst:  kst(t.executed_at),
+        timestamp_utc:  t.executed_at,
+        symbol:         t.coin,
+        side:           t.side,
+        filled_qty:     t.coin_amount ?? null,
+        krw_amount:     t.krw_amount  ?? null,
+        price_krw:      t.price_krw   ?? null,
+        reason:         t.reason,
+        engine:         'V1',
+        source_table:   'crypto_trade_log',
+      }));
+
+      // V2 fills = v2_fills joined with orders
+      const ordersById = {};
+      for (const o of orders) ordersById[o.id] = o;
+
+      const v2ExchangeFills = v2Fills.map((f) => {
+        const order = orders.find((o) => o.id === f.order_id);
+        return {
+          timestamp_kst:  kst(f.executed_at),
+          timestamp_utc:  f.executed_at,
+          symbol:         f.asset,
+          side:           f.side,
+          filled_qty:     f.qty,
+          krw_amount:     f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null,
+          price_krw:      f.price_krw,
+          fee_krw:        f.fee_krw,
+          fee_rate:       f.fee_rate,
+          order_id:       f.order_id,
+          order_reason:   order?.reason ?? null,
+          engine:         'V2',
+          source_table:   'v2_fills',
+        };
+      });
+
+      const exchangeFills = [...v1ExchangeFills, ...v2ExchangeFills]
+        .sort((a, b) => a.timestamp_utc.localeCompare(b.timestamp_utc));
+
+      // ── 2. Internal order intents ─────────────────────────────────────────
+      // V2 orders that reached intent_created (or beyond) — these are the bot's decisions
+      const internalOrderIntents = orders.map((o) => ({
+        timestamp_kst:    kst(o.created_at),
+        timestamp_utc:    o.created_at,
+        symbol:           o.asset,
+        side:             o.side,
+        engine:           'V2',
+        execution_mode:   'live',
+        intent_state:     o.state,
+        decision_reason:  o.reason,
+        krw_requested:    o.krw_requested,
+        strategy_tag:     o.strategy_tag,
+        regime_at_order:  o.regime_at_order,
+        identifier:       o.identifier,
+        retry_count:      o.retry_count,
+        error_message:    o.error_message ?? null,
+      }));
+
+      // ── 3. Execution events ───────────────────────────────────────────────
+      const filledOrders = orders.filter((o) =>
+        ['filled', 'dust_refunded_and_filled', 'submitted', 'accepted', 'partially_filled', 'failed_transient', 'failed_terminal'].includes(o.state)
+      );
+
+      const executionRecords = filledOrders.map((o) => {
+        const matchingFill = v2Fills.find((f) => f.order_id === o.id);
+        const execEvent    = execEvents.find((e) => e.context_json?.identifier === o.identifier);
+        const rawResp      = o.raw_response;
+        return {
+          timestamp_kst:   kst(o.updated_at),
+          timestamp_utc:   o.updated_at,
+          symbol:          o.asset,
+          side:            o.side,
+          order_id:        o.id,
+          identifier:      o.identifier,
+          order_submitted: ['submitted', 'accepted', 'partially_filled', 'filled', 'dust_refunded_and_filled'].includes(o.state),
+          order_filled:    ['filled', 'dust_refunded_and_filled'].includes(o.state),
+          final_state:     o.state,
+          filled_qty:      matchingFill?.qty ?? null,
+          krw_amount:      matchingFill ? Math.round((matchingFill.price_krw ?? 0) * (matchingFill.qty ?? 0)) : null,
+          fee_krw:         matchingFill?.fee_krw ?? null,
+          result:          o.state,
+          exchange_order_uuid:  rawResp?.uuid ?? null,
+          exchange_state:       rawResp?.state ?? null,
+          exchange_volume:      rawResp?.executed_volume ?? null,
+          execution_event_found: !!execEvent,
+          error_detail:    o.error_message ?? null,
+        };
+      });
+
+      // ── 4. Balance before/after ───────────────────────────────────────────
+      const dbPositionsSnap = positions.map((p) => ({
+        asset:        p.asset,
+        strategy_tag: p.strategy_tag,
+        state:        p.state,
+        qty_open:     Number(p.qty_open),
+        avg_cost_krw: p.avg_cost_krw,
+        last_updated: kst(p.updated_at),
+      }));
+
+      const balanceBeforeAfter = {
+        window_start_kst: kst(since),
+        window_end_kst:   kst(new Date().toISOString()),
+        portfolio_before: snapBefore ? {
+          timestamp_kst: kst(snapBefore.created_at),
+          nav_krw:       snapBefore.nav_krw,
+          krw_cash:      snapBefore.krw_balance,
+          btc_value_krw: snapBefore.btc_value_krw,
+          eth_value_krw: snapBefore.eth_value_krw,
+          sol_value_krw: snapBefore.sol_value_krw,
+          source:        'portfolio_snapshots_v2',
+        } : null,
+        portfolio_after: snapAfter ? {
+          timestamp_kst: kst(snapAfter.created_at),
+          nav_krw:       snapAfter.nav_krw,
+          krw_cash:      snapAfter.krw_balance,
+          btc_value_krw: snapAfter.btc_value_krw,
+          eth_value_krw: snapAfter.eth_value_krw,
+          sol_value_krw: snapAfter.sol_value_krw,
+          source:        'portfolio_snapshots_v2',
+        } : null,
+        db_positions_current: dbPositionsSnap,
+        nav_change_krw: snapBefore && snapAfter
+          ? Math.round((snapAfter.nav_krw ?? 0) - (snapBefore.nav_krw ?? 0))
+          : null,
+        snapshot_count_in_window: windowSnaps.length,
+      };
+
+      // ── 5. Reconciliation results ─────────────────────────────────────────
+      const reconciliationResults = {
+        reconciliation_runs: reconRuns.map((r) => ({
+          run_at_kst:         kst(r.run_at),
+          status:             r.status,
+          trading_enabled:    r.trading_enabled,
+          open_orders_found:  r.open_orders_found,
+          freeze_reasons:     r.freeze_reasons ?? [],
+          discrepancies:      r.discrepancies  ?? null,
+          checks: {
+            adoption_complete:    r.checks_run?.adoption_complete?.passed    ?? null,
+            no_unresolved_orders: r.checks_run?.no_unresolved_orders?.passed ?? null,
+            balance_match:        r.checks_run?.balance_match?.passed        ?? null,
+            ownership_clarity:    r.checks_run?.ownership_clarity?.passed    ?? null,
+            position_integrity:   r.checks_run?.position_integrity?.passed   ?? null,
+          },
+        })),
+        freeze_events: freezeEvents.map((e) => ({
+          timestamp_kst: kst(e.created_at),
+          event_type:    e.event_type,
+          message:       e.message,
+          frozen:        e.context_json?.new_frozen ?? null,
+          reasons:       e.context_json?.reasons ?? [],
+        })),
+        mismatch_detected:     reconRuns.some((r) => r.discrepancies && Object.keys(r.discrepancies).length > 0),
+        freeze_triggered:      freezeEvents.some((e) => e.context_json?.new_frozen === true),
+        reconciliation_passed: reconRuns.some((r) => r.status === 'passed'),
+      };
+
+      // ── 6. Fill match report ──────────────────────────────────────────────
+      // For each exchange fill, find matching intent/execution/balance/recon records.
+      const fillMatchReport = exchangeFills.map((fill) => {
+        const fillTs = new Date(fill.timestamp_utc).getTime();
+        const W5     = 5 * 60 * 1000;   // ±5 min window for matching
+        const W15    = 15 * 60 * 1000;  // ±15 min for reconciliation
+
+        // matched_intent: V2 order intent OR DECISION_CYCLE showing buy/sell eligible
+        let matchedIntent     = false;
+        let intentDetail      = null;
+        if (fill.engine === 'V2') {
+          // V2 fill always has an order — check it exists in our orders table
+          const matchOrder = orders.find((o) => o.id === fill.order_id);
+          matchedIntent = !!matchOrder;
+          intentDetail  = matchOrder
+            ? `order ${matchOrder.id.slice(0,8)} state=${matchOrder.state} reason=${matchOrder.reason}`
+            : 'order_record_missing';
+        } else {
+          // V1 fill — look for a DECISION_CYCLE event near the same time
+          const nearDecision = decisions.find((d) => {
+            const dc = d.context_json ?? {};
+            return dc.symbol === fill.symbol
+              && Math.abs(new Date(d.created_at).getTime() - fillTs) <= W5;
+          });
+          matchedIntent = !!nearDecision;
+          intentDetail  = nearDecision
+            ? `DECISION_CYCLE at ${kst(nearDecision.created_at)} action=${nearDecision.context_json?.final_action}`
+            : 'no_DECISION_CYCLE_within_5min (V1 fill — V2 decision trail not expected)';
+        }
+
+        // matched_execution: V2 execution record exists, V1 has none (expected)
+        let matchedExecution  = false;
+        let executionDetail   = null;
+        if (fill.engine === 'V2') {
+          const matchExec = executionRecords.find((e) =>
+            e.order_id === fill.order_id && e.order_filled
+          );
+          matchedExecution = !!matchExec;
+          executionDetail  = matchExec
+            ? `order filled state=${matchExec.final_state} qty=${matchExec.filled_qty}`
+            : 'execution_record_not_filled_or_missing';
+        } else {
+          // V1 — no V2 execution table entry expected
+          matchedExecution = null; // N/A for V1
+          executionDetail  = 'V1_engine:execution_not_tracked_in_V2_tables';
+        }
+
+        // matched_balance_change: check if any snapshot near the fill time shows
+        // a change in the relevant coin's value
+        const snapNear = windowSnaps.filter((s) =>
+          Math.abs(new Date(s.created_at).getTime() - fillTs) <= W15
+        );
+        const snapKey = `${fill.symbol.toLowerCase()}_value_krw`;
+        let matchedBalanceChange = null;
+        let balanceDetail        = null;
+        if (snapNear.length >= 2) {
+          const before = snapNear[0][snapKey];
+          const after  = snapNear[snapNear.length - 1][snapKey];
+          const changed = before != null && after != null && Math.abs(after - before) > 100;
+          matchedBalanceChange = changed;
+          balanceDetail = changed
+            ? `${fill.symbol} value changed ₩${Math.round(before).toLocaleString()} → ₩${Math.round(after).toLocaleString()}`
+            : `snapshot value unchanged before=${before} after=${after} (may be price-only move)`;
+        } else if (snapNear.length === 1) {
+          matchedBalanceChange = null;
+          balanceDetail = 'only_one_snapshot_near_fill_time:cannot_determine_change';
+        } else {
+          matchedBalanceChange = null;
+          balanceDetail = 'no_portfolio_snapshot_within_15min_of_fill';
+        }
+
+        // matched_reconciliation: reconciliation passed within 15 min after fill
+        const reconAfter = reconRuns.find((r) =>
+          new Date(r.run_at).getTime() > fillTs &&
+          new Date(r.run_at).getTime() < fillTs + W15
+        );
+        const matchedReconciliation = reconAfter ? reconAfter.trading_enabled === true : null;
+        const reconDetail = reconAfter
+          ? `recon ran at ${kst(reconAfter.run_at)} → ${reconAfter.status}`
+          : 'no_reconciliation_run_within_15min_after_fill';
+
+        // Overall match — strict: all four must pass (N/A is treated as not-blocking)
+        const strictChecks = [matchedIntent, matchedExecution, matchedBalanceChange, matchedReconciliation]
+          .filter((v) => v !== null);
+        const overallMatch = strictChecks.length > 0 && strictChecks.every(Boolean);
+
+        let mismatchReason = null;
+        if (!overallMatch) {
+          const mismatches = [];
+          if (matchedIntent === false)           mismatches.push('intent_not_found');
+          if (matchedExecution === false)        mismatches.push('execution_record_missing_or_unfilled');
+          if (matchedBalanceChange === false)    mismatches.push('no_balance_change_detected_in_snapshots');
+          if (matchedReconciliation === false)   mismatches.push('reconciliation_failed_after_fill');
+          if (strictChecks.length === 0)         mismatches.push('no_audit_data_available_for_this_fill');
+          mismatchReason = mismatches.join(' | ');
+        }
+
+        return {
+          fill_timestamp_kst:          fill.timestamp_kst,
+          symbol:                      fill.symbol,
+          side:                        fill.side,
+          engine:                      fill.engine,
+          filled_qty:                  fill.filled_qty,
+          krw_amount:                  fill.krw_amount,
+          matched_intent:              matchedIntent,
+          intent_detail:               intentDetail,
+          matched_execution:           matchedExecution,
+          execution_detail:            executionDetail,
+          matched_balance_change:      matchedBalanceChange,
+          balance_detail:              balanceDetail,
+          matched_reconciliation:      matchedReconciliation,
+          reconciliation_detail:       reconDetail,
+          overall_match:               overallMatch,
+          mismatch_reason:             mismatchReason,
+        };
+      });
+
+      // ── 7. Summary ────────────────────────────────────────────────────────
+      const matchedFills   = fillMatchReport.filter((r) => r.overall_match).length;
+      const unmatchedFills = fillMatchReport.filter((r) => !r.overall_match).length;
+      const naFills        = fillMatchReport.filter((r) => r.overall_match === null).length;
+
+      const unmatchedReasons = fillMatchReport
+        .filter((r) => r.mismatch_reason)
+        .map((r) => r.mismatch_reason);
+      const reasonCounts = {};
+      for (const reason of unmatchedReasons) {
+        for (const part of reason.split(' | ')) {
+          reasonCounts[part] = (reasonCounts[part] ?? 0) + 1;
+        }
+      }
+      const topUnmatchedReasons = Object.entries(reasonCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([reason, count]) => ({ reason, count }));
+
+      // Classify overall health
+      let overallVerification = 'CLEAN';
+      if (unmatchedFills > 0) {
+        const hasV1Only = fillMatchReport.filter((r) => !r.overall_match).every((r) => r.engine === 'V1');
+        overallVerification = hasV1Only ? 'UNMATCHED_V1_ONLY' : 'UNMATCHED_V2_FILLS_DETECTED';
+      }
+      if (exchangeFills.length === 0) overallVerification = 'NO_FILLS_IN_WINDOW';
+
+      const report = {
+        generated_at_kst: kst(new Date().toISOString()),
+        window_hours:      hours,
+        window_start_kst:  kst(since),
+        coins:             COINS,
+
+        // ── 1 ───────────────────────────────────────────────────────────────
+        exchange_fills: exchangeFills,
+
+        // ── 2 ───────────────────────────────────────────────────────────────
+        internal_order_intents: internalOrderIntents,
+
+        // ── 3 ───────────────────────────────────────────────────────────────
+        execution_events: executionRecords,
+
+        // ── 4 ───────────────────────────────────────────────────────────────
+        balance_before_after: balanceBeforeAfter,
+
+        // ── 5 ───────────────────────────────────────────────────────────────
+        reconciliation_results: reconciliationResults,
+
+        // ── 6 ───────────────────────────────────────────────────────────────
+        fill_match_report: fillMatchReport,
+
+        // ── 7 ───────────────────────────────────────────────────────────────
+        summary: {
+          total_exchange_fills:    exchangeFills.length,
+          v1_fills:                v1ExchangeFills.length,
+          v2_fills:                v2ExchangeFills.length,
+          total_matched_fills:     matchedFills,
+          total_unmatched_fills:   unmatchedFills,
+          total_na_fills:          naFills,
+          overall_verification:    overallVerification,
+          top_unmatched_reasons:   topUnmatchedReasons,
+          likely_cause_of_unmatched: unmatchedFills === 0
+            ? 'All fills matched'
+            : v1ExchangeFills.length > 0 && fillMatchReport.filter((r) => !r.overall_match && r.engine === 'V1').length > 0
+              ? 'V1 fills lack V2 execution records — expected when V1 engine was active. V1 fills are not tracked in v2_fills or orders tables.'
+              : 'V2 fills have missing execution or reconciliation records — investigate execution_events section.',
+          data_notes: [
+            v1ExchangeFills.length > 0 ? `${v1ExchangeFills.length} V1 fills found — these predate the V2 live-only refactor and will not have V2 execution records. This is expected.` : null,
+            v2ExchangeFills.length === 0 && v1ExchangeFills.length === 0 ? 'No fills in window — either no trades happened or v2_fills and crypto_trade_log both have no entries for this period.' : null,
+            reconRuns.length === 0 ? 'No reconciliation runs found in window.' : null,
+          ].filter(Boolean),
+        },
+      };
+
+      res.setHeader('Content-Disposition', `attachment; filename="trade-verification-${hours}h.json"`);
+      return res.status(200).json(report);
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|trade-verification|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

@@ -342,6 +342,24 @@ export default function CryptoTraderDashboard() {
     setExportingDiag(false);
   }, []);
 
+  const [exportingVerification, setExportingVerification] = useState(false);
+  const exportTradeVerification = useCallback(async (hours = 24) => {
+    setExportingVerification(true); setError(null);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=trade-verification&hours=${hours}`);
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `trade-verification-${hours}h.json`; a.click();
+      URL.revokeObjectURL(url);
+      const total = j.summary?.total_exchange_fills ?? 0;
+      const matched = j.summary?.total_matched_fills ?? 0;
+      setMsg(`Trade verification (${hours}h): ${total} fills, ${matched} matched. File: trade-verification-${hours}h.json`);
+    } catch (e) { setError(e.message); }
+    setExportingVerification(false);
+  }, []);
+
   const [deploying, setDeploying] = useState(false);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
@@ -618,6 +636,11 @@ export default function CryptoTraderDashboard() {
               onClick={() => exportDiagnostic(24)} disabled={exportingDiag}
               title="Download 24h missed-trade decision audit (BTC/ETH/SOL)">
               {exportingDiag ? 'Exporting…' : '🔍 Diagnostic (24h)'}
+            </button>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(34,197,94,0.1)', color: '#4ade80' }}
+              onClick={() => exportTradeVerification(24)} disabled={exportingVerification}
+              title="Download 24h trade verification report — matches each Upbit fill to its decision trail">
+              {exportingVerification ? 'Exporting…' : '✓ Verify Trades (24h)'}
             </button>
           </div>
         </div>
