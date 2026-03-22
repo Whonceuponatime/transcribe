@@ -155,17 +155,9 @@ export default function CryptoTraderDashboard() {
     setClassifyingId(null);
   }, [fetchV2Data]);
 
-  // Auto-refresh every 10 seconds.
-  // 0.5s would cost money (Vercel 100k/month free tier hit in <1 day at that rate).
-  // 10s = ~43k function calls/month — safely within free tier for one user.
   useEffect(() => {
     fetchStatus();
     fetchV2Data();
-    const interval = setInterval(() => {
-      fetchStatus();
-      fetchV2Data();
-    }, 10_000);
-    return () => clearInterval(interval);
   }, [fetchStatus, fetchV2Data]);
 
   // Save live trading controls (replaces mode toggle)
