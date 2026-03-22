@@ -673,26 +673,33 @@ export default function CryptoTraderDashboard() {
               </div>
             )}
 
-            {/* Adopted supported holdings */}
-            {(adoption.adoptedAssets ?? []).length > 0 && (
-              <div style={{ marginBottom: '0.6rem' }}>
-                <div style={{ color: '#a78bfa', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Adopted Holdings — Managed</div>
-                {(adoption.adoptedAssets ?? []).map((a, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '0.75rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, minWidth: '3rem', color: '#a78bfa' }}>{a.currency}</span>
-                    <span className="ct__muted" style={{ fontSize: '0.75rem' }}>qty: {Number(a.qty ?? 0).toFixed(6)}</span>
-                    {a.avg_cost_krw ? <span className="ct__muted" style={{ fontSize: '0.75rem' }}>avg: ₩{Math.round(a.avg_cost_krw).toLocaleString()}</span>
-                      : <span style={{ color: '#555', fontSize: '0.72rem' }}>avg: unknown</span>}
-                    {a.mark_price && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>mark: ₩{Math.round(a.mark_price).toLocaleString()}</span>}
-                    {a.estimated_market_value && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>≈₩{Math.round(a.estimated_market_value).toLocaleString()}</span>}
-                    <span style={{ fontSize: '0.68rem', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
-                      {a.strategy_tag ?? 'unassigned'}
-                    </span>
-                    <span style={{ fontSize: '0.68rem', color: '#22c55e' }}>managed</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Adopted supported holdings — read from positions table (authoritative source).
+                adoption.adoptedAssets only contains what the LATEST adoption run imported,
+                so BTC (adopted in an earlier run) would be missing. v2Positions has all three. */}
+            {(() => {
+              const adoptedFromPositions = v2Positions.filter((p) => p.origin === 'adopted_at_startup');
+              if (adoptedFromPositions.length === 0) return null;
+              return (
+                <div style={{ marginBottom: '0.6rem' }}>
+                  <div style={{ color: '#a78bfa', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Adopted Holdings — Managed</div>
+                  {adoptedFromPositions.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.75rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, minWidth: '3rem', color: '#a78bfa' }}>{p.asset ?? p.coin}</span>
+                      <span className="ct__muted" style={{ fontSize: '0.75rem' }}>qty: {Number(p.balance ?? p.qty_open ?? 0).toFixed(6)}</span>
+                      {(p.avgBuyKrw ?? p.avg_cost_krw)
+                        ? <span className="ct__muted" style={{ fontSize: '0.75rem' }}>avg: ₩{Math.round(p.avgBuyKrw ?? p.avg_cost_krw).toLocaleString()}</span>
+                        : <span style={{ color: '#555', fontSize: '0.72rem' }}>avg: unknown</span>}
+                      {p.currentPrice && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>mark: ₩{Math.round(p.currentPrice).toLocaleString()}</span>}
+                      {p.currentValueKrw && <span className="ct__muted" style={{ fontSize: '0.75rem' }}>≈₩{Math.round(p.currentValueKrw).toLocaleString()}</span>}
+                      <span style={{ fontSize: '0.68rem', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                        {p.strategy_tag ?? 'unassigned'}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#22c55e' }}>managed</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Unsupported / excluded holdings */}
             {(adoption.unsupportedAssets ?? []).length > 0 && (
@@ -710,7 +717,7 @@ export default function CryptoTraderDashboard() {
               </div>
             )}
 
-            {(adoption.adoptedAssets ?? []).length === 0 && (adoption.unsupportedAssets ?? []).length === 0 && (
+            {v2Positions.filter((p) => p.origin === 'adopted_at_startup').length === 0 && (adoption.unsupportedAssets ?? []).length === 0 && (
               <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No pre-existing holdings found at adoption time — account was empty or all dust.</div>
             )}
 
