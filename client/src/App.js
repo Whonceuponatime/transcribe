@@ -89,7 +89,7 @@ function App() {
       <InstallAppBanner />
       <header className="App-header">
         <div className="App-header__brand">
-          <h1>🃏 Jack of clubs</h1>
+          <h1>🗡️ Sad Dagger</h1>
           <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
         </div>
         <AuthStatus />

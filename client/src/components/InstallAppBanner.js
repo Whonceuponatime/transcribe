@@ -35,7 +35,7 @@ export default function InstallAppBanner() {
   return (
     <div className="install-app-banner" role="banner">
       <span className="install-app-banner__text">
-        Add Jack of clubs to your home screen to use it like an app.
+        Add Sad Dagger to your home screen to use it like an app.
       </span>
       <div className="install-app-banner__actions">
         <button type="button" className="install-app-banner__install" onClick={handleInstall}>

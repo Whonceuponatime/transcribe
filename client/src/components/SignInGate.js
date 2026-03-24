@@ -11,7 +11,7 @@ export default function SignInGate() {
     <div className="sign-in-gate">
       <div className="sign-in-gate__card">
         <div className="sign-in-gate__cta">
-          <h1 className="sign-in-gate__title">🃏 Jack of clubs</h1>
+          <h1 className="sign-in-gate__title">🗡️ Sad Dagger</h1>
           <p className="sign-in-gate__subtitle">
             Comprehensive media processing suite
           </p>
