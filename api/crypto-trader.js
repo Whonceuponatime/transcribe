@@ -174,32 +174,64 @@ module.exports = async function handler(req, res) {
     }
 
     // ── GET bot logs ────────────────────────────────────────────────────────
+    // ── GET V2 bot event logs ─────────────────────────────────────────────
+    // Reads from bot_events (V2 structured table).
+    // Excludes per-cycle decision noise so only actionable events surface.
     if (action === 'logs' && req.method === 'GET') {
       const limit = Math.min(Number(req.query.limit) || 100, 200);
-      // Exclude debug/diagnostic logs from the main log panel (too noisy)
+      const NOISE_EVENTS = [
+        'DECISION_CYCLE','DECISION_EMIT_ATTEMPT','DECISION_EMIT_SUCCESS',
+        'CYCLE_START_HEARTBEAT','CYCLE_END_HEARTBEAT','SNAPSHOT_EMIT_SUCCESS',
+        'RESEARCH_INDICATORS','EXIT_EVALUATION',
+      ];
       const { data: logs, error: logsErr } = await supabase
-        .from('crypto_bot_logs')
-        .select('id, level, tag, message, meta, created_at')
-        .neq('level', 'debug')
+        .from('bot_events')
+        .select('id, event_type, severity, subsystem, message, created_at')
+        .in('severity', ['info', 'warn', 'error'])
+        .not('event_type', 'in', `(${NOISE_EVENTS.map((e) => `"${e}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(limit);
       if (logsErr) return res.status(500).json({ error: logsErr.message });
       return res.status(200).json({ logs: logs || [] });
     }
 
-    // ── GET sell diagnostics (last 7 days, one entry every ~15 min) ─────────
+    // ── GET decision feed — recent DECISION_CYCLE events ─────────────────
+    // Replaces the old V1 sell_diag endpoint.
+    // Returns the last N DECISION_CYCLE rows across BTC/ETH/SOL so the
+    // dashboard can show what the bot is evaluating every cycle.
     if (action === 'diagnostics' && req.method === 'GET') {
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const limit  = Math.min(Number(req.query.limit) || 60, 200);
       const { data: diags, error: diagErr } = await supabase
-        .from('crypto_bot_logs')
-        .select('id, tag, message, meta, created_at')
-        .eq('level', 'debug')
-        .eq('tag', 'sell_diag')
-        .gte('created_at', since)
+        .from('bot_events')
+        .select('id, message, context_json, regime, created_at')
+        .eq('event_type', 'DECISION_CYCLE')
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(limit);
       if (diagErr) return res.status(500).json({ error: diagErr.message });
-      return res.status(200).json({ diagnostics: diags || [] });
+      // Shape into compact rows for the dashboard
+      const diagnostics = (diags || []).map((ev) => {
+        const cx = ev.context_json ?? {};
+        return {
+          id:             ev.id,
+          created_at:     ev.created_at,
+          symbol:         cx.symbol         ?? null,
+          price:          cx.price          ?? null,
+          regime:         cx.regime ?? ev.regime ?? null,
+          qty_open:       cx.qty_open       ?? null,
+          avg_cost_krw:   cx.avg_cost_krw   ?? null,
+          pnl_percent:    cx.pnl_percent    ?? null,
+          final_action:   cx.final_action   ?? null,
+          final_reason:   cx.final_reason   ?? null,
+          sell_blocker:   cx.sell_checks?.final_sell_blocker ?? null,
+          buy_blocker:    cx.buy_checks    != null
+            ? (cx.buy_checks.signal_met ? null : 'signal_not_met')
+            : null,
+          rsi:            cx.buy_checks?.rsi    ?? cx.sell_checks?.rsi    ?? null,
+          bb_pctB:        cx.buy_checks?.bb_pctB ?? cx.sell_checks?.bb_pctB ?? null,
+          cycle_id:       cx.cycle_id       ?? null,
+        };
+      });
+      return res.status(200).json({ diagnostics });
     }
 
     // ── GET full log export ────────────────────────────────────────────────

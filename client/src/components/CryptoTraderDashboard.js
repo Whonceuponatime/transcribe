@@ -931,7 +931,7 @@ export default function CryptoTraderDashboard() {
         )}
       </div>
 
-      {/* ═══ BOT LOGS ═══ */}
+      {/* ═══ BOT LOGS (V2 bot_events) ═══ */}
       <div className="ct__section">
         <div className="ct__logs-header" onClick={toggleLogs} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 className="ct__section-title" style={{ margin: 0 }}>Bot Logs</h3>
@@ -949,27 +949,31 @@ export default function CryptoTraderDashboard() {
           <div className="ct__logs-panel">
             {logsLoading && <div className="ct__logs-empty">Loading…</div>}
             {!logsLoading && logs.length === 0 && (
-              <div className="ct__logs-empty">No logs yet — the bot will write entries here after its next cycle.</div>
+              <div className="ct__logs-empty">No events yet — they appear after the next cycle.</div>
             )}
-            {!logsLoading && logs.length > 0 && logs.map((log) => (
-              <div key={log.id} className={`ct__log-row ct__log-row--${log.level}`}>
-                <span className="ct__log-time">
-                  {new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-                <span className="ct__log-tag">{log.tag || '—'}</span>
-                <span className="ct__log-msg">{log.message}</span>
-              </div>
-            ))}
+            {!logsLoading && logs.length > 0 && logs.map((log) => {
+              const sevColor = log.severity === 'error' ? '#ef4444' : log.severity === 'warn' ? '#f59e0b' : '#22c55e';
+              return (
+                <div key={log.id} className={`ct__log-row ct__log-row--${log.severity || 'info'}`}>
+                  <span className="ct__log-time">
+                    {new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <span className="ct__log-tag" style={{ color: sevColor, minWidth: '3.5rem' }}>{log.severity?.toUpperCase() || 'INFO'}</span>
+                  <span className="ct__log-tag" style={{ color: '#888', minWidth: '6rem' }}>{log.subsystem || log.event_type || '—'}</span>
+                  <span className="ct__log-msg">{log.message}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ═══ SELL DIAGNOSTICS ═══ */}
+      {/* ═══ DECISION FEED (V2 DECISION_CYCLE events) ═══ */}
       <div className="ct__section">
         <div className="ct__logs-header" onClick={toggleDiag} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h3 className="ct__section-title" style={{ margin: 0 }}>Sell Diagnostics</h3>
-            <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.2rem' }}>Per-coin sell block reasons logged every ~15 min — use this to review why sells aren't firing</div>
+            <h3 className="ct__section-title" style={{ margin: 0 }}>Decision Feed</h3>
+            <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.2rem' }}>Live V2 buy/sell evaluations — one row per coin per cycle</div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             {diagOpen && <button className="ct__btn ct__btn--sm" onClick={(e) => { e.stopPropagation(); fetchDiag(); }}>↻ Refresh</button>}
@@ -980,30 +984,29 @@ export default function CryptoTraderDashboard() {
           <div className="ct__logs-panel">
             {diagLoading && <div className="ct__logs-empty">Loading…</div>}
             {!diagLoading && diagLogs.length === 0 && (
-              <div className="ct__logs-empty">No diagnostics yet — they appear every ~15 min once the bot is running.</div>
+              <div className="ct__logs-empty">No decisions yet — they appear every 2 min once the bot is running.</div>
             )}
-            {!diagLoading && diagLogs.length > 0 && diagLogs.map((log) => {
-              const coins = log.meta?.sellDiag || [];
+            {!diagLoading && diagLogs.length > 0 && diagLogs.map((d) => {
+              const isAction = d.final_action === 'BUY_SUBMITTED' || d.final_action === 'ADD_ON_SUBMITTED' || d.final_action === 'SELL_TRIGGERED';
+              const isElig   = d.final_action === 'BUY_ELIGIBLE'  || d.final_action === 'ADD_ON_ELIGIBLE';
+              const acColor  = isAction ? '#22c55e' : isElig ? '#60a5fa' : '#555';
               return (
-                <div key={log.id} className="ct__log-row ct__log-row--debug" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', opacity: 0.7, fontSize: '0.72rem' }}>
-                    <span>{new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    <span>{log.meta?.cycleLabel || log.tag}</span>
-                  </div>
-                  {coins.length > 0 ? coins.map((d) => (
-                    <div key={d.coin} style={{ paddingLeft: '0.5rem', borderLeft: `3px solid ${d.atProfit ? '#22c55e' : '#ef4444'}`, marginLeft: '0.25rem' }}>
-                      <strong style={{ color: d.atProfit ? '#22c55e' : '#f87171' }}>{d.coin}</strong>
-                      <span style={{ margin: '0 0.4rem', color: '#ccc' }}>gain {d.gainPct}% net {d.netGainPct}%</span>
-                      {d.blockedBy
-                        ? <span style={{ color: '#fbbf24' }}>⛔ {d.blockedBy}</span>
-                        : d.signalsMet?.length
-                          ? <span style={{ color: '#22c55e' }}>✓ signals: {d.signalsMet.join(', ')}</span>
-                          : <span style={{ color: '#888' }}>no signals met</span>}
-                      <span style={{ color: '#666', fontSize: '0.7rem', marginLeft: '0.5rem' }}>
-                        RSI={d.indicators?.rsi} StochRSI={d.indicators?.stochRsi} VWAP={d.indicators?.vwapDev}% WR={d.indicators?.williamsR}
-                      </span>
-                    </div>
-                  )) : <span style={{ color: '#888', fontSize: '0.8rem' }}>{log.message}</span>}
+                <div key={d.id} className="ct__log-row" style={{ gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <span className="ct__log-time" style={{ minWidth: '6.5rem' }}>
+                    {new Date(d.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <span style={{ fontWeight: 700, minWidth: '2.5rem', color: '#e2e8f0' }}>{d.symbol}</span>
+                  <span style={{ color: acColor, minWidth: '9rem', fontSize: '0.78rem' }}>{d.final_action || '—'}</span>
+                  {d.pnl_percent != null && (
+                    <span style={{ color: d.pnl_percent >= 0 ? '#4ade80' : '#f87171', fontSize: '0.78rem' }}>
+                      P&amp;L {d.pnl_percent > 0 ? '+' : ''}{d.pnl_percent?.toFixed(2)}%
+                    </span>
+                  )}
+                  {d.rsi != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>RSI {d.rsi}</span>}
+                  {d.bb_pctB != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>%B {d.bb_pctB}</span>}
+                  <span className="ct__log-msg" style={{ color: '#666', fontSize: '0.72rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {d.final_reason}
+                  </span>
                 </div>
               );
             })}
