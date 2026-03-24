@@ -287,6 +287,24 @@ export default function CryptoTraderDashboard() {
     setExportingDiag(false);
   }, []);
 
+  const [exportingTuning, setExportingTuning] = useState(false);
+  const exportTuning = useCallback(async (hours = 24) => {
+    setExportingTuning(true); setError(null);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=tuning-export&hours=${hours}`);
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `tuning-export-${hours}h.json`; a.click();
+      URL.revokeObjectURL(url);
+      const cycles = j.summary?.total_decision_cycles ?? 0;
+      const sells  = j.summary?.total_sells_filled ?? 0;
+      setMsg(`Tuning export (${hours}h): ${cycles} decision cycles, ${sells} fills. File: tuning-export-${hours}h.json`);
+    } catch (e) { setError(e.message); }
+    setExportingTuning(false);
+  }, []);
+
   const [exportingVerification, setExportingVerification] = useState(false);
   const exportTradeVerification = useCallback(async (hours = 24) => {
     setExportingVerification(true); setError(null);
@@ -573,6 +591,11 @@ export default function CryptoTraderDashboard() {
               onClick={() => exportTradeVerification(24)} disabled={exportingVerification}
               title="Download 24h trade verification report — matches each Upbit fill to its decision trail">
               {exportingVerification ? 'Exporting…' : '✓ Verify Trades (24h)'}
+            </button>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(251,146,60,0.12)', color: '#fb923c' }}
+              onClick={() => exportTuning(24)} disabled={exportingTuning}
+              title="Download 24h strategy tuning validation — near-misses, blockers, trim activity, realized P&L">
+              {exportingTuning ? 'Exporting…' : '📊 Tuning Audit (24h)'}
             </button>
           </div>
         </div>

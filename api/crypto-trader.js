@@ -1680,7 +1680,397 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(report);
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|trade-verification|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    // ── GET tuning validation export ─────────────────────────────────────────
+    // Compact per-symbol analysis of whether the strategy tuning increased
+    // profitable rotation without making the bot reckless.
+    // Sections: summary · blocker_counts_by_symbol · executed_trades ·
+    //   near_miss_buys · near_miss_sells · realized_profit_summary ·
+    //   turnover_summary · final_assessment_inputs
+    if (action === 'tuning-export' && req.method === 'GET') {
+      const hours  = Math.min(Number(req.query.hours) || 24, 72);
+      const since  = new Date(Date.now() - hours * 3600000).toISOString();
+      const until  = new Date().toISOString();
+      const COINS  = ['BTC', 'ETH', 'SOL'];
+      const safe   = async (q) => { try { return await q; } catch (_) { return { data: null }; } };
+
+      // Korea Standard Time helper (UTC+9)
+      const toKST = (iso) => {
+        if (!iso) return null;
+        const d = new Date(new Date(iso).getTime() + 9 * 3600000);
+        return d.toISOString().replace('T', ' ').slice(0, 19) + ' KST';
+      };
+
+      const [decisionRes, ordersRes, fillsRes, snapshotsRes, cfgRes, positionsRes] = await Promise.all([
+        supabase.from('bot_events')
+          .select('message, context_json, created_at').eq('event_type', 'DECISION_CYCLE')
+          .gte('created_at', since).order('created_at', { ascending: true }).limit(5000),
+        supabase.from('orders')
+          .select('id, asset, side, state, reason, krw_requested, qty_requested, created_at, position_id')
+          .in('asset', COINS).gte('created_at', since).order('created_at', { ascending: true }).limit(500),
+        safe(supabase.from('v2_fills')
+          .select('order_id, position_id, asset, side, price_krw, qty, fee_krw, entry_reason, executed_at')
+          .in('asset', COINS).gte('executed_at', since).order('executed_at', { ascending: true }).limit(500)),
+        safe(supabase.from('portfolio_snapshots_v2')
+          .select('nav_krw, created_at').gte('created_at', since).order('created_at', { ascending: true }).limit(500)),
+        safe(supabase.from('bot_config').select('*').limit(1).single()),
+        safe(supabase.from('positions')
+          .select('position_id, asset, avg_cost_krw, qty_open')
+          .in('state', ['open', 'adopted', 'partial']).in('asset', COINS)),
+      ]);
+
+      const decisions  = decisionRes.data  || [];
+      const orders     = ordersRes.data    || [];
+      const fills      = fillsRes.data     || [];
+      const snapshots  = snapshotsRes.data || [];
+      const cfg        = cfgRes.data       || {};
+
+      // ── Blocker classifier ───────────────────────────────────────────────
+      function classifyBlocker(raw) {
+        if (!raw) return 'other';
+        const r = raw.toLowerCase();
+        if (r.includes('below_required_edge') || r.includes('below_edge')) return 'below_required_edge';
+        if (r.includes('existing_position_add_rule'))   return 'existing_position_add_rule';
+        if (r.includes('bb_pctb') || r.includes('bb_pct_b')) return 'bb_pctB_threshold';
+        if (r.includes('rsi'))                          return 'rsi_threshold';
+        if (r.includes('ob_imbalance'))                 return 'ob_imbalance_threshold';
+        if (r.includes('cooldown'))                     return 'cooldown';
+        if (r.includes('exposure') || r.includes('risk_cap') || r.includes('entries in last') || r.includes('turnover') || r.includes('streak')) return 'risk_cap';
+        if (r.includes('frozen'))                       return 'system_frozen';
+        if (r.includes('protected'))                    return 'protected_position';
+        if (r === 'no_position' || r.includes('no_position')) return 'no_position';
+        if (r.includes('cash') || r.includes('reserve')) return 'cash_not_ok';
+        return 'other';
+      }
+
+      // ── Order classifier ─────────────────────────────────────────────────
+      const filledStates    = new Set(['filled', 'dust_refunded_and_filled']);
+      const submittedStates = new Set(['submitted', 'accepted', 'filled', 'dust_refunded_and_filled', 'intent_created']);
+
+      function classifyOrder(ord) {
+        const r = (ord.reason ?? '').toLowerCase();
+        if (ord.side === 'buy')  return r.includes('_addon') ? 'add_on' : 'initial_entry';
+        if (r.includes('trim1')) return 'trim1';
+        if (r.includes('trim2')) return 'trim2';
+        if (r.includes('runner') || r.includes('regime_break') || r.includes('time_stop')) return 'full_exit';
+        return 'other';
+      }
+
+      // ── Process DECISION_CYCLE rows ──────────────────────────────────────
+      const TRIM1_TARGET   = cfg.exit_quick_trim1_gross_pct ?? 0.85;
+      const TRIM2_TARGET   = cfg.exit_quick_trim2_gross_pct ?? 1.25;
+      const BLOCKER_KEYS   = ['below_required_edge','existing_position_add_rule','bb_pctB_threshold',
+        'rsi_threshold','ob_imbalance_threshold','cooldown','risk_cap','system_frozen',
+        'protected_position','no_position','cash_not_ok','other'];
+
+      let totalDecisions = 0, totalNoAction = 0;
+      const buyEligBySymbol  = { BTC: 0, ETH: 0, SOL: 0 };
+      const sellEligBySymbol = { BTC: 0, ETH: 0, SOL: 0 };
+      const blockerCounts    = {};
+      const blockerBySym     = { BTC: {}, ETH: {}, SOL: {} };
+      const nearMissBuys     = [];
+      const nearMissSells    = [];
+
+      for (const ev of decisions) {
+        const cx  = ev.context_json ?? {};
+        const sym = cx.symbol;
+        if (!COINS.includes(sym)) continue;
+        totalDecisions++;
+
+        const fa  = cx.final_action ?? '';
+        const fr  = cx.final_reason ?? '';
+        const bc  = cx.buy_checks   ?? {};
+        const sc  = cx.sell_checks  ?? {};
+        const pnl = cx.pnl_percent;
+
+        if (['BUY_ELIGIBLE','ADD_ON_ELIGIBLE','BUY_SUBMITTED','ADD_ON_SUBMITTED'].includes(fa)) buyEligBySymbol[sym]++;
+        if (fa === 'SELL_TRIGGERED') sellEligBySymbol[sym]++;
+        if (fa === 'NO_ACTION') totalNoAction++;
+
+        // Extract and count blocker — prefer sell-side blocker for sell rows, buy-side for buy rows
+        const rawSellBlocker = sc.final_sell_blocker ?? null;
+        const rawBuyBlocker  = fr.includes('buy_blocked:') ? fr.replace(/^.*buy_blocked:/, '').split(' |')[0] : null;
+        const rawBlocker     = rawBuyBlocker ?? rawSellBlocker ?? (fa === 'NO_ACTION' ? fr : null);
+
+        if (rawBlocker) {
+          const nb = classifyBlocker(rawBlocker);
+          blockerCounts[nb] = (blockerCounts[nb] ?? 0) + 1;
+          blockerBySym[sym][nb] = (blockerBySym[sym][nb] ?? 0) + 1;
+        }
+
+        // Near-miss buys — signal partially close to passing or add-on blocked by gap
+        const bbPctB    = bc.bb_pctB     ?? null;
+        const bbThresh  = bc.bb_threshold ?? null;
+        const rsi       = bc.rsi          ?? null;
+        const rsiStr    = bc.rsi_threshold ?? '';
+        const obImb     = bc.ob_imbalance  ?? null;
+        const obThresh  = bc.ob_threshold   ?? null;
+
+        const bbClose = bbPctB != null && bbThresh != null && bbPctB >= bbThresh && bbPctB < bbThresh * 1.20;
+        const rsiClose = (() => {
+          if (rsi == null || !rsiStr) return false;
+          const parts = rsiStr.split('-');
+          if (parts.length === 2) { const max = Number(parts[1]); return rsi > max && rsi < max + 5; }
+          const max = Number(rsiStr.replace(/[^0-9.]/g, ''));
+          return !isNaN(max) && rsi >= max && rsi < max + 5;
+        })();
+        const obClose         = obImb != null && obThresh != null && obImb < 0 && obImb >= obThresh * 1.20 && obImb < obThresh;
+        const isAddonBlocked  = (rawBuyBlocker ?? '').startsWith('existing_position_add_rule');
+
+        if (fa === 'NO_ACTION' && bc.buys_enabled !== false && (bbClose || rsiClose || obClose || isAddonBlocked)) {
+          const cooldownMatch = fr.match(/cooldown_(\d+)min/);
+          nearMissBuys.push({
+            timestamp_kst:    toKST(ev.created_at),
+            symbol:           sym,
+            price:            cx.price     ?? null,
+            qty_open:         cx.qty_open  ?? null,
+            avg_cost_krw:     cx.avg_cost_krw ?? null,
+            buy_blocker:      rawBuyBlocker ? classifyBlocker(rawBuyBlocker) : null,
+            rsi:              rsi,
+            rsi_threshold:    rsiStr || null,
+            bb_pctB:          bbPctB,
+            bb_threshold:     bbThresh,
+            ob_imbalance:     obImb,
+            ob_threshold:     obThresh,
+            cooldown_remaining: cooldownMatch ? `${cooldownMatch[1]}min` : null,
+            risk_cap_ok:      bc.risk_cap_ok ?? null,
+            final_reason:     fr,
+          });
+        }
+
+        // Near-miss sells — has position, pnl positive but below trim1
+        if (sc.qty_ok && pnl != null && pnl > 0 && pnl < TRIM1_TARGET) {
+          nearMissSells.push({
+            timestamp_kst:     toKST(ev.created_at),
+            symbol:            sym,
+            price:             cx.price       ?? null,
+            qty_open:          cx.qty_open    ?? null,
+            avg_cost_krw:      cx.avg_cost_krw ?? null,
+            pnl_percent:       pnl,
+            required_edge_pct: sc.required_edge_pct ?? null,
+            final_sell_blocker: sc.final_sell_blocker ?? null,
+            tranche_state:     sc.tranche_state      ?? null,
+            trailing_stop_hit: sc.trailing_stop_hit  ?? null,
+            regime_break_hit:  sc.regime_break_hit   ?? null,
+            final_reason:      fr,
+          });
+        }
+      }
+
+      // Top 10 blockers overall
+      const topBlockers = Object.entries(blockerCounts)
+        .sort((a, b) => b[1] - a[1]).slice(0, 10)
+        .map(([reason, count]) => ({ reason, count }));
+
+      // Blocker counts per symbol (all keys, zero if absent)
+      const blockerCountsBySymbol = {};
+      for (const sym of COINS) {
+        blockerCountsBySymbol[sym] = Object.fromEntries(BLOCKER_KEYS.map((k) => [k, blockerBySym[sym]?.[k] ?? 0]));
+      }
+
+      // ── Process orders ───────────────────────────────────────────────────
+      let buySub = 0, sellSub = 0, buyFill = 0, sellFill = 0;
+      let trim1Count = 0, trim2Count = 0, addonCount = 0, fullExitCount = 0;
+      const turnoverBySym = { BTC: 0, ETH: 0, SOL: 0 };
+      const addonBySym    = { BTC: 0, ETH: 0, SOL: 0 };
+      const trimBySym     = { BTC: 0, ETH: 0, SOL: 0 };
+      let totalTurnover   = 0;
+      let realPnlTotal    = 0;
+      const realPnlBySym  = { BTC: 0, ETH: 0, SOL: 0 };
+      let pnlTrim1 = 0, pnlTrim2 = 0, pnlFullExit = 0;
+      const pnlPerSell    = [];
+      const executedTrades = [];
+
+      for (const ord of orders) {
+        const sym = ord.asset;
+        if (!COINS.includes(sym)) continue;
+        const cat      = classifyOrder(ord);
+        const submitted = submittedStates.has(ord.state);
+        const filled    = filledStates.has(ord.state);
+
+        if (ord.side === 'buy')  { if (submitted) buySub++;  if (filled) buyFill++;  }
+        if (ord.side === 'sell') { if (submitted) sellSub++; if (filled) sellFill++; }
+        if (cat === 'trim1')     trim1Count++;
+        if (cat === 'trim2')     trim2Count++;
+        if (cat === 'add_on')    addonCount++;
+        if (cat === 'full_exit') fullExitCount++;
+
+        const krw = Number(ord.krw_requested ?? 0);
+        if (submitted) {
+          totalTurnover += krw;
+          if (turnoverBySym[sym] != null) turnoverBySym[sym] += krw;
+        }
+        if (cat === 'add_on')                                            addonBySym[sym] = (addonBySym[sym] ?? 0) + 1;
+        if (['trim1','trim2','full_exit'].includes(cat))                 trimBySym[sym]  = (trimBySym[sym]  ?? 0) + 1;
+
+        // Approximate P&L for filled sells: find nearest DECISION_CYCLE with pnl_percent
+        let pnlPct = null;
+        if (ord.side === 'sell' && filled) {
+          const ordMs = new Date(ord.created_at).getTime();
+          const match = decisions.find((d) => {
+            const dcx = d.context_json ?? {};
+            return dcx.symbol === sym && dcx.pnl_percent != null
+              && Math.abs(new Date(d.created_at).getTime() - ordMs) <= 5 * 60 * 1000;
+          });
+          pnlPct = match?.context_json?.pnl_percent ?? null;
+          if (pnlPct != null) {
+            const approxKrw = (pnlPct / 100) * krw;
+            realPnlTotal += approxKrw;
+            if (realPnlBySym[sym] != null) realPnlBySym[sym] += approxKrw;
+            if (cat === 'trim1')     pnlTrim1    += approxKrw;
+            if (cat === 'trim2')     pnlTrim2    += approxKrw;
+            if (cat === 'full_exit') pnlFullExit += approxKrw;
+            pnlPerSell.push(approxKrw);
+          }
+        }
+
+        // Find matching fill for qty
+        const matchFill = fills.find((f) =>
+          f.order_id === ord.id ||
+          (f.asset === sym && f.side === ord.side &&
+           Math.abs(new Date(f.executed_at ?? 0).getTime() - new Date(ord.created_at).getTime()) < 5 * 60 * 1000)
+        );
+
+        executedTrades.push({
+          timestamp_kst:    toKST(ord.created_at),
+          symbol:           sym,
+          side:             ord.side,
+          category:         cat,
+          order_submitted:  submitted,
+          order_filled:     filled,
+          krw_amount:       krw || null,
+          filled_qty:       matchFill?.qty ?? null,
+          gross_target_pct: cat === 'trim1' ? TRIM1_TARGET : cat === 'trim2' ? TRIM2_TARGET : null,
+          pnl_percent:      pnlPct,
+          final_reason:     ord.reason ?? null,
+          order_id:         ord.id ?? null,
+        });
+      }
+
+      const avgPnl = pnlPerSell.length ? pnlPerSell.reduce((a, b) => a + b, 0) / pnlPerSell.length : null;
+      const sorted = [...pnlPerSell].sort((a, b) => a - b);
+      const medPnl = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
+
+      // ── Turnover vs NAV ──────────────────────────────────────────────────
+      const latestNav    = snapshots.length ? snapshots[snapshots.length - 1].nav_krw : null;
+      const turnoverPct  = latestNav && totalTurnover ? +((totalTurnover / latestNav) * 100).toFixed(2) : null;
+
+      // ── Hold time from fills ─────────────────────────────────────────────
+      const buyFillsByPos = {}, sellFillsByPos = {};
+      for (const f of fills) {
+        const bucket = f.side === 'buy' ? buyFillsByPos : sellFillsByPos;
+        if (!bucket[f.position_id]) bucket[f.position_id] = [];
+        bucket[f.position_id].push(f);
+      }
+      const holdTimes = [];
+      for (const [pid, buys] of Object.entries(buyFillsByPos)) {
+        const sells = sellFillsByPos[pid] ?? [];
+        if (buys.length && sells.length) {
+          const tBuy  = Math.min(...buys.map((b)  => new Date(b.executed_at).getTime()));
+          const tSell = Math.min(...sells.map((s) => new Date(s.executed_at).getTime()));
+          if (tSell > tBuy) holdTimes.push((tSell - tBuy) / 3600000);
+        }
+      }
+      const avgHoldHours = holdTimes.length
+        ? +( holdTimes.reduce((a, b) => a + b, 0) / holdTimes.length).toFixed(1)
+        : null;
+
+      // ── Most common blockers per symbol ──────────────────────────────────
+      const BUY_BLOCKER_KEYS  = ['bb_pctB_threshold','rsi_threshold','ob_imbalance_threshold','cooldown','risk_cap','existing_position_add_rule','cash_not_ok'];
+      const SELL_BLOCKER_KEYS = ['below_required_edge','no_position','protected_position'];
+
+      function topKey(symCounts, keys) {
+        let best = null, bestN = 0;
+        for (const k of keys) { if ((symCounts[k] ?? 0) > bestN) { bestN = symCounts[k]; best = k; } }
+        return best;
+      }
+
+      const mostCommonBuyBlocker  = Object.fromEntries(COINS.map((s) => [s, topKey(blockerBySym[s], BUY_BLOCKER_KEYS)]));
+      const mostCommonSellBlocker = Object.fromEntries(COINS.map((s) => [s, topKey(blockerBySym[s], SELL_BLOCKER_KEYS)]));
+
+      // ── Build export ─────────────────────────────────────────────────────
+      const tuningExport = {
+        exported_at_kst: toKST(new Date().toISOString()),
+        window_hours:    hours,
+        engine:          'V2_live',
+
+        summary: {
+          window_start:                         toKST(since),
+          window_end:                           toKST(until),
+          total_decision_cycles:                totalDecisions,
+          total_buys_submitted:                 buySub,
+          total_sells_submitted:                sellSub,
+          total_buys_filled:                    buyFill,
+          total_sells_filled:                   sellFill,
+          total_partial_trim1_fired:            trim1Count,
+          total_partial_trim2_fired:            trim2Count,
+          total_addon_buys_fired:               addonCount,
+          total_full_exit_sells:                fullExitCount,
+          total_no_action_cycles:               totalNoAction,
+          total_buy_eligible_cycles_by_symbol:  buyEligBySymbol,
+          total_sell_eligible_cycles_by_symbol: sellEligBySymbol,
+          top_10_blocker_reasons_overall:       topBlockers,
+        },
+
+        blocker_counts_by_symbol: blockerCountsBySymbol,
+
+        executed_trades: executedTrades,
+
+        near_miss_buys:  nearMissBuys.slice(-30),
+        near_miss_sells: nearMissSells.slice(-30),
+
+        realized_profit_summary: {
+          realized_pnl_krw_total:       realPnlTotal  ? +realPnlTotal.toFixed(0)  : null,
+          realized_pnl_by_symbol:       Object.fromEntries(Object.entries(realPnlBySym).map(([k, v]) => [k, +v.toFixed(0)])),
+          realized_pnl_from_trim1:      pnlTrim1      ? +pnlTrim1.toFixed(0)      : null,
+          realized_pnl_from_trim2:      pnlTrim2      ? +pnlTrim2.toFixed(0)      : null,
+          realized_pnl_from_full_exits: pnlFullExit   ? +pnlFullExit.toFixed(0)   : null,
+          average_realized_pnl_per_sell: avgPnl != null ? +avgPnl.toFixed(0)      : null,
+          median_realized_pnl_per_sell:  medPnl != null ? +medPnl.toFixed(0)      : null,
+          note: pnlPerSell.length === 0
+            ? 'No filled sell orders in window — all P&L fields are null.'
+            : 'Approximate: pnl_percent from nearest DECISION_CYCLE × krw_amount. ±5% error is normal.',
+        },
+
+        turnover_summary: {
+          turnover_krw_total:     totalTurnover ? +totalTurnover.toFixed(0) : 0,
+          turnover_by_symbol:     Object.fromEntries(Object.entries(turnoverBySym).map(([k, v]) => [k, +v.toFixed(0)])),
+          turnover_pct_of_nav:    turnoverPct,
+          latest_nav_krw:         latestNav ? +latestNav.toFixed(0) : null,
+          add_on_count_by_symbol: addonBySym,
+          trim_count_by_symbol:   trimBySym,
+          avg_hold_time_hours:    avgHoldHours,
+        },
+
+        final_assessment_inputs: {
+          most_common_buy_blocker_by_symbol:    mostCommonBuyBlocker,
+          most_common_sell_blocker_by_symbol:   mostCommonSellBlocker,
+          did_trim1_fire:                        trim1Count > 0,
+          did_trim2_fire:                        trim2Count > 0,
+          did_addons_fire:                       addonCount > 0,
+          did_realized_profit_occur:             realPnlTotal > 0,
+          did_turnover_increase_vs_previous_window: null,
+          current_thresholds: {
+            entry_bb_pct_uptrend:          cfg.entry_bb_pct_uptrend          ?? 0.45,
+            entry_rsi_min_uptrend:         cfg.entry_rsi_min_uptrend         ?? 42,
+            entry_rsi_max_uptrend:         cfg.entry_rsi_max_uptrend         ?? 55,
+            entry_bb_pct_range:            cfg.entry_bb_pct_range            ?? 0.30,
+            entry_rsi_max_range:           cfg.entry_rsi_max_range           ?? 45,
+            ob_imbalance_min:              cfg.ob_imbalance_min              ?? -0.45,
+            exit_safety_buffer_pct:        cfg.exit_safety_buffer_pct        ?? 0.10,
+            exit_quick_trim1_gross_pct:    cfg.exit_quick_trim1_gross_pct    ?? 0.85,
+            exit_quick_trim2_gross_pct:    cfg.exit_quick_trim2_gross_pct    ?? 1.25,
+            addon_min_dip_pct:             cfg.addon_min_dip_pct             ?? 1.0,
+            addon_size_mult:               cfg.addon_size_mult                ?? 0.5,
+            max_entries_per_coin_24h:      cfg.max_entries_per_coin_24h      ?? 3,
+          },
+        },
+      };
+
+      res.setHeader('Content-Disposition', `attachment; filename="tuning-export-${hours}h.json"`);
+      return res.status(200).json(tuningExport);
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });
