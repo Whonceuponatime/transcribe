@@ -687,14 +687,14 @@ CREATE TABLE IF NOT EXISTS bot_config (
   core_target_pct          NUMERIC(5,2) NOT NULL DEFAULT 30,
   tactical_target_pct      NUMERIC(5,2) NOT NULL DEFAULT 15,
   krw_min_reserve_pct      NUMERIC(5,2) NOT NULL DEFAULT 12,
-  entry_bb_pct_uptrend     NUMERIC(5,3) NOT NULL DEFAULT 0.25,
-  entry_rsi_min_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 35,
-  entry_rsi_max_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 45,
-  entry_bb_pct_range       NUMERIC(5,3) NOT NULL DEFAULT 0.10,
-  entry_rsi_max_range      NUMERIC(5,2) NOT NULL DEFAULT 35,
+  entry_bb_pct_uptrend     NUMERIC(5,3) NOT NULL DEFAULT 0.45,
+  entry_rsi_min_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 42,
+  entry_rsi_max_uptrend    NUMERIC(5,2) NOT NULL DEFAULT 55,
+  entry_bb_pct_range       NUMERIC(5,3) NOT NULL DEFAULT 0.30,
+  entry_rsi_max_range      NUMERIC(5,2) NOT NULL DEFAULT 45,
   entry_bb_pct_downtrend   NUMERIC(5,3) NOT NULL DEFAULT 0.05,
   entry_rsi_max_downtrend  NUMERIC(5,2) NOT NULL DEFAULT 28,
-  ob_imbalance_min         NUMERIC(5,3) NOT NULL DEFAULT -0.30,
+  ob_imbalance_min         NUMERIC(5,3) NOT NULL DEFAULT -0.45,
   exit_atr_trim1           NUMERIC(5,2) NOT NULL DEFAULT 1.20,
   exit_atr_trim2           NUMERIC(5,2) NOT NULL DEFAULT 2.00,
   exit_atr_trailing        NUMERIC(5,2) NOT NULL DEFAULT 1.50,
@@ -719,6 +719,7 @@ CREATE TABLE IF NOT EXISTS bot_config (
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO bot_config DEFAULT VALUES ON CONFLICT DO NOTHING;
+CREATE UNIQUE INDEX IF NOT EXISTS bot_config_singleton ON bot_config ((true));
 
 CREATE TABLE IF NOT EXISTS positions (
   position_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),

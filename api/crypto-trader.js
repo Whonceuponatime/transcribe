@@ -883,7 +883,11 @@ module.exports = async function handler(req, res) {
       }
       if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'No valid fields' });
       patch.updated_at = new Date().toISOString();
-      const { error: cfgErr } = await supabase.from('bot_config').update(patch).not('id', 'is', null);
+      // Fetch the singleton row's ID first so the update is always targeted by PK.
+      // Previously used .not('id','is',null) which updated every row in the table.
+      const { data: cfgRow } = await supabase.from('bot_config').select('id').limit(1).single();
+      if (!cfgRow?.id) return res.status(500).json({ error: 'bot_config row not found' });
+      const { error: cfgErr } = await supabase.from('bot_config').update(patch).eq('id', cfgRow.id);
       if (cfgErr) return res.status(500).json({ error: cfgErr.message });
       return res.status(200).json({ ok: true, updated: patch });
     }
