@@ -722,6 +722,28 @@ CREATE TABLE IF NOT EXISTS bot_config (
   trading_enabled          BOOLEAN NOT NULL DEFAULT true,
   buys_enabled             BOOLEAN NOT NULL DEFAULT true,
   sells_enabled            BOOLEAN NOT NULL DEFAULT true,
+  -- Adaptive entry threshold layer (migration 032)
+  -- Set adaptive_thresholds_enabled = false to revert to fixed config values.
+  adaptive_thresholds_enabled  BOOLEAN      NOT NULL DEFAULT true,
+  adaptive_bb_12h_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.04,
+  adaptive_bb_24h_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.07,
+  adaptive_bb_flat_offset      NUMERIC(5,3) NOT NULL DEFAULT 0.03,
+  adaptive_bb_vol_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.05,
+  adaptive_bb_risk_offset      NUMERIC(5,3) NOT NULL DEFAULT 0.08,
+  adaptive_bb_uptrend_min      NUMERIC(5,3) NOT NULL DEFAULT 0.20,
+  adaptive_bb_uptrend_max      NUMERIC(5,3) NOT NULL DEFAULT 0.60,
+  adaptive_bb_range_min        NUMERIC(5,3) NOT NULL DEFAULT 0.10,
+  adaptive_bb_range_max        NUMERIC(5,3) NOT NULL DEFAULT 0.50,
+  adaptive_bb_downtrend_min    NUMERIC(5,3) NOT NULL DEFAULT 0.02,
+  adaptive_bb_downtrend_max    NUMERIC(5,3) NOT NULL DEFAULT 0.12,
+  adaptive_ob_12h_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.04,
+  adaptive_ob_24h_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.07,
+  adaptive_ob_flat_offset      NUMERIC(5,3) NOT NULL DEFAULT 0.03,
+  adaptive_ob_vol_offset       NUMERIC(5,3) NOT NULL DEFAULT 0.05,
+  adaptive_ob_risk_offset      NUMERIC(5,3) NOT NULL DEFAULT 0.08,
+  adaptive_ob_floor            NUMERIC(5,3) NOT NULL DEFAULT -0.70,
+  adaptive_ob_ceil             NUMERIC(5,3) NOT NULL DEFAULT -0.15,
+  adaptive_atr_high_pct        NUMERIC(5,2) NOT NULL DEFAULT 3.00,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
