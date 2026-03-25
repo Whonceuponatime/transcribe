@@ -744,6 +744,11 @@ CREATE TABLE IF NOT EXISTS bot_config (
   adaptive_ob_floor            NUMERIC(5,3) NOT NULL DEFAULT -0.70,
   adaptive_ob_ceil             NUMERIC(5,3) NOT NULL DEFAULT -0.15,
   adaptive_atr_high_pct        NUMERIC(5,2) NOT NULL DEFAULT 3.00,
+  -- Starter (rotation) entry mode (migration 033)
+  -- Small flat-portfolio entry when pullback signal not met; blocked in DOWNTREND.
+  starter_entry_enabled        BOOLEAN      NOT NULL DEFAULT true,
+  starter_size_mult            NUMERIC(5,3) NOT NULL DEFAULT 0.25,
+  starter_rsi_max              NUMERIC(5,2) NOT NULL DEFAULT 70,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
