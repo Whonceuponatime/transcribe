@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
 import AuthStatus from './components/AuthStatus';
@@ -22,7 +22,13 @@ import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
-  const [activeTab, setActiveTab] = useState('transcription');
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('activeTab') || 'transcription'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -88,11 +94,13 @@ function App() {
     <div className="App">
       <InstallAppBanner />
       <header className="App-header">
-        <div className="App-header__brand">
-          <h1>🗡️ Sad Dagger</h1>
-          <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
+        <div className="App-header__inner">
+          <div className="App-header__brand">
+            <h1>🗡️ Sad Dagger</h1>
+            <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
+          </div>
+          <AuthStatus />
         </div>
-        <AuthStatus />
       </header>
 
       <AppNav activeTab={activeTab} onSelectTab={setActiveTab} />

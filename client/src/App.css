@@ -42,6 +42,10 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Layout rhythm — shared by header, nav, and main */
+  --content-max-width: 1400px;
+  --layout-px: 1rem;
 }
 
 /* Aliases for compatibility */
@@ -131,11 +135,18 @@ body {
 }
 
 .App-header {
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-  padding: 0.6rem 1rem;
-  padding-left: max(1rem, var(--safe-left));
-  padding-right: max(1rem, var(--safe-right));
+  background-color: var(--bg-surface);
+  /* no border-bottom — nav-wrap provides the bottom visual boundary */
+}
+
+/* Inner container: aligns header content to the same width as main content */
+.App-header__inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+  padding: 0.5rem var(--layout-px);
+  padding-left: max(var(--layout-px), var(--safe-left));
+  padding-right: max(var(--layout-px), var(--safe-right));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -146,59 +157,70 @@ body {
 .App-header__brand {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
 }
 
 .App-header h1 {
   color: var(--text);
   font-family: var(--font-brand);
-  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
+  line-height: 1.2;
 }
 
 .App-header__tagline {
   color: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 0.8rem;
   margin: 0;
+  line-height: 1.3;
 }
 
+/* Keep AuthStatus in normal flow within the header inner container */
 .App-header .auth-status {
   position: relative;
   top: auto;
   right: auto;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .App-main {
   flex: 1;
-  padding: 0.75rem 1rem;
-  padding-left: max(1rem, var(--safe-left));
-  padding-right: max(1rem, var(--safe-right));
+  padding: 0.75rem var(--layout-px);
+  padding-left: max(var(--layout-px), var(--safe-left));
+  padding-right: max(var(--layout-px), var(--safe-right));
   padding-bottom: max(1.5rem, calc(var(--safe-bottom) + 1rem));
-  max-width: 1400px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   width: 100%;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Navigation: mobile-first — scrollable strips, touch-friendly */
+/* Navigation: sticky band — same surface bg as header, visually unified */
 .nav-wrap {
-  margin-bottom: 0.75rem;
-  padding: 0 max(0.5rem, var(--safe-left)) 0 max(0.5rem, var(--safe-right));
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--bg-page);
-  padding-bottom: 0.5rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Inner container: aligns nav content to the same width as main content */
+.nav-wrap-inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+  padding: 0.4rem var(--layout-px);
+  padding-left: max(var(--layout-px), var(--safe-left));
+  padding-right: max(var(--layout-px), var(--safe-right));
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .nav-categories {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 0.6rem;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -574,24 +596,33 @@ button:active:not(:disabled) {
 
 /* Desktop: two-column layouts and relaxed padding */
 @media (min-width: 769px) {
+  :root {
+    --layout-px: 1.5rem;
+  }
+
   .template-two-col {
     grid-template-columns: 1fr 1fr;
     min-height: 400px;
   }
   .app-container {
     grid-template-columns: 1fr 1fr;
-    height: calc(100vh - 200px);
     min-height: 500px;
   }
   .template-single-card {
     max-width: 720px;
   }
   .App-main {
-    padding: 1rem;
-    padding-bottom: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1.5rem;
   }
-  .App-header {
-    padding: 0.75rem 1.5rem;
+  .App-header__inner {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+  .nav-wrap-inner {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    gap: 0.35rem;
   }
   .nav-categories {
     justify-content: center;
@@ -602,6 +633,17 @@ button:active:not(:disabled) {
     justify-content: center;
     flex-wrap: wrap;
     overflow-x: visible;
+  }
+  /* Tighter tab heights on desktop — touch-min only needed on mobile */
+  .nav-category-btn {
+    min-height: 34px;
+    font-size: 0.85rem;
+    padding: 0 0.9rem;
+  }
+  .nav-tool-btn {
+    min-height: 32px;
+    font-size: 0.8rem;
+    padding: 0 0.8rem;
   }
 }
 
@@ -703,17 +745,17 @@ button:active:not(:disabled) {
   background: var(--accent);
 }
 
-/* Mobile: compact header and typography */
+/* Header typography — mobile first */
 .App-header h1 {
   font-size: 1.2rem;
 }
 .App-header__tagline {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 @media (min-width: 769px) {
   .App-header h1 {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
   }
   .App-header__tagline {
     font-size: 0.8rem;
@@ -722,7 +764,7 @@ button:active:not(:disabled) {
 
 @media (max-width: 360px) {
   .App-header h1 {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
   .App-header__tagline {
     font-size: 0.65rem;

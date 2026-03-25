@@ -61,34 +61,36 @@ export default function AppNav({ activeTab, onSelectTab }) {
   return (
     <>
       <div className="nav-wrap">
-        <div className="nav-categories" role="tablist" aria-label="Categories">
-          {Object.entries(CATEGORIES).map(([key, cat]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={activeCategory === key}
-              className={`nav-category-btn ${activeCategory === key ? 'active' : ''}`}
-              onClick={() => setActiveCategory(key)}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-        <div className="nav-submenu" role="tablist" aria-label="Tools">
-          {category.tools.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tool.id}
-              className={`nav-tool-btn ${activeTab === tool.id ? 'active' : ''}`}
-              onClick={() => onSelectTab(tool.id)}
-            >
-              <span aria-hidden>{tool.icon}</span>
-              <span className="nav-tool-btn__label">{tool.label}</span>
-            </button>
-          ))}
+        <div className="nav-wrap-inner">
+          <div className="nav-categories" role="tablist" aria-label="Categories">
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={activeCategory === key}
+                className={`nav-category-btn ${activeCategory === key ? 'active' : ''}`}
+                onClick={() => setActiveCategory(key)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="nav-submenu" role="tablist" aria-label="Tools">
+            {category.tools.map((tool) => (
+              <button
+                key={tool.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tool.id}
+                className={`nav-tool-btn ${activeTab === tool.id ? 'active' : ''}`}
+                onClick={() => onSelectTab(tool.id)}
+              >
+                <span aria-hidden>{tool.icon}</span>
+                <span className="nav-tool-btn__label">{tool.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <nav className="nav-bottom" aria-label="Category shortcuts">
