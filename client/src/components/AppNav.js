@@ -76,20 +76,22 @@ export default function AppNav({ activeTab, onSelectTab }) {
               </button>
             ))}
           </div>
-          <div className="nav-submenu" role="tablist" aria-label="Tools">
-            {category.tools.map((tool) => (
-              <button
-                key={tool.id}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tool.id}
-                className={`nav-tool-btn ${activeTab === tool.id ? 'active' : ''}`}
-                onClick={() => onSelectTab(tool.id)}
-              >
-                <span aria-hidden>{tool.icon}</span>
-                <span className="nav-tool-btn__label">{tool.label}</span>
-              </button>
-            ))}
+          <div className="nav-submenu-panel">
+            <div className="nav-submenu" role="tablist" aria-label="Tools">
+              {category.tools.map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tool.id}
+                  className={`nav-tool-btn ${activeTab === tool.id ? 'active' : ''}`}
+                  onClick={() => onSelectTab(tool.id)}
+                >
+                  <span aria-hidden>{tool.icon}</span>
+                  <span className="nav-tool-btn__label">{tool.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
