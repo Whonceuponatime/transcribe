@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const reconEngine = require('../lib/reconciliationEngine');
 // V1 (cryptoTrader.js) import removed. V2 is the only engine.
 
 function getSupabase() {
@@ -142,6 +143,20 @@ module.exports = async function handler(req, res) {
         signalDecision:null,
         lastCycle:     null,
         fearGreed:     null,
+      });
+    }
+
+    // ── POST backfill-orphaned-fills — repair fill audit trail ───────────────
+    // Runs backfillOrphanedFills directly from the API without restarting Pi.
+    // Safe to call multiple times — idempotency guard prevents double-insertion.
+    if (action === 'backfill-orphaned-fills' && req.method === 'POST') {
+      const result = await reconEngine.backfillOrphanedFills(supabase);
+      return res.status(200).json({
+        ok:      true,
+        applied: result.applied ?? [],
+        skipped: result.skipped ?? [],
+        failed:  result.failed  ?? [],
+        error:   result.error   ?? null,
       });
     }
 
