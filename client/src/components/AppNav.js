@@ -17,7 +17,6 @@ const CATEGORIES = {
     shortLabel: 'Convert',
     tools: [
       { id: 'converter', label: 'Image Converter', icon: '🖼️' },
-      { id: 'ethernet', label: 'Ethernet Connections (PDF)', icon: '🔌' },
       { id: 'markdown-csv', label: 'Markdown/CSV', icon: '📊' },
       { id: 'zigzag', label: 'Zigzag', icon: '📄' },
     ],

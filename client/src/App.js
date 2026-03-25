@@ -16,7 +16,6 @@ import LiveTranslator from './components/LiveTranslator';
 import MarkdownCSVConverter from './components/MarkdownCSVConverter';
 import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
-import EthernetExtractor from './components/EthernetExtractor';
 import CryptoTraderDashboard from './components/CryptoTraderDashboard';
 import InstallAppBanner from './components/InstallAppBanner';
 
@@ -177,8 +176,6 @@ function App() {
           <ZigzagMerger />
         ) : activeTab === 'translator' ? (
           <LiveTranslator />
-        ) : activeTab === 'ethernet' ? (
-          <EthernetExtractor />
         ) : activeTab === 'markdown-csv' ? (
           <MarkdownCSVConverter />
         ) : activeTab === 'crypto-trader' ? (
