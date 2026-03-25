@@ -793,27 +793,38 @@ CREATE INDEX IF NOT EXISTS idx_orders_identifier  ON orders(identifier);
 CREATE INDEX IF NOT EXISTS idx_orders_created     ON orders(created_at DESC);
 
 -- v2_fills: renamed from 'fills' to avoid conflict with live-trading fills table
+-- upbit_trade_uuid: Upbit's per-trade UUID (t.uuid from order trades array).
+--   NULL for synthetic fills created when no trade detail is available.
+--   One order can have multiple rows (one per trade match at different prices).
+--   UNIQUE(order_id) is intentionally NOT used — it would block multi-trade orders.
 CREATE TABLE IF NOT EXISTS v2_fills (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id        UUID NOT NULL REFERENCES orders(id),
-  position_id     UUID REFERENCES positions(position_id),
-  asset           TEXT NOT NULL,
-  side            TEXT NOT NULL CHECK (side IN ('buy','sell')),
-  price_krw       NUMERIC(20,4)  NOT NULL,
-  qty             NUMERIC(24,10) NOT NULL,
-  fee_krw         NUMERIC(20,4)  NOT NULL DEFAULT 0,
-  fee_rate        NUMERIC(8,6)   NOT NULL DEFAULT 0.0025,
-  strategy_tag    TEXT CHECK (strategy_tag IN ('core','tactical','unassigned')),
-  entry_regime    TEXT,
-  entry_reason    TEXT,
-  atr_at_entry    NUMERIC(20,4),
-  spread_estimate NUMERIC(10,6),
-  usd_proxy_fx    NUMERIC(12,4),
-  executed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id         UUID NOT NULL REFERENCES orders(id),
+  position_id      UUID REFERENCES positions(position_id),
+  asset            TEXT NOT NULL,
+  side             TEXT NOT NULL CHECK (side IN ('buy','sell')),
+  price_krw        NUMERIC(20,4)  NOT NULL,
+  qty              NUMERIC(24,10) NOT NULL,
+  fee_krw          NUMERIC(20,4)  NOT NULL DEFAULT 0,
+  fee_rate         NUMERIC(8,6)   NOT NULL DEFAULT 0.0025,
+  strategy_tag     TEXT CHECK (strategy_tag IN ('core','tactical','unassigned')),
+  entry_regime     TEXT,
+  entry_reason     TEXT,
+  atr_at_entry     NUMERIC(20,4),
+  spread_estimate  NUMERIC(10,6),
+  usd_proxy_fx     NUMERIC(12,4),
+  upbit_trade_uuid TEXT,                      -- Upbit trade UUID; NULL for synthetic fills
+  executed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_v2_fills_order_id   ON v2_fills(order_id);
 CREATE INDEX IF NOT EXISTS idx_v2_fills_asset_time ON v2_fills(asset, executed_at DESC);
+-- Idempotency: prevent duplicate real fills (one index entry per non-NULL trade UUID)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_fills_upbit_trade_uuid
+  ON v2_fills(upbit_trade_uuid) WHERE upbit_trade_uuid IS NOT NULL;
+-- Idempotency: prevent duplicate synthetic fills (one per order when no trade UUID)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_fills_synthetic_order
+  ON v2_fills(order_id) WHERE upbit_trade_uuid IS NULL;
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots_v2 (
   id              BIGSERIAL PRIMARY KEY,
