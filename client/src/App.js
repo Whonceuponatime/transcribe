@@ -22,10 +22,10 @@ import InstallAppBanner from './components/InstallAppBanner';
 function App() {
   const { isAuthenticated, loading, supabaseConfigured } = useAuth();
   const [activeTab, setActiveTab] = useState(
-    () => localStorage.getItem('activeTab') || 'transcription'
+    () => localStorage.getItem('activeTab') || 'crypto-trader'
   );
   const [activeCategory, setActiveCategory] = useState(
-    () => getCategoryForTab(localStorage.getItem('activeTab') || 'transcription')
+    () => getCategoryForTab(localStorage.getItem('activeTab') || 'crypto-trader')
   );
 
   useEffect(() => {

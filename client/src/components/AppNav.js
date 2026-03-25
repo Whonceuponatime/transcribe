@@ -1,36 +1,36 @@
 import React from 'react';
 
 const CATEGORIES = {
-  transcription: {
-    label: 'Transcription',
-    icon: '🎬',
-    shortLabel: 'Transcribe',
+  dashboard: {
+    label: 'Dashboard',
+    icon: '📊',
+    shortLabel: 'Home',
     tools: [
-      { id: 'transcription', label: 'Video Transcription', icon: '🎬' },
-      { id: 'audio', label: 'Audio Transcription', icon: '🎵' },
-      { id: 'translator', label: 'Live Translator', icon: '🌐' },
-    ],
-  },
-  conversion: {
-    label: 'Conversion',
-    icon: '🖼️',
-    shortLabel: 'Convert',
-    tools: [
-      { id: 'converter', label: 'Image Converter', icon: '🖼️' },
-      { id: 'markdown-csv', label: 'Markdown/CSV', icon: '📊' },
-      { id: 'zigzag', label: 'Zigzag', icon: '📄' },
-    ],
-  },
-  utilities: {
-    label: 'Utilities',
-    icon: '✉️',
-    shortLabel: 'Tools',
-    tools: [
-      { id: 'rewriter', label: 'Email Rewriter', icon: '✉️' },
-      { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
-      { id: 'tts', label: 'Text to Speech', icon: '📖' },
-      { id: 'metadata', label: 'Metadata Tools', icon: '🛡️' },
       { id: 'crypto-trader', label: 'Upbit Bot', icon: '🤖' },
+    ],
+  },
+  language: {
+    label: 'Language',
+    icon: '🌐',
+    shortLabel: 'Language',
+    tools: [
+      { id: 'transcription', label: 'Video Transcribe', icon: '🎬' },
+      { id: 'audio', label: 'Audio Transcribe', icon: '🎵' },
+      { id: 'translator', label: 'Live Translate', icon: '🌐' },
+      { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
+      { id: 'rewriter', label: 'Rewriter', icon: '✉️' },
+      { id: 'tts', label: 'Text to Speech', icon: '📖' },
+    ],
+  },
+  files: {
+    label: 'Files',
+    icon: '📁',
+    shortLabel: 'Files',
+    tools: [
+      { id: 'converter', label: 'Image Convert', icon: '🖼️' },
+      { id: 'markdown-csv', label: 'Markdown/CSV', icon: '📊' },
+      { id: 'zigzag', label: 'Zigzag PDF', icon: '📄' },
+      { id: 'metadata', label: 'Metadata', icon: '🛡️' },
     ],
   },
 };
