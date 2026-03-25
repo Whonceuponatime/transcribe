@@ -28,7 +28,7 @@ module.exports = async function handler(req, res) {
       const [
         v2CfgRes, heartbeatRes, ksRes, triggerRes,
         v2SnapRes, freezeRes, regimeRes, reconRes, riskRes,
-        positionsRes, recentTradesRes,
+        positionsRes, recentTradesRes, liveUnresolvedRes,
       ] = await Promise.all([
         supabase.from('bot_config').select('*').limit(1).single(),
         safe(supabase.from('app_settings').select('value,updated_at').eq('key', 'pi_heartbeat').single()),
@@ -39,8 +39,11 @@ module.exports = async function handler(req, res) {
         safe(supabase.from('app_settings').select('value').eq('key', 'current_regime').single()),
         safe(supabase.from('app_settings').select('value').eq('key', 'latest_reconciliation').single()),
         safe(supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single()),
-        supabase.from('positions').select('asset,strategy_tag,state,origin,managed,qty_open,avg_cost_krw,operator_classified_at').in('state', ['open','adopted','partial']),
+        // Include updated_at so dashboard can show how stale positions are
+        supabase.from('positions').select('asset,strategy_tag,state,origin,managed,qty_open,avg_cost_krw,operator_classified_at,updated_at').in('state', ['open','adopted','partial']),
         supabase.from('v2_fills').select('asset,side,price_krw,qty,fee_krw,executed_at').order('executed_at', { ascending: false }).limit(20),
+        // Live unresolved order count — shows current reality independent of cached freeze reasons
+        safe(supabase.from('orders').select('id', { count: 'exact', head: true }).in('state', ['intent_created','submitted','accepted','partially_filled'])),
       ]);
 
       const v2Cfg    = v2CfgRes.data      ?? {};
@@ -54,26 +57,39 @@ module.exports = async function handler(req, res) {
       const piLastSeen  = hb?.value?.lastSeen ?? null;
       const piOnline    = piLastSeen ? (Date.now() - new Date(piLastSeen).getTime()) < 10 * 60 * 1000 : false;
 
-      // Build position array from V2 positions table + v2_portfolio_snapshot prices
+      // Build position array.
+      // currentPrice: read from snapshot's per-coin price (stored by saveV2Snapshot from priceMap).
+      //   Previously derived as (snapshot_value_krw / DB_qty_open) — this is WRONG when positions
+      //   table is stale (e.g. after a sell whose fill was not applied). The derived price would be
+      //   half the real price if DB shows 2x the actual exchange qty.
+      // currentValueKrw: balance (DB qty) * currentPrice — coherent with the position row shown.
       const positions = (positionsRes.data || []).map((p) => {
-        const priceKey    = p.asset.toLowerCase();
-        const valueKrw    = snap[`${priceKey}_value_krw`] ?? null;
-        const currentPrice = p.qty_open > 0 && valueKrw ? valueKrw / p.qty_open : null;
-        const gainPct     = currentPrice && p.avg_cost_krw > 0
+        const priceKey     = p.asset.toLowerCase();
+        // Prefer stored unit price; fall back to deriving it only if not yet in snapshot
+        const storedPrice  = snap[`${priceKey}_price_krw`] ?? null;
+        const snapValue    = snap[`${priceKey}_value_krw`]  ?? null;
+        const currentPrice = storedPrice
+          ?? (p.qty_open > 0 && snapValue ? snapValue / p.qty_open : null);
+        const currentValueKrw = currentPrice && p.qty_open > 0
+          ? currentPrice * Number(p.qty_open) : null;
+        const gainPct      = currentPrice && p.avg_cost_krw > 0
           ? ((currentPrice - p.avg_cost_krw) / p.avg_cost_krw) * 100 : null;
         return {
-          coin:           p.asset,
-          balance:        Number(p.qty_open),
-          avgBuyKrw:      p.avg_cost_krw ?? null,
+          coin:            p.asset,
+          balance:         Number(p.qty_open),
+          avgBuyKrw:       p.avg_cost_krw ?? null,
           currentPrice,
-          currentValueKrw: valueKrw,
-          gainPct:        gainPct != null ? +gainPct.toFixed(2) : null,
-          strategy_tag:   p.strategy_tag,
-          state:          p.state,
-          origin:         p.origin,
-          managed:        p.managed,
+          currentValueKrw,
+          gainPct:         gainPct != null ? +gainPct.toFixed(2) : null,
+          strategy_tag:    p.strategy_tag,
+          state:           p.state,
+          origin:          p.origin,
+          managed:         p.managed,
+          positionUpdatedAt: p.updated_at ?? null, // lets dashboard warn when position data is stale
         };
       });
+
+      const liveUnresolvedCount = liveUnresolvedRes?.count ?? null;
 
       return res.status(200).json({
         // Engine identity
@@ -88,9 +104,11 @@ module.exports = async function handler(req, res) {
         tradingEnabled:   v2Cfg.trading_enabled ?? true,
         buysEnabled:      v2Cfg.buys_enabled    ?? true,
         sellsEnabled:     v2Cfg.sells_enabled   ?? true,
-        // System safety state
-        systemFrozen:     freeze.frozen ?? true,
-        freezeReasons:    freeze.reasons ?? [],
+        // System safety state (cached from last reconciliation run)
+        systemFrozen:       freeze.frozen ?? true,
+        freezeReasons:      freeze.reasons ?? [],
+        freezeCachedAt:     freeze.updatedAt ?? null,     // when freeze reasons were last written
+        liveUnresolvedOrders: liveUnresolvedCount,        // real-time check, independent of cache
         // Regime
         currentRegime:    regime.regime ?? null,
         regimeEma50:      regime.ema50  ?? null,
@@ -104,25 +122,26 @@ module.exports = async function handler(req, res) {
         positions,
         snapshotAge:      snap.created_at
           ? Math.round((Date.now() - new Date(snap.created_at).getTime()) / 1000) : null,
+        snapshotAt:       snap.created_at ?? null,
         // Reconciliation
         latestReconciliation: recon,
         riskEngineState:  riskSt,
         // Recent V2 fills
         recentTrades: (recentTradesRes.data || []).map((f) => ({
-          coin:       f.asset,
-          side:       f.side,
-          krw_amount: f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null,
+          coin:        f.asset,
+          side:        f.side,
+          krw_amount:  f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null,
           coin_amount: f.qty,
-          price_krw:  f.price_krw,
+          price_krw:   f.price_krw,
           executed_at: f.executed_at,
-          engine:     'V2',
+          engine:      'V2',
         })),
         // V1-era fields explicitly nulled so dashboard knows to ignore them
-        config:        null, // retired — use bot_config via v2-config endpoint
-        signalScore:   null, // retired
-        signalDecision:null, // retired
-        lastCycle:     null, // retired — V2 cycle state is in bot_events
-        fearGreed:     null, // retired from status — use bot_events for context
+        config:        null,
+        signalScore:   null,
+        signalDecision:null,
+        lastCycle:     null,
+        fearGreed:     null,
       });
     }
 

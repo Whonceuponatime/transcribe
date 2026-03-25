@@ -396,6 +396,29 @@ async function startupSequence() {
     await writeLog('error', 'reconcile', `resolveStuckOrders startup error: ${stuckErr.message}`);
   }
 
+  // ── Step 2.6: Backfill orphaned fills ───────────────────────────────────
+  // Covers the gap resolveStuckOrders cannot: orders already in terminal
+  // ('filled') state with no v2_fills rows and stale positions.qty_open.
+  // This happens when executeSell's poll moved the order to 'filled' but
+  // extractFills still returned [] (empty trades array at that moment).
+  console.log('[startup] Backfilling any orphaned fills (filled orders with no fill records)…');
+  try {
+    const orphanResult = await reconEngine.backfillOrphanedFills(supabase);
+    if (orphanResult.applied.length > 0) {
+      console.log(`[startup] Orphaned fills backfilled: ${orphanResult.applied.map((r) => `${r.asset}(${r.qtyBefore}→${r.qtyAfter})`).join(', ')}`);
+      await writeLog('warn', 'reconcile',
+        `Startup: backfilled ${orphanResult.applied.length} orphaned fill(s) — positions corrected`,
+        { applied: orphanResult.applied, skipped: orphanResult.skipped, failed: orphanResult.failed }
+      );
+    }
+    if (orphanResult.failed.length > 0) {
+      console.warn(`[startup] Orphaned fill backfill failed for: ${orphanResult.failed.map((f) => f.asset).join(', ')}`);
+    }
+  } catch (orphanErr) {
+    console.error('[startup] backfillOrphanedFills error:', orphanErr.message);
+    await writeLog('error', 'reconcile', `backfillOrphanedFills startup error: ${orphanErr.message}`);
+  }
+
   // ── Step 3: Startup reconciliation ──────────────────────────────────────
   console.log('[startup] Running startup reconciliation…');
   let reconResult = { passed: false, frozen: true, freezeReasons: ['reconciliation_not_run'] };
