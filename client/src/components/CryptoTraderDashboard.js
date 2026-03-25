@@ -375,8 +375,17 @@ export default function CryptoTraderDashboard() {
         </div>
         <div className="ct__badges">
           {killSwitch && <span className="ct__badge ct__badge--kill">KILL SWITCH ON</span>}
+          {/* FROZEN takes priority over all other status badges — driven by status.systemFrozen
+              which reads system_freeze.frozen from app_settings (the live reconciliation source). */}
+          {status?.systemFrozen && (
+            <span className="ct__badge ct__badge--kill" title={`Freeze reasons: ${(status.freezeReasons ?? []).join(', ') || 'unknown'}`}>
+              ⛔ SYSTEM FROZEN
+            </span>
+          )}
           <span className="ct__badge ct__badge--on">V2 LIVE</span>
-          {!v2TradingEnabled && <span className="ct__badge ct__badge--off">TRADING PAUSED</span>}
+          {!v2TradingEnabled && !status?.systemFrozen && (
+            <span className="ct__badge ct__badge--off">TRADING PAUSED</span>
+          )}
           {triggerPending && <span className="ct__badge ct__badge--signal">Pending…</span>}
         </div>
         <div className="ct__actions">
@@ -407,6 +416,15 @@ export default function CryptoTraderDashboard() {
               {totalPnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnlKrw))}
               {totalPnlUsd != null && ` / ${totalPnlKrw >= 0 ? '+' : ''}${fmtUsd(Math.abs(totalPnlUsd), 0)}`}
               {' '}unrealised P&L
+            </div>
+          )}
+          {/* Snapshot freshness — source: status.snapshotAt from v2_portfolio_snapshot.
+              Warn if data is older than 10 minutes (600s) so stale state is visible. */}
+          {status?.snapshotAt && (
+            <div style={{ fontSize: '0.68rem', color: status.snapshotAge > 600 ? '#f59e0b' : '#555', marginTop: '0.3rem' }}>
+              {status.snapshotAge > 600
+                ? `⚠ Portfolio data ${Math.round(status.snapshotAge / 60)}min old`
+                : `Data as of ${new Date(status.snapshotAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
             </div>
           )}
         </div>
@@ -624,24 +642,40 @@ export default function CryptoTraderDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <h3 className="ct__section-title" style={{ margin: 0 }}>Portfolio Adoption</h3>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Trading enabled badge */}
-            <span style={{
-              padding: '0.2rem 0.7rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
-              background: tradingEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-              color:      tradingEnabled ? '#22c55e' : '#f87171',
-            }}>
-              {tradingEnabled ? '✓ Trading Enabled' : '⛔ Trading Blocked'}
-            </span>
-            {/* Reconciliation status */}
-            {reconStatus && (
-              <span style={{
-                padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.7rem',
-                background: reconStatus.passed ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.1)',
-                color:      reconStatus.passed ? '#22c55e' : '#f59e0b',
-              }}>
-                Recon: {reconStatus.passed ? 'Passed' : 'Frozen'}
-              </span>
-            )}
+            {/* Trading enabled badge — source of truth:
+                effectiveTradingEnabled = NOT frozen (system_freeze) AND bot_config.trading_enabled.
+                A frozen system blocks trading regardless of bot_config. */}
+            {(() => {
+              const effectiveTrading = tradingEnabled && v2TradingEnabled;
+              const frozenOnly = !tradingEnabled && v2TradingEnabled;
+              return (
+                <span style={{
+                  padding: '0.2rem 0.7rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                  background: effectiveTrading ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                  color:      effectiveTrading ? '#22c55e' : '#f87171',
+                }}
+                  title={frozenOnly ? 'bot_config.trading_enabled=true but system is frozen' : undefined}>
+                  {effectiveTrading ? '✓ Trading Enabled' : frozenOnly ? '⛔ Frozen (config=ON)' : '⛔ Trading Blocked'}
+                </span>
+              );
+            })()}
+            {/* Reconciliation badge — source of truth: status.latestReconciliation.
+                If system is frozen, ALWAYS show Frozen regardless of reconStatus.passed —
+                a freeze written after the last reconciliation overrides the cached result. */}
+            {reconStatus && (() => {
+              const isFrozen = systemFreeze?.frozen || status?.systemFrozen;
+              const reconPassed = reconStatus.passed && !isFrozen;
+              return (
+                <span style={{
+                  padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.7rem',
+                  background: reconPassed ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.1)',
+                  color:      reconPassed ? '#22c55e' : '#f59e0b',
+                }}
+                  title={reconStatus.runAt ? `Last recon: ${new Date(reconStatus.runAt).toLocaleString()}` : undefined}>
+                  Recon: {reconPassed ? 'Passed' : 'Frozen'}
+                </span>
+              );
+            })()}
             {/* Actions */}
             <button className="ct__btn" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} onClick={triggerReconcile} title="Re-run reconciliation now">
               ↻ Reconcile
@@ -698,9 +732,11 @@ export default function CryptoTraderDashboard() {
 
             {/* Adopted supported holdings — read from positions table (authoritative source).
                 adoption.adoptedAssets only contains what the LATEST adoption run imported,
-                so BTC (adopted in an earlier run) would be missing. v2Positions has all three. */}
+                so BTC (adopted in an earlier run) would be missing. v2Positions has all three.
+                Filter: only show positions with qty_open > 0 — a zero-qty record means the
+                position was fully sold and should not appear as an active holding here. */}
             {(() => {
-              const adoptedFromPositions = v2Positions.filter((p) => p.origin === 'adopted_at_startup');
+              const adoptedFromPositions = v2Positions.filter((p) => p.origin === 'adopted_at_startup' && Number(p.qty_open ?? 0) > 0);
               if (adoptedFromPositions.length === 0) return null;
               return (
                 <div style={{ marginBottom: '0.6rem' }}>
@@ -987,8 +1023,8 @@ export default function CryptoTraderDashboard() {
               <div className="ct__logs-empty">No decisions yet — they appear every 2 min once the bot is running.</div>
             )}
             {!diagLoading && diagLogs.length > 0 && diagLogs.map((d) => {
-              const isAction = d.final_action === 'BUY_SUBMITTED' || d.final_action === 'ADD_ON_SUBMITTED' || d.final_action === 'SELL_TRIGGERED';
-              const isElig   = d.final_action === 'BUY_ELIGIBLE'  || d.final_action === 'ADD_ON_ELIGIBLE';
+              const isAction = ['BUY_SUBMITTED', 'ADD_ON_SUBMITTED', 'STARTER_SUBMITTED', 'SELL_TRIGGERED'].includes(d.final_action);
+              const isElig   = ['BUY_ELIGIBLE',  'ADD_ON_ELIGIBLE',  'STARTER_ELIGIBLE'].includes(d.final_action);
               const acColor  = isAction ? '#22c55e' : isElig ? '#60a5fa' : '#555';
               return (
                 <div key={d.id} className="ct__log-row" style={{ gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -1026,8 +1062,9 @@ export default function CryptoTraderDashboard() {
                 <tr><th>Time</th><th>Coin</th><th>Side</th><th>KRW</th><th>Coins</th><th>Reason</th></tr>
               </thead>
               <tbody>
-                {trades.map((t) => (
-                  <tr key={t.id}>
+                {trades.map((t, tIdx) => (
+                  // t.id is not returned by the status API — use a composite key
+                  <tr key={`${t.executed_at ?? tIdx}-${t.coin}-${t.side}`}>
                     <td>{t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     <td style={{ fontWeight: 700 }}>{t.coin}</td>
                     <td className={`ct__side--${t.side}`}>{t.side === 'buy' ? '↑ BUY' : '↓ SELL'}</td>
