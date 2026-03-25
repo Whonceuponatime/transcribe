@@ -369,6 +369,33 @@ async function startupSequence() {
 
   adoptionDone = true; // adoption step completed (even if errored)
 
+  // ── Step 2.5: Resolve stuck orders before reconciliation ────────────────
+  // Orders left in 'accepted' state from a previous crashed/disconnected run
+  // are fetched from Upbit, their fills applied to positions, and their state
+  // updated to terminal. Without this step, reconciliation always freezes on
+  // restart after the sell→'wait'→crash sequence, requiring manual intervention.
+  console.log('[startup] Resolving any stuck orders from previous run…');
+  try {
+    const stuckResult = await reconEngine.resolveStuckOrders(supabase);
+    if (stuckResult.resolved.length > 0) {
+      console.log(`[startup] Stuck orders resolved: ${stuckResult.resolved.map((r) => `${r.asset}(${r.state})`).join(', ')}`);
+      await writeLog('warn', 'reconcile',
+        `Startup: resolved ${stuckResult.resolved.length} stuck order(s) — positions updated before reconciliation`,
+        { resolved: stuckResult.resolved, failed: stuckResult.failed }
+      );
+    }
+    if (stuckResult.failed.length > 0) {
+      console.warn(`[startup] Failed to resolve ${stuckResult.failed.length} stuck order(s): ${stuckResult.failed.map((f) => f.asset).join(', ')}`);
+      await writeLog('error', 'reconcile',
+        `Startup: ${stuckResult.failed.length} stuck order(s) could not be resolved — manual review required`,
+        { failed: stuckResult.failed }
+      );
+    }
+  } catch (stuckErr) {
+    console.error('[startup] resolveStuckOrders error:', stuckErr.message);
+    await writeLog('error', 'reconcile', `resolveStuckOrders startup error: ${stuckErr.message}`);
+  }
+
   // ── Step 3: Startup reconciliation ──────────────────────────────────────
   console.log('[startup] Running startup reconciliation…');
   let reconResult = { passed: false, frozen: true, freezeReasons: ['reconciliation_not_run'] };
