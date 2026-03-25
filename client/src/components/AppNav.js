@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 const CATEGORIES = {
   transcription: {
@@ -47,35 +47,14 @@ function getCategoryForTab(tabId) {
   return 'transcription';
 }
 
-export default function AppNav({ activeTab, onSelectTab }) {
-  const [activeCategory, setActiveCategory] = useState(() =>
-    getCategoryForTab(activeTab)
-  );
-
-  useEffect(() => {
-    setActiveCategory(getCategoryForTab(activeTab));
-  }, [activeTab]);
-
+export default function AppNav({ activeTab, onSelectTab, activeCategory, setActiveCategory }) {
   const category = CATEGORIES[activeCategory];
 
   return (
     <>
+      {/* Sticky submenu band — only the tool strip lives here now */}
       <div className="nav-wrap">
         <div className="nav-wrap-inner">
-          <div className="nav-categories" role="tablist" aria-label="Categories">
-            {Object.entries(CATEGORIES).map(([key, cat]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={activeCategory === key}
-                className={`nav-category-btn ${activeCategory === key ? 'active' : ''}`}
-                onClick={() => setActiveCategory(key)}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
           <div className="nav-submenu-panel">
             <div className="nav-submenu" role="tablist" aria-label="Tools">
               {category.tools.map((tool) => (
@@ -95,6 +74,8 @@ export default function AppNav({ activeTab, onSelectTab }) {
           </div>
         </div>
       </div>
+
+      {/* Mobile-only bottom bar — categories */}
       <nav className="nav-bottom" aria-label="Category shortcuts">
         {Object.entries(CATEGORIES).map(([key, cat]) => (
           <button
@@ -112,4 +93,4 @@ export default function AppNav({ activeTab, onSelectTab }) {
   );
 }
 
-export { FLAT_TOOLS, getCategoryForTab };
+export { CATEGORIES, FLAT_TOOLS, getCategoryForTab };

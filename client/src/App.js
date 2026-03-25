@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
 import AuthStatus from './components/AuthStatus';
-import AppNav from './components/AppNav';
+import AppNav, { CATEGORIES, getCategoryForTab } from './components/AppNav';
 import SignInGate from './components/SignInGate';
 import VideoUpload from './components/VideoUpload';
 import TranscriptionPanel from './components/TranscriptionPanel';
@@ -25,9 +25,13 @@ function App() {
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('activeTab') || 'transcription'
   );
+  const [activeCategory, setActiveCategory] = useState(
+    () => getCategoryForTab(localStorage.getItem('activeTab') || 'transcription')
+  );
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
+    setActiveCategory(getCategoryForTab(activeTab));
   }, [activeTab]);
   const [uploadedVideo, setUploadedVideo] = useState(null);
   const [transcription, setTranscription] = useState('');
@@ -99,11 +103,35 @@ function App() {
             <h1>🗡️ Sad Dagger</h1>
             <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
           </div>
-          <AuthStatus />
+
+          {/* Category segmented control — center column on desktop */}
+          <div className="nav-categories" role="tablist" aria-label="Categories">
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={activeCategory === key}
+                className={`nav-category-btn ${activeCategory === key ? 'active' : ''}`}
+                onClick={() => setActiveCategory(key)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="App-header__auth">
+            <AuthStatus />
+          </div>
         </div>
       </header>
 
-      <AppNav activeTab={activeTab} onSelectTab={setActiveTab} />
+      <AppNav
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+      />
 
       <main className="App-main">
         {activeTab === 'transcription' ? (
