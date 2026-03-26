@@ -382,6 +382,14 @@ export default function CryptoTraderDashboard() {
               ⛔ SYSTEM FROZEN
             </span>
           )}
+          {/* Unresolved orders badge — shown even when not frozen, so the operator
+              can see stuck accepted/submitted orders before reconciliation fires. */}
+          {!status?.systemFrozen && (status?.liveUnresolvedOrders ?? 0) > 0 && (
+            <span className="ct__badge ct__badge--kill"
+              title={`${status.liveUnresolvedOrders} order(s) in non-terminal state (accepted/submitted/partially_filled). Reconciliation will freeze if these persist past next startup.`}>
+              ⚠ {status.liveUnresolvedOrders} UNRESOLVED ORDER{status.liveUnresolvedOrders > 1 ? 'S' : ''}
+            </span>
+          )}
           <span className="ct__badge ct__badge--on">V2 LIVE</span>
           {!v2TradingEnabled && !status?.systemFrozen && (
             <span className="ct__badge ct__badge--off">TRADING PAUSED</span>
@@ -726,7 +734,7 @@ export default function CryptoTraderDashboard() {
               <div style={{ display: 'flex', gap: '1rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: '0.3rem' }}>
                 <span style={{ fontWeight: 700, minWidth: '3rem', color: '#22c55e' }}>KRW</span>
                 <span className="ct__muted">₩{Math.round(adoption.krwBalance).toLocaleString()}</span>
-                <span style={{ fontSize: '0.7rem', color: '#555' }}>— execution cash</span>
+                <span style={{ fontSize: '0.7rem', color: '#777' }}>— at adoption time (not current)</span>
               </div>
             )}
 
