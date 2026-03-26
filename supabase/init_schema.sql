@@ -749,6 +749,10 @@ CREATE TABLE IF NOT EXISTS bot_config (
   starter_entry_enabled        BOOLEAN      NOT NULL DEFAULT true,
   starter_size_mult            NUMERIC(5,3) NOT NULL DEFAULT 0.25,
   starter_rsi_max              NUMERIC(5,2) NOT NULL DEFAULT 70,
+  -- Micro-position bypass (migration 034)
+  -- When > 0: existing positions below this KRW notional do not trigger the
+  -- add-on dip% rule. Probe entries cannot lock out follow-up real signals.
+  micro_position_bypass_krw    NUMERIC(12,4) NOT NULL DEFAULT 0,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );

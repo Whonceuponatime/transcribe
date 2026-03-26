@@ -1048,6 +1048,24 @@ export default function CryptoTraderDashboard() {
                   )}
                   {d.rsi != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>RSI {d.rsi}</span>}
                   {d.bb_pctB != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>%B {d.bb_pctB}</span>}
+                  {/* Effective BB cap — red if blocked, green if passing */}
+                  {d.effective_bb_threshold != null && (
+                    <span style={{ fontSize: '0.68rem', color: d.bb_pctB != null && d.bb_pctB >= d.effective_bb_threshold ? '#ef4444' : '#4b5563' }}>
+                      BB≤{d.effective_bb_threshold}
+                    </span>
+                  )}
+                  {/* Effective OB min */}
+                  {d.effective_ob_threshold != null && (
+                    <span style={{ color: '#4b5563', fontSize: '0.68rem' }}>OB≥{d.effective_ob_threshold}</span>
+                  )}
+                  {/* Adaptive signals active this cycle */}
+                  {d.adaptive_signals?.length > 0 && (
+                    <span style={{ color: '#374151', fontSize: '0.65rem' }}>[{d.adaptive_signals.join(',')}]</span>
+                  )}
+                  {/* Micro-position bypass fired */}
+                  {d.micro_bypassed && (
+                    <span style={{ color: '#a78bfa', fontSize: '0.68rem' }} title={`Position notional ₩${d.pos_notional_krw?.toLocaleString()} below bypass threshold`}>μ-bypass</span>
+                  )}
                   <span className="ct__log-msg" style={{ color: '#666', fontSize: '0.72rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {d.final_reason}
                   </span>

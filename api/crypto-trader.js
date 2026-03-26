@@ -263,6 +263,12 @@ module.exports = async function handler(req, res) {
           rsi:            cx.buy_checks?.rsi    ?? cx.sell_checks?.rsi    ?? null,
           bb_pctB:        cx.buy_checks?.bb_pctB ?? cx.sell_checks?.bb_pctB ?? null,
           cycle_id:       cx.cycle_id       ?? null,
+          // Effective runtime thresholds — allow operator to see actual cap vs raw config
+          effective_bb_threshold: cx.buy_checks?.effective_bb_threshold    ?? null,
+          effective_ob_threshold: cx.buy_checks?.effective_ob_imbalance_min ?? null,
+          adaptive_signals:       cx.buy_checks?.adaptive_offsets_applied?.signals ?? null,
+          micro_bypassed:         cx.buy_checks?.micro_bypassed   ?? null,
+          pos_notional_krw:       cx.buy_checks?.pos_notional_krw ?? null,
         };
       });
       return res.status(200).json({ diagnostics });
