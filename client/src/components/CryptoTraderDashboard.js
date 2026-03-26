@@ -414,16 +414,15 @@ export default function CryptoTraderDashboard() {
         <div className="ct__portfolio-total">
           <div className="ct__portfolio-label">Total Portfolio</div>
           <div className="ct__portfolio-value">
-            {totalValueUsd != null ? fmtUsd(totalValueUsd, 0) : '—'}
+            {status?.totalValueKrw != null ? `₩${fmt(status.totalValueKrw)}` : '—'}
           </div>
-          {status?.totalValueKrw != null && (
-            <div className="ct__portfolio-krw">₩{fmt(status.totalValueKrw)} total incl. cash</div>
-          )}
+          <div className="ct__portfolio-krw">
+            total incl. cash{totalValueUsd != null ? ` · ${fmtUsd(totalValueUsd, 0)}` : ''}
+          </div>
           {totalCostKrw > 0 && (
             <div className="ct__portfolio-pnl" style={{ color: totalPnlKrw >= 0 ? '#22c55e' : '#ef4444' }}>
-              {totalPnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnlKrw))}
-              {totalPnlUsd != null && ` / ${totalPnlKrw >= 0 ? '+' : ''}${fmtUsd(Math.abs(totalPnlUsd), 0)}`}
-              {' '}unrealised P&L
+              P&L {totalPnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnlKrw))}
+              {' '}unrealised
             </div>
           )}
           {/* Snapshot freshness — source: status.snapshotAt from v2_portfolio_snapshot.
@@ -508,9 +507,15 @@ export default function CryptoTraderDashboard() {
                 )}
               </div>
 
-              <div className="ct__coin-price">₩{fmt(pos.currentPrice)}</div>
-              {pos.currentPrice && usdKrw && (
-                <div className="ct__coin-price-usd">{fmtUsd(pos.currentPrice / usdKrw, 2)}</div>
+              <div className="ct__coin-price">
+                {pos.balance > 0 && pos.currentValueKrw != null
+                  ? `₩${fmt(pos.currentValueKrw)}`
+                  : '—'}
+              </div>
+              {pos.currentPrice != null && (
+                <div className="ct__coin-price-usd" style={{ color: '#555' }}>
+                  Spot ₩{fmt(pos.currentPrice)}
+                </div>
               )}
 
               <div className="ct__coin-divider" />
@@ -519,25 +524,23 @@ export default function CryptoTraderDashboard() {
                 <span className="ct__coin-label">Holdings</span>
                 <span className="ct__coin-value">{fmtCoin(pos.balance)} {pos.coin}</span>
               </div>
-              <div className="ct__coin-row">
-                <span className="ct__coin-label">Value</span>
-                <span className="ct__coin-value">
-                  ₩{fmt(pos.currentValueKrw)}
-                  {pos.currentValueUsd != null && <span className="ct__coin-value--dim"> · {fmtUsd(pos.currentValueUsd, 0)}</span>}
-                </span>
-              </div>
-              <div className="ct__coin-row">
-                <span className="ct__coin-label">Avg buy</span>
-                <span className="ct__coin-value" style={{ color: '#666' }}>
-                  ₩{fmt(pos.avgBuyKrw)}
-                  {pos.avgBuyUsd != null && <span className="ct__coin-value--dim"> · {fmtUsd(pos.avgBuyUsd, 0)}</span>}
-                </span>
-              </div>
+              {pos.balance > 0 && pos.currentValueKrw != null && (
+                <div className="ct__coin-row">
+                  <span className="ct__coin-label">Holding value</span>
+                  <span className="ct__coin-value">₩{fmt(pos.currentValueKrw)}</span>
+                </div>
+              )}
+              {pos.avgBuyKrw > 0 && (
+                <div className="ct__coin-row">
+                  <span className="ct__coin-label">Avg buy</span>
+                  <span className="ct__coin-value" style={{ color: '#666' }}>₩{fmt(pos.avgBuyKrw)}</span>
+                </div>
+              )}
 
               {pnlKrw != null && pos.balance > 0 && (
                 <div className={`ct__coin-pnl-abs ct__coin-pnl-abs--${cardMod}`}>
-                  {pnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(pnlKrw))}
-                  {pnlUsd != null && ` / ${pnlKrw >= 0 ? '+' : ''}${fmtUsd(Math.abs(pnlUsd), 0)}`}
+                  P&L {pnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(pnlKrw))}
+                  {g != null && <span style={{ opacity: 0.75 }}> · {pct(g)}</span>}
                 </div>
               )}
               {pos.balance <= 0 && <div style={{ fontSize: '0.72rem', color: '#444', marginTop: '0.2rem' }}>No position</div>}
