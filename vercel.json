@@ -4,6 +4,16 @@
   "framework": null,
   "installCommand": "npm install",
   "rewrites": [
+    { "source": "/api/live/quote",      "destination": "/api/live?action=quote"      },
+    { "source": "/api/live/sync",       "destination": "/api/live?action=sync"       },
+    { "source": "/api/live/signal",     "destination": "/api/live?action=signal"     },
+    { "source": "/api/live/orders",     "destination": "/api/live?action=orders"     },
+    { "source": "/api/live/kill-switch","destination": "/api/live?action=kill-switch"},
+    { "source": "/api/live/portfolio",  "destination": "/api/live?action=portfolio"  },
+    { "source": "/api/live/mode",       "destination": "/api/live?action=mode"       },
+    { "source": "/api/live/order/test", "destination": "/api/live?action=order-test" },
+    { "source": "/api/ethernet/extract","destination": "/api/ethernet?action=extract"},
+    { "source": "/api/ethernet/upload", "destination": "/api/ethernet?action=upload" },
     { "source": "/((?!api/)(?!icons/)(?!manifest\\.json)(?!sw\\.js)(?!favicon\\.ico).*)", "destination": "/index.html" }
   ],
   "crons": []
