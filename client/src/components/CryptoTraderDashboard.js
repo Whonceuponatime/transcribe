@@ -356,7 +356,7 @@ export default function CryptoTraderDashboard() {
   const totalCostKrw = positions.reduce((s, p) => s + (p.avgBuyKrw > 0 ? p.avgBuyKrw * p.balance : 0), 0);
   const totalHoldingsKrw = positions.reduce((s, p) => s + (p.currentValueKrw ?? 0), 0);
   const totalPnlKrw = totalHoldingsKrw - totalCostKrw;
-  const totalPnlUsd = usdKrw && totalPnlKrw ? totalPnlKrw / usdKrw : null;
+  // totalPnlUsd removed — USD P&L no longer displayed
 
   const pill = (key, label, val, col) => (
     <span key={key} className="ct__ind-pill"
@@ -495,7 +495,7 @@ export default function CryptoTraderDashboard() {
           const cardMod = pos.balance <= 0 ? 'flat' : g == null ? 'flat' : g > 0 ? 'up' : g < 0 ? 'down' : 'flat';
           const pnlKrw  = pos.avgBuyKrw > 0 && pos.currentValueKrw != null
             ? pos.currentValueKrw - pos.avgBuyKrw * pos.balance : null;
-          const pnlUsd  = pnlKrw != null && usdKrw ? pnlKrw / usdKrw : null;
+          // pnlUsd removed — USD P&L no longer displayed
           const ind     = pos.indicators ?? {};
 
           return (
