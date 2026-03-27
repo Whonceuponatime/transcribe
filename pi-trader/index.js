@@ -157,6 +157,36 @@ async function heartbeat() {
   } catch (_) {}
 }
 
+/**
+ * Fetch Fear & Greed index and store in app_settings for V2 macro gate.
+ * Uses the same key V1 used ('fear_greed') so the dashboard can still read it.
+ * Non-fatal — V2 fails open if unavailable.
+ */
+async function refreshFearGreed() {
+  try {
+    const https = require('https');
+    const raw = await new Promise((resolve, reject) => {
+      const req = https.get('https://api.alternative.me/fng/?limit=1', (res) => {
+        let data = '';
+        res.on('data', (c) => { data += c; });
+        res.on('end', () => resolve(data));
+      });
+      req.setTimeout(8000, () => req.destroy(new Error('timeout')));
+      req.on('error', reject);
+    });
+    const d = JSON.parse(raw)?.data?.[0];
+    if (!d) return;
+    await supabase.from('app_settings').upsert({
+      key:        'fear_greed',
+      value:      { value: Number(d.value), label: d.value_classification, fetchedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' });
+    console.log(`[pi] Fear & Greed: ${d.value} (${d.value_classification})`);
+  } catch (err) {
+    console.warn('[pi] Fear & Greed fetch failed (non-fatal):', err.message);
+  }
+}
+
 async function pollDeploy() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'crypto_deploy_trigger').single();
@@ -488,8 +518,10 @@ async function startupSequence() {
 cron.schedule('* * * * *', () => runCycleV2({}, 'cycle'), { timezone: 'UTC' });
 // Reconciliation every 4h
 cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
-// Hourly performance digest
+// Hourly performance digest + Fear & Greed refresh for macro gate
 cron.schedule('0 * * * *', hourlyDigest, { timezone: 'UTC' });
+cron.schedule('0 * * * *', refreshFearGreed, { timezone: 'UTC' });
+refreshFearGreed(); // initial fetch on startup
 
 // Poll manual trigger / kill switch / deploy / reconcile every 10s
 setInterval(pollTrigger,          10_000);
