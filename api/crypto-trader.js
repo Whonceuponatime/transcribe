@@ -55,7 +55,8 @@ module.exports = async function handler(req, res) {
       const riskSt   = riskRes.data?.value   ?? {};
       const hb       = heartbeatRes.data;
 
-      const piLastSeen  = hb?.value?.lastSeen ?? null;
+      const piLastSeen  = hb?.value?.lastSeen   ?? null;
+      const piLastCycle = hb?.value?.lastCycleAt ?? null;
       const piOnline    = piLastSeen ? (Date.now() - new Date(piLastSeen).getTime()) < 10 * 60 * 1000 : false;
 
       // Build position array.
@@ -99,6 +100,8 @@ module.exports = async function handler(req, res) {
         // Pi state
         piOnline,
         piLastSeen,
+        lastCycleAt:           piLastCycle,
+        secondsSinceLastCycle: piLastCycle ? Math.round((Date.now() - new Date(piLastCycle).getTime()) / 1000) : null,
         triggerPending:   triggerRes.data?.value?.pending === true,
         killSwitch:       ksRes.data?.value?.enabled ?? false,
         // V2 trading controls

@@ -37,6 +37,7 @@ for (const key of required) {
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 let runningV2    = false;
 let adoptionDone = false; // set true after startup adoption completes
+let lastCycleCompletedAt = null; // written after every successful cycle for dashboard freshness
 
 // Hourly digest accumulator (V2 fills, not V1 trades)
 let hourlyTrades   = [];
@@ -139,7 +140,12 @@ async function heartbeat() {
   try {
     await supabase.from('app_settings').upsert({
       key: 'pi_heartbeat',
-      value: { lastSeen: new Date().toISOString(), version: '5.0', engine: 'V2_live_only' },
+      value: {
+        lastSeen:     new Date().toISOString(),
+        lastCycleAt:  lastCycleCompletedAt,
+        version:      '5.0',
+        engine:       'V2_live_only',
+      },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'key' });
   } catch (_) {}
@@ -259,6 +265,7 @@ async function runCycleV2(opts = {}, label = 'v2_auto') {
     console.error(`[v2] Cycle error: ${err.message}`);
     await writeLog('error', `v2_${label}`, `[v2] Cycle error: ${err.message}`);
   } finally {
+    lastCycleCompletedAt = new Date().toISOString();
     runningV2 = false;
   }
 }
@@ -477,10 +484,8 @@ async function startupSequence() {
 
 // ─── Schedules (V2 live engine only) ─────────────────────────────────────────
 
-// V2 sell checks every 2 min
-cron.schedule('*/2 * * * *', () => runCycleV2({ dipBuyOnly: false }, 'sell_check'), { timezone: 'UTC' });
-// V2 buy checks every 5 min
-cron.schedule('*/5 * * * *', () => runCycleV2({}, 'buy_check'), { timezone: 'UTC' });
+// V2 full evaluation every 1 min (sell + buy both enabled)
+cron.schedule('* * * * *', () => runCycleV2({}, 'cycle'), { timezone: 'UTC' });
 // Reconciliation every 4h
 cron.schedule('0 */4 * * *', () => reconcile('scheduled'), { timezone: 'UTC' });
 // Hourly performance digest
@@ -491,8 +496,8 @@ setInterval(pollTrigger,          10_000);
 setInterval(pollDeploy,           10_000);
 setInterval(pollReconcileTrigger, 10_000);
 
-// Heartbeat every 5 min
-setInterval(heartbeat, 5 * 60_000);
+// Heartbeat every 1 min for dashboard freshness
+setInterval(heartbeat, 60_000);
 heartbeat();
 
 // Startup: adoption → reconciliation → first V2 cycle
