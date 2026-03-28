@@ -753,6 +753,14 @@ CREATE TABLE IF NOT EXISTS bot_config (
   -- When > 0: existing positions below this KRW notional do not trigger the
   -- add-on dip% rule. Probe entries cannot lock out follow-up real signals.
   micro_position_bypass_krw    NUMERIC(12,4) NOT NULL DEFAULT 0,
+  -- Active re-entry config (migration 035)
+  -- starter_ob_imbalance_min: separate OB gate for starters; NULL = use ob_imbalance_min
+  -- adaptive_inactivity_*_hours: configurable triggers replacing hardcoded 12h/24h
+  -- starter_cooldown_ms: prepared for future separate starter cooldown; not yet wired
+  starter_ob_imbalance_min      NUMERIC(5,3) DEFAULT NULL,
+  adaptive_inactivity_12h_hours NUMERIC(5,2) DEFAULT NULL,
+  adaptive_inactivity_24h_hours NUMERIC(5,2) DEFAULT NULL,
+  starter_cooldown_ms           INTEGER      DEFAULT NULL,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
