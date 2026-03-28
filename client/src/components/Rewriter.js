@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './Rewriter.css';
+import { downloadText } from '../lib/downloadText';
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -77,6 +78,8 @@ export default function Rewriter() {
     if (!rewritten) return;
     navigator.clipboard.writeText(rewritten);
   };
+
+  const handleDownload = () => downloadText(rewritten, 'md');
 
   const handleClear = () => {
     setDraft('');
@@ -177,6 +180,14 @@ export default function Rewriter() {
           disabled={!rewritten}
         >
           Copy result
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleDownload}
+          disabled={!rewritten}
+        >
+          Download .md
         </button>
         <button type="button" className="btn-ghost" onClick={handleClear}>
           Clear

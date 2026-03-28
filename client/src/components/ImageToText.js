@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import './ImageToText.css';
+import { downloadText } from '../lib/downloadText';
 
 const FORMATS = [
   { value: 'plain', label: 'Plain text' },
@@ -141,6 +142,9 @@ export default function ImageToText() {
     if (!result) return;
     navigator.clipboard.writeText(result);
   };
+
+  // Use .md for markdown/structured output, .txt for plain text output.
+  const handleDownload = () => downloadText(result, format === 'plain' ? 'txt' : 'md');
 
   const handleClear = () => {
     setImages([]);
@@ -290,6 +294,11 @@ export default function ImageToText() {
         {result && (
           <button type="button" className="btn-secondary" onClick={handleCopy}>
             Copy result
+          </button>
+        )}
+        {result && (
+          <button type="button" className="btn-secondary" onClick={handleDownload}>
+            Download {format === 'plain' ? '.txt' : '.md'}
           </button>
         )}
         <button type="button" className="btn-ghost" onClick={handleClear}>
