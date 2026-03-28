@@ -761,6 +761,10 @@ CREATE TABLE IF NOT EXISTS bot_config (
   adaptive_inactivity_12h_hours NUMERIC(5,2) DEFAULT NULL,
   adaptive_inactivity_24h_hours NUMERIC(5,2) DEFAULT NULL,
   starter_cooldown_ms           INTEGER      DEFAULT NULL,
+  -- Starter add-on size multiplier (migration 036)
+  -- Applied to the starter budget when probing an existing tactical position.
+  -- NULL = 1.0 (same as a flat-portfolio starter). Set <1 to make smaller.
+  starter_addon_size_mult       NUMERIC(5,3) DEFAULT NULL,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
