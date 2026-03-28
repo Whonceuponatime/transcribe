@@ -15,7 +15,8 @@
 .ct__badge--off   { background: rgba(148,163,184,0.15); color: #94a3b8; }
 .ct__badge--kill  { background: #dc2626; color: #fff; }
 .ct__badge--signal{ background: rgba(245,158,11,0.15);  color: #f59e0b; }
-.ct__actions { display: flex; gap: 0.4rem; margin-left: auto; flex-wrap: wrap; }
+.ct__actions { display: flex; gap: 0.4rem; margin-left: auto; flex-wrap: wrap; align-items: center; }
+.ct__last-updated { font-size: 0.72rem; color: #666; white-space: nowrap; }
 
 /* ═══ BUTTONS ═══ */
 .ct__btn {

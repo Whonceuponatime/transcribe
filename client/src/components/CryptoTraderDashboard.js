@@ -44,6 +44,7 @@ export default function CryptoTraderDashboard() {
   const [logs, setLogs] = useState([]);
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // V2 state
   const [v2Regime, setV2Regime]               = useState(null);
@@ -68,8 +69,9 @@ export default function CryptoTraderDashboard() {
 
   // V1 cfg state removed. V2 controls are in v2TradingEnabled/v2BuysEnabled/v2SellsEnabled.
 
-  const fetchStatus = useCallback(async () => {
-    setLoading(true); setError(null);
+  // silent=true skips the loading spinner and error state — used for background auto-refresh.
+  const fetchStatus = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) { setLoading(true); setError(null); }
     try {
       const res = await fetch(`${API}/api/crypto-trader?action=status`);
       if (res.ok) {
@@ -80,12 +82,13 @@ export default function CryptoTraderDashboard() {
         if (d.tradingEnabled !== undefined) setV2TradingEnabled(d.tradingEnabled);
         if (d.buysEnabled    !== undefined) setV2BuysEnabled(d.buysEnabled);
         if (d.sellsEnabled   !== undefined) setV2SellsEnabled(d.sellsEnabled);
+        setLastUpdated(new Date());
       } else {
         const e = await res.json();
-        setError(e.error || 'Failed to load status');
+        if (!silent) setError(e.error || 'Failed to load status');
       }
-    } catch (e) { setError(e.message); }
-    setLoading(false);
+    } catch (e) { if (!silent) setError(e.message); }
+    if (!silent) setLoading(false);
   }, []);
 
   // Fetch v2 data (regime, positions, circuit breakers, mode, adoption)
@@ -158,6 +161,15 @@ export default function CryptoTraderDashboard() {
   useEffect(() => {
     fetchStatus();
     fetchV2Data();
+  }, [fetchStatus, fetchV2Data]);
+
+  // Auto-refresh every 15 seconds — silent so no loading flash.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchStatus({ silent: true });
+      fetchV2Data();
+    }, 15000);
+    return () => clearInterval(id);
   }, [fetchStatus, fetchV2Data]);
 
   // Save live trading controls (replaces mode toggle)
@@ -397,7 +409,8 @@ export default function CryptoTraderDashboard() {
           {triggerPending && <span className="ct__badge ct__badge--signal">Pending…</span>}
         </div>
         <div className="ct__actions">
-          <button className="ct__btn" onClick={fetchStatus} disabled={loading}>{loading ? '…' : 'Refresh'}</button>
+          <button className="ct__btn" onClick={() => fetchStatus()} disabled={loading}>{loading ? '…' : 'Refresh'}</button>
+          {lastUpdated && <span className="ct__last-updated" title="Auto-refreshes every 15s">↻ {lastUpdated.toLocaleTimeString()}</span>}
           <button className="ct__btn ct__btn--primary" onClick={() => execute(false)} disabled={executing}>{executing ? 'Running…' : 'Run Cycle'}</button>
           <button className="ct__btn ct__btn--warn" onClick={() => execute(true)} disabled={executing}>Force DCA</button>
           <button className={`ct__btn ct__btn--danger`} onClick={toggleKillSwitch}>
