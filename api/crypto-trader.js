@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
         safe(supabase.from('app_settings').select('value').eq('key', 'risk_engine_state').single()),
         // Include updated_at so dashboard can show how stale positions are
         supabase.from('positions').select('asset,strategy_tag,state,origin,managed,qty_open,avg_cost_krw,operator_classified_at,updated_at').in('state', ['open','adopted','partial']),
-        supabase.from('v2_fills').select('asset,side,price_krw,qty,fee_krw,executed_at').order('executed_at', { ascending: false }).limit(20),
+        supabase.from('v2_fills').select('asset,side,price_krw,qty,fee_krw,entry_reason,entry_regime,strategy_tag,order_id,position_id,executed_at').order('executed_at', { ascending: false }).limit(30),
         // Live unresolved order count — shows current reality independent of cached freeze reasons
         safe(supabase.from('orders').select('id', { count: 'exact', head: true }).in('state', ['intent_created','submitted','accepted','partially_filled'])),
       ]);
@@ -55,8 +55,7 @@ module.exports = async function handler(req, res) {
       const riskSt   = riskRes.data?.value   ?? {};
       const hb       = heartbeatRes.data;
 
-      const piLastSeen  = hb?.value?.lastSeen   ?? null;
-      const piLastCycle = hb?.value?.lastCycleAt ?? null;
+      const piLastSeen  = hb?.value?.lastSeen ?? null;
       const piOnline    = piLastSeen ? (Date.now() - new Date(piLastSeen).getTime()) < 10 * 60 * 1000 : false;
 
       // Build position array.
@@ -100,8 +99,6 @@ module.exports = async function handler(req, res) {
         // Pi state
         piOnline,
         piLastSeen,
-        lastCycleAt:           piLastCycle,
-        secondsSinceLastCycle: piLastCycle ? Math.round((Date.now() - new Date(piLastCycle).getTime()) / 1000) : null,
         triggerPending:   triggerRes.data?.value?.pending === true,
         killSwitch:       ksRes.data?.value?.enabled ?? false,
         // V2 trading controls
@@ -130,16 +127,27 @@ module.exports = async function handler(req, res) {
         // Reconciliation
         latestReconciliation: recon,
         riskEngineState:  riskSt,
-        // Recent V2 fills
-        recentTrades: (recentTradesRes.data || []).map((f) => ({
-          coin:        f.asset,
-          side:        f.side,
-          krw_amount:  f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null,
-          coin_amount: f.qty,
-          price_krw:   f.price_krw,
-          executed_at: f.executed_at,
-          engine:      'V2',
-        })),
+        // Recent V2 fills — gross/net explicit; entry_reason mapped to reason
+        recentTrades: (recentTradesRes.data || []).map((f) => {
+          const gross = f.price_krw && f.qty ? Math.round(f.price_krw * f.qty) : null;
+          const fee   = f.fee_krw ? Math.round(f.fee_krw) : 0;
+          return {
+            coin:         f.asset,
+            side:         f.side,
+            gross_krw:    gross,
+            fee_krw:      fee,
+            net_krw:      gross != null ? gross - fee : null,
+            coin_amount:  f.qty,
+            price_krw:    f.price_krw,
+            reason:       f.entry_reason  ?? null,   // was missing — entry_reason col → reason key
+            entry_regime: f.entry_regime  ?? null,
+            strategy_tag: f.strategy_tag  ?? null,
+            order_id:     f.order_id      ?? null,
+            position_id:  f.position_id   ?? null,
+            executed_at:  f.executed_at,
+            engine:       'V2',
+          };
+        }),
         // V1-era fields explicitly nulled so dashboard knows to ignore them
         config:        null,
         signalScore:   null,
@@ -223,7 +231,8 @@ module.exports = async function handler(req, res) {
       ];
       const { data: logs, error: logsErr } = await supabase
         .from('bot_events')
-        .select('id, event_type, severity, subsystem, message, created_at')
+        .select('id, event_type, severity, subsystem, message, context_json, created_at')
+        .eq('mode', 'live')
         .in('severity', ['info', 'warn', 'error'])
         .not('event_type', 'in', `(${NOISE_EVENTS.map((e) => `"${e}"`).join(',')})`)
         .order('created_at', { ascending: false })
@@ -248,6 +257,8 @@ module.exports = async function handler(req, res) {
       // Shape into compact rows for the dashboard
       const diagnostics = (diags || []).map((ev) => {
         const cx = ev.context_json ?? {};
+        const bc = cx.buy_checks  ?? {};
+        const sc = cx.sell_checks ?? {};
         return {
           id:             ev.id,
           created_at:     ev.created_at,
@@ -259,19 +270,29 @@ module.exports = async function handler(req, res) {
           pnl_percent:    cx.pnl_percent    ?? null,
           final_action:   cx.final_action   ?? null,
           final_reason:   cx.final_reason   ?? null,
-          sell_blocker:   cx.sell_checks?.final_sell_blocker ?? null,
-          buy_blocker:    cx.buy_checks    != null
-            ? (cx.buy_checks.signal_met ? null : 'signal_not_met')
-            : null,
-          rsi:            cx.buy_checks?.rsi    ?? cx.sell_checks?.rsi    ?? null,
-          bb_pctB:        cx.buy_checks?.bb_pctB ?? cx.sell_checks?.bb_pctB ?? null,
+          sell_blocker:   sc.final_sell_blocker ?? null,
+          // buy_blocker: full reason string (not collapsed to 'signal_not_met')
+          buy_blocker:    Object.keys(bc).length > 0 && !bc.final_buy_eligible
+            ? (cx.final_reason ?? 'blocked') : null,
+          risk_blocker:   bc.risk_blocker   ?? null,
+          rsi:            bc.rsi    ?? sc.rsi    ?? null,
+          bb_pctB:        bc.bb_pctB ?? sc.bb_pctB ?? null,
+          ob_imbalance:   bc.ob_imbalance   ?? null,
           cycle_id:       cx.cycle_id       ?? null,
-          // Effective runtime thresholds — allow operator to see actual cap vs raw config
-          effective_bb_threshold: cx.buy_checks?.effective_bb_threshold    ?? null,
-          effective_ob_threshold: cx.buy_checks?.effective_ob_imbalance_min ?? null,
-          adaptive_signals:       cx.buy_checks?.adaptive_offsets_applied?.signals ?? null,
-          micro_bypassed:         cx.buy_checks?.micro_bypassed   ?? null,
-          pos_notional_krw:       cx.buy_checks?.pos_notional_krw ?? null,
+          // Effective runtime thresholds
+          effective_bb_threshold: bc.effective_bb_threshold    ?? null,
+          effective_ob_threshold: bc.effective_ob_imbalance_min ?? null,
+          adaptive_signals:       bc.adaptive_offsets_applied?.signals ?? null,
+          micro_bypassed:         bc.micro_bypassed    ?? null,
+          pos_notional_krw:       bc.pos_notional_krw  ?? null,
+          // Starter-into-existing diagnostics (migration 036 + diagnostics patch)
+          starter_into_existing_attempted:   bc.starter_into_existing_attempted   ?? null,
+          starter_into_existing_passed:      bc.starter_into_existing_passed      ?? null,
+          starter_into_existing_blocker:     bc.starter_into_existing_blocker     ?? null,
+          starter_addon_size_mult_effective: bc.starter_addon_size_mult_effective ?? null,
+          starter_cooldown_ms_effective:     bc.starter_cooldown_ms_effective     ?? null,
+          existing_position_strategy_tag:    bc.existing_position_strategy_tag    ?? null,
+          route_to_existing_position:        bc.route_to_existing_position        ?? null,
         };
       });
       return res.status(200).json({ diagnostics });

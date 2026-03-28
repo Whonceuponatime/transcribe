@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './CryptoTraderDashboard.css';
 
 const API = '';
@@ -163,14 +163,6 @@ export default function CryptoTraderDashboard() {
     fetchV2Data();
   }, [fetchStatus, fetchV2Data]);
 
-  // Auto-refresh every 15 seconds — silent so no loading flash.
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetchStatus({ silent: true });
-      fetchV2Data();
-    }, 15000);
-    return () => clearInterval(id);
-  }, [fetchStatus, fetchV2Data]);
 
   // Save live trading controls (replaces mode toggle)
   const saveV2Control = useCallback(async (patch) => {
@@ -266,6 +258,25 @@ export default function CryptoTraderDashboard() {
     setDiagOpen(next);
     if (next) await fetchDiag();
   }, [diagOpen, fetchDiag]);
+
+  // Refs track panel open state without causing interval re-registration on open/close.
+  // Placed after fetchDiag/fetchLogs/diagOpen/logsOpen are all defined.
+  const diagOpenRef = useRef(false);
+  const logsOpenRef = useRef(false);
+  useEffect(() => { diagOpenRef.current = diagOpen; }, [diagOpen]);
+  useEffect(() => { logsOpenRef.current = logsOpen; }, [logsOpen]);
+
+  // Auto-refresh every 15 seconds — silent so no loading flash.
+  // Decision Feed and Bot Logs also refresh when their panel is open.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchStatus({ silent: true });
+      fetchV2Data();
+      if (diagOpenRef.current) fetchDiag();
+      if (logsOpenRef.current) fetchLogs();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [fetchStatus, fetchV2Data, fetchDiag, fetchLogs]);
 
   const [exporting, setExporting] = useState(false);
   const exportLogs = useCallback(async () => {
@@ -966,29 +977,50 @@ export default function CryptoTraderDashboard() {
           <div style={{ fontSize: '0.78rem', color: '#22c55e', marginBottom: '0.6rem' }}>✓ No circuit breakers active</div>
         )}
 
-        {/* Open tactical positions */}
-        {v2Positions.length > 0 && (
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Open Tactical Positions</div>
-            {v2Positions.map((p) => (
-              <div key={p.position_id} style={{ display: 'flex', gap: '1rem', fontSize: '0.82rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, minWidth: '3rem' }}>{p.asset}</span>
-                <span className="ct__muted">qty: {Number(p.qty_open).toFixed(6)}</span>
-                <span className="ct__muted">avg: ₩{Math.round(p.avg_cost_krw).toLocaleString()}</span>
-                {p.unrealized_pnl_pct != null && (
-                  <span style={{ color: p.unrealized_pnl_pct >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {p.unrealized_pnl_pct >= 0 ? '+' : ''}{p.unrealized_pnl_pct.toFixed(2)}%
-                  </span>
-                )}
-                <span className="ct__muted" style={{ fontSize: '0.72rem' }}>regime@entry: {p.entry_regime ?? '—'}</span>
-                <span className="ct__muted" style={{ fontSize: '0.72rem' }}>{p.entry_reason ?? ''}</span>
+        {/* Open tactical positions — filtered to strategy_tag=tactical only */}
+        {(() => {
+          const tactical = v2Positions.filter((p) => p.strategy_tag === 'tactical');
+          return (
+            <>
+              <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Open Tactical Positions{tactical.length > 0 ? ` (${tactical.length})` : ''}
               </div>
-            ))}
-          </div>
-        )}
-        {v2Positions.length === 0 && (
-          <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No open tactical positions</div>
-        )}
+              {tactical.length === 0 ? (
+                <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No open tactical positions</div>
+              ) : tactical.map((p) => (
+                <div key={p.position_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.45rem 0' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.82rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, minWidth: '3rem' }}>{p.asset}</span>
+                    <span className="ct__muted">qty: {Number(p.qty_open).toFixed(6)}</span>
+                    <span className="ct__muted">avg: ₩{Math.round(p.avg_cost_krw).toLocaleString()}</span>
+                    {p.current_price_krw && <span className="ct__muted">mark: ₩{Math.round(p.current_price_krw).toLocaleString()}</span>}
+                    {p.unrealized_pnl_pct != null && (
+                      <span style={{ color: p.unrealized_pnl_pct >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                        {p.unrealized_pnl_pct >= 0 ? '+' : ''}{p.unrealized_pnl_pct.toFixed(2)}%
+                      </span>
+                    )}
+                    <span className="ct__muted" style={{ fontSize: '0.72rem' }}>reg@entry: {p.entry_regime ?? '—'}</span>
+                    {(p.fired_trims ?? []).length > 0 && (
+                      <span style={{ fontSize: '0.68rem', color: '#a78bfa' }} title="Profit tranches already sold">
+                        trims: {p.fired_trims.join(',')}
+                      </span>
+                    )}
+                    {p.opened_at && (
+                      <span className="ct__muted" style={{ fontSize: '0.68rem' }}>
+                        since: {new Date(p.opened_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                  {p.entry_reason && (
+                    <div style={{ fontSize: '0.68rem', color: '#555', marginTop: '0.15rem', paddingLeft: '0.1rem' }}>
+                      ↳ {p.entry_reason}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          );
+        })()}
       </div>
 
       {/* ═══ BOT LOGS (V2 bot_events) ═══ */}
@@ -1013,6 +1045,11 @@ export default function CryptoTraderDashboard() {
             )}
             {!logsLoading && logs.length > 0 && logs.map((log) => {
               const sevColor = log.severity === 'error' ? '#ef4444' : log.severity === 'warn' ? '#f59e0b' : '#22c55e';
+              const cx = log.context_json ?? {};
+              // For EXECUTION events: surface reason + fill count inline
+              const execDetail = log.event_type === 'EXECUTION' && cx.reason
+                ? `${cx.reason}${cx.fills != null ? ` (${cx.fills} fill${cx.fills !== 1 ? 's' : ''})` : ''}`
+                : null;
               return (
                 <div key={log.id} className={`ct__log-row ct__log-row--${log.severity || 'info'}`}>
                   <span className="ct__log-time">
@@ -1020,7 +1057,10 @@ export default function CryptoTraderDashboard() {
                   </span>
                   <span className="ct__log-tag" style={{ color: sevColor, minWidth: '3.5rem' }}>{log.severity?.toUpperCase() || 'INFO'}</span>
                   <span className="ct__log-tag" style={{ color: '#888', minWidth: '6rem' }}>{log.subsystem || log.event_type || '—'}</span>
-                  <span className="ct__log-msg">{log.message}</span>
+                  <span className="ct__log-msg">
+                    {log.message}
+                    {execDetail && <span style={{ color: '#555', fontSize: '0.68rem' }}> — {execDetail}</span>}
+                  </span>
                 </div>
               );
             })}
@@ -1050,41 +1090,62 @@ export default function CryptoTraderDashboard() {
               const isAction = ['BUY_SUBMITTED', 'ADD_ON_SUBMITTED', 'STARTER_SUBMITTED', 'SELL_TRIGGERED'].includes(d.final_action);
               const isElig   = ['BUY_ELIGIBLE',  'ADD_ON_ELIGIBLE',  'STARTER_ELIGIBLE'].includes(d.final_action);
               const acColor  = isAction ? '#22c55e' : isElig ? '#60a5fa' : '#555';
+              const obBlocked = d.ob_imbalance != null && d.effective_ob_threshold != null && d.ob_imbalance < d.effective_ob_threshold;
+              const bbBlocked = d.bb_pctB      != null && d.effective_bb_threshold  != null && d.bb_pctB      >= d.effective_bb_threshold;
               return (
-                <div key={d.id} className="ct__log-row" style={{ gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <span className="ct__log-time" style={{ minWidth: '6.5rem' }}>
-                    {new Date(d.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                  <span style={{ fontWeight: 700, minWidth: '2.5rem', color: '#e2e8f0' }}>{d.symbol}</span>
-                  <span style={{ color: acColor, minWidth: '9rem', fontSize: '0.78rem' }}>{d.final_action || '—'}</span>
-                  {d.pnl_percent != null && (
-                    <span style={{ color: d.pnl_percent >= 0 ? '#4ade80' : '#f87171', fontSize: '0.78rem' }}>
-                      P&amp;L {d.pnl_percent > 0 ? '+' : ''}{d.pnl_percent?.toFixed(2)}%
+                <div key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '0.45rem 0' }}>
+                  {/* Main indicator row */}
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="ct__log-time" style={{ minWidth: '6.5rem' }}>
+                      {new Date(d.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
+                    <span style={{ fontWeight: 700, minWidth: '2.5rem', color: '#e2e8f0' }}>{d.symbol}</span>
+                    <span style={{ color: acColor, minWidth: '9rem', fontSize: '0.78rem' }}>{d.final_action || '—'}</span>
+                    {d.pnl_percent != null && (
+                      <span style={{ color: d.pnl_percent >= 0 ? '#4ade80' : '#f87171', fontSize: '0.78rem' }}>
+                        P&amp;L {d.pnl_percent > 0 ? '+' : ''}{d.pnl_percent?.toFixed(2)}%
+                      </span>
+                    )}
+                    {d.rsi != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>RSI {d.rsi}</span>}
+                    {/* BB: value / cap — red when blocking */}
+                    {d.bb_pctB != null && (
+                      <span style={{ fontSize: '0.72rem', color: bbBlocked ? '#ef4444' : '#888' }}>
+                        %B {d.bb_pctB}{d.effective_bb_threshold != null ? `/${d.effective_bb_threshold}` : ''}
+                      </span>
+                    )}
+                    {/* OB: value / min — red when blocking */}
+                    {d.ob_imbalance != null && (
+                      <span style={{ fontSize: '0.72rem', color: obBlocked ? '#ef4444' : '#888' }}>
+                        OB {d.ob_imbalance}{d.effective_ob_threshold != null ? `/${d.effective_ob_threshold}` : ''}
+                      </span>
+                    )}
+                    {d.adaptive_signals?.length > 0 && (
+                      <span style={{ color: '#374151', fontSize: '0.65rem' }}>[{d.adaptive_signals.join(',')}]</span>
+                    )}
+                    {d.micro_bypassed && (
+                      <span style={{ color: '#a78bfa', fontSize: '0.68rem' }} title={`Notional ₩${d.pos_notional_krw?.toLocaleString()} below bypass`}>μ-bypass</span>
+                    )}
+                    {d.route_to_existing_position && (
+                      <span style={{ color: '#60a5fa', fontSize: '0.65rem' }} title="Fill routed to existing position">→existing</span>
+                    )}
+                  </div>
+                  {/* Full reason — not truncated */}
+                  {d.final_reason && (
+                    <div style={{ fontSize: '0.7rem', color: '#555', marginTop: '0.18rem', paddingLeft: '0.1rem', wordBreak: 'break-word' }}>
+                      {d.final_reason}
+                    </div>
                   )}
-                  {d.rsi != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>RSI {d.rsi}</span>}
-                  {d.bb_pctB != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>%B {d.bb_pctB}</span>}
-                  {/* Effective BB cap — red if blocked, green if passing */}
-                  {d.effective_bb_threshold != null && (
-                    <span style={{ fontSize: '0.68rem', color: d.bb_pctB != null && d.bb_pctB >= d.effective_bb_threshold ? '#ef4444' : '#4b5563' }}>
-                      BB≤{d.effective_bb_threshold}
-                    </span>
+                  {/* Starter-into-existing detail line */}
+                  {d.starter_into_existing_attempted && (
+                    <div style={{ fontSize: '0.68rem', marginTop: '0.12rem', paddingLeft: '0.1rem', color: d.starter_into_existing_passed ? '#22c55e' : '#f59e0b' }}>
+                      starter→existing: {d.starter_into_existing_passed
+                        ? `✓ passed${d.starter_addon_size_mult_effective != null ? ` (mult=${d.starter_addon_size_mult_effective})` : ''}`
+                        : `✗ ${d.starter_into_existing_blocker ?? 'blocked'}`}
+                      {d.existing_position_strategy_tag && (
+                        <span style={{ color: '#555' }}> | pos={d.existing_position_strategy_tag}</span>
+                      )}
+                    </div>
                   )}
-                  {/* Effective OB min */}
-                  {d.effective_ob_threshold != null && (
-                    <span style={{ color: '#4b5563', fontSize: '0.68rem' }}>OB≥{d.effective_ob_threshold}</span>
-                  )}
-                  {/* Adaptive signals active this cycle */}
-                  {d.adaptive_signals?.length > 0 && (
-                    <span style={{ color: '#374151', fontSize: '0.65rem' }}>[{d.adaptive_signals.join(',')}]</span>
-                  )}
-                  {/* Micro-position bypass fired */}
-                  {d.micro_bypassed && (
-                    <span style={{ color: '#a78bfa', fontSize: '0.68rem' }} title={`Position notional ₩${d.pos_notional_krw?.toLocaleString()} below bypass threshold`}>μ-bypass</span>
-                  )}
-                  <span className="ct__log-msg" style={{ color: '#666', fontSize: '0.72rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {d.final_reason}
-                  </span>
                 </div>
               );
             })}
@@ -1101,18 +1162,23 @@ export default function CryptoTraderDashboard() {
           <div className="ct__trades">
             <table className="ct__table">
               <thead>
-                <tr><th>Time</th><th>Coin</th><th>Side</th><th>KRW</th><th>Coins</th><th>Reason</th></tr>
+                <tr><th>Time</th><th>Coin</th><th>Side</th><th>Gross KRW</th><th>Fee</th><th>Qty</th><th>Regime</th><th>Reason</th></tr>
               </thead>
               <tbody>
                 {trades.map((t, tIdx) => (
-                  // t.id is not returned by the status API — use a composite key
                   <tr key={`${t.executed_at ?? tIdx}-${t.coin}-${t.side}`}>
                     <td>{t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     <td style={{ fontWeight: 700 }}>{t.coin}</td>
                     <td className={`ct__side--${t.side}`}>{t.side === 'buy' ? '↑ BUY' : '↓ SELL'}</td>
-                    <td>{t.krw_amount ? `₩${fmt(t.krw_amount)}` : '—'}</td>
+                    <td title={t.net_krw != null ? `Net: ₩${fmt(t.net_krw)}` : undefined}>
+                      {t.gross_krw ? `₩${fmt(t.gross_krw)}` : '—'}
+                    </td>
+                    <td style={{ color: '#666', fontSize: '0.75rem' }}>
+                      {t.fee_krw ? `₩${fmt(t.fee_krw)}` : '—'}
+                    </td>
                     <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
-                    <td><span className="ct__reason">{REASON_LABELS[t.reason] || t.reason}</span></td>
+                    <td style={{ fontSize: '0.75rem', color: '#888' }}>{t.entry_regime ?? '—'}</td>
+                    <td><span className="ct__reason">{REASON_LABELS[t.reason] || t.reason || '—'}</span></td>
                   </tr>
                 ))}
               </tbody>
