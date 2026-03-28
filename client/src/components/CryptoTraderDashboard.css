@@ -229,3 +229,116 @@
 
 /* keep for compat */
 .ct__pos-card, .ct__positions, .ct__balance-hero { display: none; }
+
+/* ═══ PHASE 3: TELEMETRY STRIP ═══ */
+.ct__telem-strip {
+  display: flex; align-items: stretch; flex-wrap: nowrap; overflow-x: auto;
+  background: #080808; border: 1px solid #1a1a1a; border-radius: 8px;
+  margin-bottom: 0.65rem;
+}
+.ct__telem-card {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.5rem 0.9rem; border-right: 1px solid #141414; flex-shrink: 0;
+}
+.ct__telem-card:last-child { border-right: none; }
+.ct__telem-label { font-size: 0.59rem; color: #444; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.ct__telem-val   { font-size: 0.82rem; font-weight: 700; color: #ccc; white-space: nowrap; }
+
+/* ═══ PHASE 3: POSITION TABLE ═══ */
+.ct__panel-label { font-size: 0.64rem; color: #444; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 0.4rem; }
+.ct__pos-table-wrap { overflow-x: auto; margin-top: 0.35rem; border-radius: 6px; border: 1px solid #141414; }
+.ct__pos-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.ct__pos-table th {
+  color: #3a3a3a; font-weight: 600; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 0.3rem 0.65rem; border-bottom: 1px solid #1a1a1a; text-align: left;
+  background: #080808; white-space: nowrap;
+}
+.ct__pos-table td { padding: 0.32rem 0.65rem; color: #bbb; border-bottom: none; }
+.ct__pos-table .ct__pos-row td { border-bottom: none; padding-bottom: 0.1rem; }
+.ct__pos-table .ct__pos-reason-row td {
+  color: #3d3d3d; font-size: 0.67rem; padding-top: 0.05rem; padding-bottom: 0.35rem;
+  border-bottom: 1px solid #111;
+}
+.ct__pos-table tbody tr:last-child td { border-bottom: none; }
+.ct__regime-chip {
+  font-size: 0.6rem; font-weight: 700; padding: 0.08rem 0.3rem; border-radius: 3px;
+  border: 1px solid; display: inline-block; white-space: nowrap;
+}
+.ct__trim-chip {
+  font-size: 0.6rem; background: rgba(167,139,250,0.12); color: #a78bfa;
+  padding: 0.07rem 0.28rem; border-radius: 3px; margin-right: 0.18rem;
+  display: inline-block; font-weight: 600;
+}
+
+/* ═══ PHASE 3: DECISION FEED CARDS ═══ */
+.ct__diag-cards { display: flex; flex-direction: column; }
+.ct__diag-card { padding: 0.55rem 0.8rem; border-bottom: 1px solid #0f0f0f; }
+.ct__diag-card:last-child { border-bottom: none; }
+.ct__diag-card:hover { background: rgba(255,255,255,0.015); }
+.ct__diag-header {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.18rem;
+}
+.ct__diag-time { font-size: 0.67rem; color: #3a3a3a; white-space: nowrap; min-width: 5.8rem; }
+.ct__diag-coin { font-size: 0.88rem; font-weight: 800; color: #e2e8f0; min-width: 2.4rem; }
+.ct__diag-regime-badge {
+  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.38rem; border-radius: 3px; white-space: nowrap;
+}
+.ct__diag-action-chip {
+  font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 4px; white-space: nowrap;
+}
+.ct__diag-price { font-size: 0.7rem; color: #3d3d3d; margin-left: auto; white-space: nowrap; }
+.ct__diag-indicators {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.16rem;
+}
+.ct__diag-ind { font-size: 0.67rem; color: #4b5563; white-space: nowrap; }
+.ct__diag-ind strong { color: #9ca3af; font-weight: 600; }
+.ct__diag-cap { color: #374151; font-size: 0.63rem; }
+.ct__diag-chip {
+  font-size: 0.61rem; font-weight: 600; padding: 0.09rem 0.32rem; border-radius: 3px; white-space: nowrap;
+}
+.ct__diag-chip--purple { background: rgba(167,139,250,0.12); color: #a78bfa; }
+.ct__diag-chip--blue   { background: rgba(96,165,250,0.12);  color: #60a5fa; }
+.ct__diag-chip--red    { background: rgba(239,68,68,0.1);    color: #f87171; }
+.ct__diag-chip--amber  { background: rgba(245,158,11,0.1);   color: #d97706; }
+.ct__diag-reason  { font-size: 0.69rem; color: #3d4654; word-break: break-word; line-height: 1.45; margin-bottom: 0.1rem; }
+.ct__diag-starter { font-size: 0.67rem; }
+
+/* ═══ PHASE 3: BLOTTER ═══ */
+.ct__blotter-wrap { overflow-x: auto; }
+.ct__blotter { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.ct__blotter th {
+  color: #3a3a3a; font-weight: 600; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 0.3rem 0.6rem; border-bottom: 1px solid #1a1a1a; text-align: left; white-space: nowrap;
+  background: #080808; position: sticky; top: 0; z-index: 1;
+}
+.ct__blotter td { padding: 0.32rem 0.6rem; border-bottom: 1px solid #0d0d0d; white-space: nowrap; }
+.ct__blotter tbody tr:last-child td { border-bottom: none; }
+.ct__blotter tbody tr:hover td { background: rgba(255,255,255,0.015); }
+.ct__blotter-buy  td:first-child { border-left: 2px solid rgba(34,197,94,0.3); }
+.ct__blotter-sell td:first-child { border-left: 2px solid rgba(245,158,11,0.3); }
+.ct__blotter td.ct__bl-fee   { color: #3d3d3d; font-size: 0.7rem; }
+.ct__blotter td.ct__bl-price { color: #555; }
+.ct__side-pill {
+  font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; white-space: nowrap;
+}
+.ct__side-pill--buy  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.ct__side-pill--sell { background: rgba(245,158,11,0.1); color: #f59e0b; }
+
+/* ═══ PHASE 3: SECONDARY LOG PANEL ═══ */
+.ct__logs-panel-secondary {
+  margin-top: 0.65rem; max-height: 280px; overflow-y: auto;
+  border-radius: 6px; border: 1px solid #141414; background: #060606;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+.ct__log-row-v3 {
+  display: grid; grid-template-columns: 7rem 4.5rem 7rem 1fr;
+  gap: 0.5rem; padding: 0.25rem 0.7rem;
+  border-bottom: 1px solid #0d0d0d; font-size: 0.68rem; align-items: start;
+}
+.ct__log-row-v3:last-child { border-bottom: none; }
+.ct__log-row-v3--info  { color: #4b5563; }
+.ct__log-row-v3--warn  { color: #92400e; background: rgba(245,158,11,0.03); }
+.ct__log-row-v3--error { color: #7f1d1d; background: rgba(239,68,68,0.04); }
+.ct__log-sev  { font-weight: 700; white-space: nowrap; }
+.ct__log-sub  { color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct__log-msg-v3 { word-break: break-word; line-height: 1.4; color: #4a5568; }

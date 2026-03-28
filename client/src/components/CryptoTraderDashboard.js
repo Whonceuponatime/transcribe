@@ -27,6 +27,10 @@ const REASON_LABELS = {
 };
 
 const rsiColor = (v) => v == null ? '#666' : v > 70 ? '#ef4444' : v < 30 ? '#22c55e' : '#f59e0b';
+const regStyle  = (r) => ({
+  background: r === 'UPTREND' ? 'rgba(34,197,94,0.12)' : r === 'DOWNTREND' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.10)',
+  color:      r === 'UPTREND' ? '#22c55e'               : r === 'DOWNTREND' ? '#ef4444'               : '#f59e0b',
+});
 
 const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#888' : v > 25 ? '#22c55e' : '#00e5ff';
 const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
@@ -977,215 +981,372 @@ export default function CryptoTraderDashboard() {
           <div style={{ fontSize: '0.78rem', color: '#22c55e', marginBottom: '0.6rem' }}>✓ No circuit breakers active</div>
         )}
 
-        {/* Open tactical positions — filtered to strategy_tag=tactical only */}
+        {/* Open tactical positions — table, filtered to strategy_tag=tactical */}
         {(() => {
           const tactical = v2Positions.filter((p) => p.strategy_tag === 'tactical');
           return (
             <>
-              <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div className="ct__panel-label">
                 Open Tactical Positions{tactical.length > 0 ? ` (${tactical.length})` : ''}
               </div>
               {tactical.length === 0 ? (
                 <div className="ct__muted" style={{ fontSize: '0.8rem' }}>No open tactical positions</div>
-              ) : tactical.map((p) => (
-                <div key={p.position_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.45rem 0' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.82rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, minWidth: '3rem' }}>{p.asset}</span>
-                    <span className="ct__muted">qty: {Number(p.qty_open).toFixed(6)}</span>
-                    <span className="ct__muted">avg: ₩{Math.round(p.avg_cost_krw).toLocaleString()}</span>
-                    {p.current_price_krw && <span className="ct__muted">mark: ₩{Math.round(p.current_price_krw).toLocaleString()}</span>}
-                    {p.unrealized_pnl_pct != null && (
-                      <span style={{ color: p.unrealized_pnl_pct >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
-                        {p.unrealized_pnl_pct >= 0 ? '+' : ''}{p.unrealized_pnl_pct.toFixed(2)}%
-                      </span>
-                    )}
-                    <span className="ct__muted" style={{ fontSize: '0.72rem' }}>reg@entry: {p.entry_regime ?? '—'}</span>
-                    {(p.fired_trims ?? []).length > 0 && (
-                      <span style={{ fontSize: '0.68rem', color: '#a78bfa' }} title="Profit tranches already sold">
-                        trims: {p.fired_trims.join(',')}
-                      </span>
-                    )}
-                    {p.opened_at && (
-                      <span className="ct__muted" style={{ fontSize: '0.68rem' }}>
-                        since: {new Date(p.opened_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
-                  {p.entry_reason && (
-                    <div style={{ fontSize: '0.68rem', color: '#555', marginTop: '0.15rem', paddingLeft: '0.1rem' }}>
-                      ↳ {p.entry_reason}
-                    </div>
-                  )}
+              ) : (
+                <div className="ct__pos-table-wrap">
+                  <table className="ct__pos-table">
+                    <thead>
+                      <tr>
+                        <th>Asset</th><th>Qty</th><th>Avg Cost</th><th>Mark</th>
+                        <th>P&amp;L</th><th>Regime</th><th>Trims</th><th>Age</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tactical.map((p) => {
+                        const pnl = p.unrealized_pnl_pct;
+                        const pnlColor = pnl == null ? '#666' : pnl >= 0 ? '#22c55e' : '#ef4444';
+                        const ageMs  = p.opened_at ? Date.now() - new Date(p.opened_at).getTime() : null;
+                        const ageStr = ageMs == null ? '—' : ageMs > 86400000
+                          ? `${Math.floor(ageMs / 86400000)}d ${Math.floor((ageMs % 86400000) / 3600000)}h`
+                          : `${Math.floor(ageMs / 3600000)}h ${Math.floor((ageMs % 3600000) / 60000)}m`;
+                        const rc = p.entry_regime ? regStyle(p.entry_regime) : null;
+                        return (
+                          <React.Fragment key={p.position_id}>
+                            <tr className="ct__pos-row">
+                              <td style={{ fontWeight: 700, color: '#e2e8f0' }}>{p.asset}</td>
+                              <td>{Number(p.qty_open).toFixed(6)}</td>
+                              <td>₩{Math.round(p.avg_cost_krw ?? 0).toLocaleString()}</td>
+                              <td>{p.current_price_krw ? `₩${Math.round(p.current_price_krw).toLocaleString()}` : '—'}</td>
+                              <td style={{ color: pnlColor, fontWeight: 700 }}>
+                                {pnl != null ? `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%` : '—'}
+                              </td>
+                              <td>
+                                {rc ? (
+                                  <span className="ct__regime-chip" style={rc}>{p.entry_regime}</span>
+                                ) : '—'}
+                              </td>
+                              <td>
+                                {(p.fired_trims ?? []).map((t) => (
+                                  <span key={t} className="ct__trim-chip">{t}</span>
+                                ))}
+                              </td>
+                              <td style={{ color: '#555', fontSize: '0.72rem' }}>{ageStr}</td>
+                            </tr>
+                            {p.entry_reason && (
+                              <tr className="ct__pos-reason-row">
+                                <td colSpan={8}>↳ {p.entry_reason}</td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </>
           );
         })()}
       </div>
 
-      {/* ═══ BOT LOGS (V2 bot_events) ═══ */}
-      <div className="ct__section">
-        <div className="ct__logs-header" onClick={toggleLogs} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 className="ct__section-title" style={{ margin: 0 }}>Bot Logs</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            {logsOpen && (
-              <button className="ct__btn" style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem' }}
-                onClick={(e) => { e.stopPropagation(); fetchLogs(); }}>
-                {logsLoading ? '…' : 'Refresh'}
-              </button>
-            )}
-            <span style={{ color: '#555', fontSize: '0.8rem' }}>{logsOpen ? '▲ hide' : '▼ show'}</span>
-          </div>
-        </div>
-        {logsOpen && (
-          <div className="ct__logs-panel">
-            {logsLoading && <div className="ct__logs-empty">Loading…</div>}
-            {!logsLoading && logs.length === 0 && (
-              <div className="ct__logs-empty">No events yet — they appear after the next cycle.</div>
-            )}
-            {!logsLoading && logs.length > 0 && logs.map((log) => {
-              const sevColor = log.severity === 'error' ? '#ef4444' : log.severity === 'warn' ? '#f59e0b' : '#22c55e';
-              const cx = log.context_json ?? {};
-              // For EXECUTION events: surface reason + fill count inline
-              const execDetail = log.event_type === 'EXECUTION' && cx.reason
-                ? `${cx.reason}${cx.fills != null ? ` (${cx.fills} fill${cx.fills !== 1 ? 's' : ''})` : ''}`
-                : null;
-              return (
-                <div key={log.id} className={`ct__log-row ct__log-row--${log.severity || 'info'}`}>
-                  <span className="ct__log-time">
-                    {new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                  <span className="ct__log-tag" style={{ color: sevColor, minWidth: '3.5rem' }}>{log.severity?.toUpperCase() || 'INFO'}</span>
-                  <span className="ct__log-tag" style={{ color: '#888', minWidth: '6rem' }}>{log.subsystem || log.event_type || '—'}</span>
-                  <span className="ct__log-msg">
-                    {log.message}
-                    {execDetail && <span style={{ color: '#555', fontSize: '0.68rem' }}> — {execDetail}</span>}
-                  </span>
+      {/* ═══ TELEMETRY STRIP ═══ */}
+      {(() => {
+        const tactical = v2Positions.filter((p) => p.strategy_tag === 'tactical');
+        const pnlPositions = tactical.filter((p) => p.current_price_krw && p.avg_cost_krw && p.qty_open > 0);
+        const totalPnlKrw = pnlPositions.length > 0
+          ? pnlPositions.reduce((s, p) => s + (Number(p.current_price_krw) - Number(p.avg_cost_krw)) * Number(p.qty_open), 0)
+          : null;
+        const blockedRows   = diagLogs.filter((d) => d.buy_blocker);
+        const starterAtt    = diagLogs.filter((d) => d.starter_into_existing_attempted).length;
+        const starterPass   = diagLogs.filter((d) => d.starter_into_existing_passed).length;
+        const recentBuys    = trades.filter((t) => t.side === 'buy').length;
+        const recentSells   = trades.filter((t) => t.side === 'sell').length;
+        const blockerCounts = {};
+        blockedRows.forEach((d) => {
+          const k = (d.buy_blocker ?? '').split(':')[0];
+          blockerCounts[k] = (blockerCounts[k] ?? 0) + 1;
+        });
+        const topBlocker = Object.entries(blockerCounts).sort((a, b) => b[1] - a[1])[0];
+        const frozen = status?.systemFrozen;
+        return (
+          <div className="ct__telem-strip">
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">Positions</div>
+              <div className="ct__telem-val">{tactical.length}</div>
+            </div>
+            {totalPnlKrw != null && (
+              <div className="ct__telem-card">
+                <div className="ct__telem-label">Unrealized P&amp;L</div>
+                <div className="ct__telem-val" style={{ color: totalPnlKrw >= 0 ? '#22c55e' : '#ef4444' }}>
+                  {totalPnlKrw >= 0 ? '+' : ''}₩{Math.round(totalPnlKrw).toLocaleString()}
                 </div>
-              );
-            })}
+              </div>
+            )}
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">Decision Rows</div>
+              <div className="ct__telem-val">{diagLogs.length}</div>
+            </div>
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">Buys Blocked</div>
+              <div className="ct__telem-val" style={{ color: blockedRows.length > 0 ? '#f59e0b' : '#555' }}>
+                {blockedRows.length}
+              </div>
+            </div>
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">Starter→Existing</div>
+              <div className="ct__telem-val">
+                <span style={{ color: '#666' }}>{starterAtt} tried</span>
+                {starterPass > 0 && <span style={{ color: '#22c55e', marginLeft: '0.35rem' }}>✓{starterPass}</span>}
+              </div>
+            </div>
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">Fills (30)</div>
+              <div className="ct__telem-val">
+                <span style={{ color: '#22c55e' }}>{recentBuys}B</span>
+                <span style={{ color: '#3a3a3a', margin: '0 0.2rem' }}>/</span>
+                <span style={{ color: '#f59e0b' }}>{recentSells}S</span>
+              </div>
+            </div>
+            {topBlocker && (
+              <div className="ct__telem-card">
+                <div className="ct__telem-label">Top Blocker</div>
+                <div className="ct__telem-val" style={{ fontSize: '0.7rem', color: '#f87171' }}>
+                  {topBlocker[0]} ×{topBlocker[1]}
+                </div>
+              </div>
+            )}
+            <div className="ct__telem-card">
+              <div className="ct__telem-label">System</div>
+              <div className="ct__telem-val" style={{ color: frozen ? '#f87171' : '#22c55e' }}>
+                {frozen ? '⛔ FROZEN' : '✓ LIVE'}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
-      {/* ═══ DECISION FEED (V2 DECISION_CYCLE events) ═══ */}
+      {/* ═══ DECISION FEED — primary diagnostic panel ═══ */}
       <div className="ct__section">
-        <div className="ct__logs-header" onClick={toggleDiag} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: diagOpen ? '0.6rem' : 0 }}
+          onClick={toggleDiag}>
           <div>
             <h3 className="ct__section-title" style={{ margin: 0 }}>Decision Feed</h3>
-            <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.2rem' }}>Live V2 buy/sell evaluations — one row per coin per cycle</div>
+            <div style={{ fontSize: '0.68rem', color: '#3a3a3a', marginTop: '0.18rem' }}>
+              {diagLogs.length > 0 ? `${diagLogs.length} rows · auto-refresh 15s` : 'Live V2 evaluations — one row per coin per cycle'}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            {diagOpen && <button className="ct__btn ct__btn--sm" onClick={(e) => { e.stopPropagation(); fetchDiag(); }}>↻ Refresh</button>}
-            <span style={{ color: '#555', fontSize: '0.8rem' }}>{diagOpen ? '▲ hide' : '▼ show'}</span>
+            {diagOpen && (
+              <button className="ct__btn" style={{ padding: '0.2rem 0.55rem', fontSize: '0.68rem' }}
+                onClick={(e) => { e.stopPropagation(); fetchDiag(); }}>
+                {diagLoading ? '…' : '↻'}
+              </button>
+            )}
+            <span style={{ color: '#3a3a3a', fontSize: '0.78rem' }}>{diagOpen ? '▲' : '▼'}</span>
           </div>
         </div>
         {diagOpen && (
-          <div className="ct__logs-panel">
+          <div className="ct__logs-panel" style={{ maxHeight: '520px', fontFamily: 'inherit' }}>
             {diagLoading && <div className="ct__logs-empty">Loading…</div>}
             {!diagLoading && diagLogs.length === 0 && (
-              <div className="ct__logs-empty">No decisions yet — they appear every 2 min once the bot is running.</div>
+              <div className="ct__logs-empty">No decisions yet — they appear every 5 min once the bot is running.</div>
             )}
-            {!diagLoading && diagLogs.length > 0 && diagLogs.map((d) => {
-              const isAction = ['BUY_SUBMITTED', 'ADD_ON_SUBMITTED', 'STARTER_SUBMITTED', 'SELL_TRIGGERED'].includes(d.final_action);
-              const isElig   = ['BUY_ELIGIBLE',  'ADD_ON_ELIGIBLE',  'STARTER_ELIGIBLE'].includes(d.final_action);
-              const acColor  = isAction ? '#22c55e' : isElig ? '#60a5fa' : '#555';
-              const obBlocked = d.ob_imbalance != null && d.effective_ob_threshold != null && d.ob_imbalance < d.effective_ob_threshold;
-              const bbBlocked = d.bb_pctB      != null && d.effective_bb_threshold  != null && d.bb_pctB      >= d.effective_bb_threshold;
-              return (
-                <div key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '0.45rem 0' }}>
-                  {/* Main indicator row */}
-                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="ct__log-time" style={{ minWidth: '6.5rem' }}>
-                      {new Date(d.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                    <span style={{ fontWeight: 700, minWidth: '2.5rem', color: '#e2e8f0' }}>{d.symbol}</span>
-                    <span style={{ color: acColor, minWidth: '9rem', fontSize: '0.78rem' }}>{d.final_action || '—'}</span>
-                    {d.pnl_percent != null && (
-                      <span style={{ color: d.pnl_percent >= 0 ? '#4ade80' : '#f87171', fontSize: '0.78rem' }}>
-                        P&amp;L {d.pnl_percent > 0 ? '+' : ''}{d.pnl_percent?.toFixed(2)}%
-                      </span>
-                    )}
-                    {d.rsi != null && <span style={{ color: '#888', fontSize: '0.72rem' }}>RSI {d.rsi}</span>}
-                    {/* BB: value / cap — red when blocking */}
-                    {d.bb_pctB != null && (
-                      <span style={{ fontSize: '0.72rem', color: bbBlocked ? '#ef4444' : '#888' }}>
-                        %B {d.bb_pctB}{d.effective_bb_threshold != null ? `/${d.effective_bb_threshold}` : ''}
-                      </span>
-                    )}
-                    {/* OB: value / min — red when blocking */}
-                    {d.ob_imbalance != null && (
-                      <span style={{ fontSize: '0.72rem', color: obBlocked ? '#ef4444' : '#888' }}>
-                        OB {d.ob_imbalance}{d.effective_ob_threshold != null ? `/${d.effective_ob_threshold}` : ''}
-                      </span>
-                    )}
-                    {d.adaptive_signals?.length > 0 && (
-                      <span style={{ color: '#374151', fontSize: '0.65rem' }}>[{d.adaptive_signals.join(',')}]</span>
-                    )}
-                    {d.micro_bypassed && (
-                      <span style={{ color: '#a78bfa', fontSize: '0.68rem' }} title={`Notional ₩${d.pos_notional_krw?.toLocaleString()} below bypass`}>μ-bypass</span>
-                    )}
-                    {d.route_to_existing_position && (
-                      <span style={{ color: '#60a5fa', fontSize: '0.65rem' }} title="Fill routed to existing position">→existing</span>
-                    )}
-                  </div>
-                  {/* Full reason — not truncated */}
-                  {d.final_reason && (
-                    <div style={{ fontSize: '0.7rem', color: '#555', marginTop: '0.18rem', paddingLeft: '0.1rem', wordBreak: 'break-word' }}>
-                      {d.final_reason}
-                    </div>
-                  )}
-                  {/* Starter-into-existing detail line */}
-                  {d.starter_into_existing_attempted && (
-                    <div style={{ fontSize: '0.68rem', marginTop: '0.12rem', paddingLeft: '0.1rem', color: d.starter_into_existing_passed ? '#22c55e' : '#f59e0b' }}>
-                      starter→existing: {d.starter_into_existing_passed
-                        ? `✓ passed${d.starter_addon_size_mult_effective != null ? ` (mult=${d.starter_addon_size_mult_effective})` : ''}`
-                        : `✗ ${d.starter_into_existing_blocker ?? 'blocked'}`}
-                      {d.existing_position_strategy_tag && (
-                        <span style={{ color: '#555' }}> | pos={d.existing_position_strategy_tag}</span>
+            {!diagLoading && diagLogs.length > 0 && (
+              <div className="ct__diag-cards">
+                {diagLogs.map((d) => {
+                  const isSubmitted = ['BUY_SUBMITTED', 'ADD_ON_SUBMITTED', 'STARTER_SUBMITTED'].includes(d.final_action);
+                  const isSell      = d.final_action === 'SELL_TRIGGERED';
+                  const isElig      = ['BUY_ELIGIBLE', 'ADD_ON_ELIGIBLE', 'STARTER_ELIGIBLE'].includes(d.final_action);
+                  const chipBg    = isSubmitted ? 'rgba(34,197,94,0.15)' : isSell ? 'rgba(245,158,11,0.13)' : isElig ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)';
+                  const chipColor = isSubmitted ? '#22c55e' : isSell ? '#f59e0b' : isElig ? '#60a5fa' : '#444';
+                  const obBlocked = d.ob_imbalance != null && d.effective_ob_threshold != null && d.ob_imbalance < d.effective_ob_threshold;
+                  const bbBlocked = d.bb_pctB != null && d.effective_bb_threshold != null && d.bb_pctB >= d.effective_bb_threshold;
+                  const dr = d.regime ? regStyle(d.regime) : null;
+                  return (
+                    <div key={d.id} className="ct__diag-card">
+                      {/* Row 1: identity + action */}
+                      <div className="ct__diag-header">
+                        <span className="ct__diag-time">
+                          {new Date(d.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                        <span className="ct__diag-coin">{d.symbol}</span>
+                        {dr && <span className="ct__diag-regime-badge" style={dr}>{d.regime}</span>}
+                        <span className="ct__diag-action-chip" style={{ background: chipBg, color: chipColor }}>
+                          {d.final_action || '—'}
+                        </span>
+                        {d.pnl_percent != null && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: d.pnl_percent >= 0 ? '#4ade80' : '#f87171' }}>
+                            P&amp;L {d.pnl_percent > 0 ? '+' : ''}{d.pnl_percent.toFixed(2)}%
+                          </span>
+                        )}
+                        {d.price != null && (
+                          <span className="ct__diag-price">₩{Math.round(d.price).toLocaleString()}</span>
+                        )}
+                      </div>
+                      {/* Row 2: indicators + chips */}
+                      <div className="ct__diag-indicators">
+                        {d.rsi != null && (
+                          <span className="ct__diag-ind">RSI <strong>{d.rsi}</strong></span>
+                        )}
+                        {d.bb_pctB != null && (
+                          <span className="ct__diag-ind" style={{ color: bbBlocked ? '#7f1d1d' : undefined }}>
+                            %B <strong style={{ color: bbBlocked ? '#f87171' : undefined }}>{d.bb_pctB}</strong>
+                            {d.effective_bb_threshold != null && <span className="ct__diag-cap">/{d.effective_bb_threshold}</span>}
+                          </span>
+                        )}
+                        {d.ob_imbalance != null && (
+                          <span className="ct__diag-ind" style={{ color: obBlocked ? '#7f1d1d' : undefined }}>
+                            OB <strong style={{ color: obBlocked ? '#f87171' : undefined }}>{d.ob_imbalance}</strong>
+                            {d.effective_ob_threshold != null && <span className="ct__diag-cap">/{d.effective_ob_threshold}</span>}
+                          </span>
+                        )}
+                        {d.adaptive_signals?.length > 0 && (
+                          <span className="ct__diag-ind" style={{ color: '#2d3748' }}>[{d.adaptive_signals.join(',')}]</span>
+                        )}
+                        {d.micro_bypassed && (
+                          <span className="ct__diag-chip ct__diag-chip--purple" title={`Notional ₩${d.pos_notional_krw?.toLocaleString()} below bypass`}>μ-bypass</span>
+                        )}
+                        {d.route_to_existing_position && (
+                          <span className="ct__diag-chip ct__diag-chip--blue">→existing</span>
+                        )}
+                        {d.risk_blocker && (
+                          <span className="ct__diag-chip ct__diag-chip--red">{d.risk_blocker}</span>
+                        )}
+                        {d.sell_blocker && d.sell_blocker !== 'no_position' && (
+                          <span className="ct__diag-chip ct__diag-chip--amber">sell:{d.sell_blocker}</span>
+                        )}
+                      </div>
+                      {/* Row 3: full reason */}
+                      {d.final_reason && (
+                        <div className="ct__diag-reason">{d.final_reason}</div>
+                      )}
+                      {/* Row 4: starter-into-existing detail */}
+                      {d.starter_into_existing_attempted && (
+                        <div className="ct__diag-starter" style={{ color: d.starter_into_existing_passed ? '#166534' : '#78350f' }}>
+                          starter→existing:{' '}
+                          {d.starter_into_existing_passed
+                            ? `✓ passed${d.starter_addon_size_mult_effective != null ? ` (mult=${d.starter_addon_size_mult_effective})` : ''}`
+                            : `✗ ${d.starter_into_existing_blocker ?? 'blocked'}`}
+                          {d.existing_position_strategy_tag && (
+                            <span style={{ color: '#2d3748', marginLeft: '0.4rem' }}>pos={d.existing_position_strategy_tag}</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* V1 Bot Settings panel removed — V2 controls are in the Engine v2 section above */}
-
-      {/* ═══ RECENT TRADES ═══ */}
+      {/* ═══ RECENT TRADES — blotter ═══ */}
       <div className="ct__section">
-        <h3 className="ct__section-title">Recent Trades</h3>
+        <h3 className="ct__section-title" style={{ marginBottom: trades.length > 0 ? '0.5rem' : '0.75rem' }}>
+          Recent Trades{trades.length > 0 ? ` (${trades.length})` : ''}
+        </h3>
         {trades.length > 0 ? (
-          <div className="ct__trades">
-            <table className="ct__table">
+          <div className="ct__blotter-wrap">
+            <table className="ct__blotter">
               <thead>
-                <tr><th>Time</th><th>Coin</th><th>Side</th><th>Gross KRW</th><th>Fee</th><th>Qty</th><th>Regime</th><th>Reason</th></tr>
+                <tr>
+                  <th>Time</th><th>Coin</th><th>Side</th>
+                  <th>Gross</th><th>Fee</th><th>Net</th>
+                  <th>Qty</th><th>Price</th><th>Regime</th><th>Reason</th>
+                </tr>
               </thead>
               <tbody>
-                {trades.map((t, tIdx) => (
-                  <tr key={`${t.executed_at ?? tIdx}-${t.coin}-${t.side}`}>
-                    <td>{t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ fontWeight: 700 }}>{t.coin}</td>
-                    <td className={`ct__side--${t.side}`}>{t.side === 'buy' ? '↑ BUY' : '↓ SELL'}</td>
-                    <td title={t.net_krw != null ? `Net: ₩${fmt(t.net_krw)}` : undefined}>
-                      {t.gross_krw ? `₩${fmt(t.gross_krw)}` : '—'}
-                    </td>
-                    <td style={{ color: '#666', fontSize: '0.75rem' }}>
-                      {t.fee_krw ? `₩${fmt(t.fee_krw)}` : '—'}
-                    </td>
-                    <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
-                    <td style={{ fontSize: '0.75rem', color: '#888' }}>{t.entry_regime ?? '—'}</td>
-                    <td><span className="ct__reason">{REASON_LABELS[t.reason] || t.reason || '—'}</span></td>
-                  </tr>
-                ))}
+                {trades.map((t, tIdx) => {
+                  const rc = t.entry_regime ? regStyle(t.entry_regime) : null;
+                  return (
+                    <tr key={`${t.executed_at ?? tIdx}-${t.coin}-${t.side}`}
+                      className={t.side === 'buy' ? 'ct__blotter-buy' : 'ct__blotter-sell'}>
+                      <td style={{ color: '#444', fontSize: '0.72rem' }}>
+                        {t.executed_at ? new Date(t.executed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td style={{ fontWeight: 700, color: '#ddd' }}>{t.coin}</td>
+                      <td>
+                        <span className={`ct__side-pill ct__side-pill--${t.side}`}>
+                          {t.side === 'buy' ? '↑ BUY' : '↓ SELL'}
+                        </span>
+                      </td>
+                      <td>{t.gross_krw ? `₩${fmt(t.gross_krw)}` : '—'}</td>
+                      <td className="ct__bl-fee">{t.fee_krw ? `₩${fmt(t.fee_krw)}` : '—'}</td>
+                      <td style={{ fontWeight: 600, color: t.side === 'sell' ? '#4ade80' : '#60a5fa' }}>
+                        {t.net_krw != null ? `₩${fmt(t.net_krw)}` : '—'}
+                      </td>
+                      <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
+                      <td className="ct__bl-price">{t.price_krw ? `₩${fmt(t.price_krw)}` : '—'}</td>
+                      <td>
+                        {rc ? (
+                          <span style={{ ...rc, padding: '0.08rem 0.32rem', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700 }}>
+                            {t.entry_regime}
+                          </span>
+                        ) : <span style={{ color: '#333' }}>—</span>}
+                      </td>
+                      <td>
+                        <span className="ct__reason" title={t.order_id ? `order: ${t.order_id}` : undefined}>
+                          {REASON_LABELS[t.reason] || t.reason || '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="ct__empty">No trades yet — bot is watching for signals every 5 minutes.</p>
+          <p className="ct__empty">No trades yet — bot is watching for signals.</p>
+        )}
+      </div>
+
+      {/* ═══ BOT LOGS — secondary, collapsed by default ═══ */}
+      <div className="ct__section" style={{ background: '#060606', borderColor: '#111' }}>
+        <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+          onClick={toggleLogs}>
+          <div style={{ display: 'flex', align: 'center', gap: '0.6rem' }}>
+            <h3 className="ct__section-title" style={{ margin: 0, color: '#333' }}>Bot Logs</h3>
+            <span style={{ fontSize: '0.65rem', color: '#2a2a2a', marginLeft: '0.5rem', alignSelf: 'center' }}>
+              mode=live · auto-refresh 15s
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {logsOpen && (
+              <button className="ct__btn" style={{ padding: '0.18rem 0.5rem', fontSize: '0.67rem', borderColor: '#1e1e1e', color: '#444' }}
+                onClick={(e) => { e.stopPropagation(); fetchLogs(); }}>
+                {logsLoading ? '…' : '↻'}
+              </button>
+            )}
+            <span style={{ color: '#2a2a2a', fontSize: '0.75rem' }}>{logsOpen ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        {logsOpen && (
+          <div className="ct__logs-panel-secondary">
+            {logsLoading && <div className="ct__logs-empty">Loading…</div>}
+            {!logsLoading && logs.length === 0 && (
+              <div className="ct__logs-empty" style={{ color: '#2a2a2a' }}>No live events yet.</div>
+            )}
+            {!logsLoading && logs.length > 0 && logs.map((log) => {
+              const sevColor = log.severity === 'error' ? '#7f1d1d' : log.severity === 'warn' ? '#78350f' : '#1e3a2e';
+              const cx = log.context_json ?? {};
+              const execDetail = log.event_type === 'EXECUTION' && cx.reason
+                ? `${cx.reason}${cx.fills != null ? ` · ${cx.fills} fill${cx.fills !== 1 ? 's' : ''}` : ''}`
+                : null;
+              return (
+                <div key={log.id} className={`ct__log-row-v3 ct__log-row-v3--${log.severity || 'info'}`}>
+                  <span className="ct__log-time" style={{ color: '#252525' }}>
+                    {new Date(log.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <span className="ct__log-sev" style={{ color: sevColor }}>{log.severity?.toUpperCase()}</span>
+                  <span className="ct__log-sub">{log.subsystem || log.event_type || '—'}</span>
+                  <span className="ct__log-msg-v3">
+                    {log.message}
+                    {execDetail && <span style={{ color: '#252525', marginLeft: '0.35rem' }}> · {execDetail}</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
