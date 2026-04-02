@@ -702,6 +702,8 @@ CREATE TABLE IF NOT EXISTS bot_config (
   exit_quick_trim1_gross_pct   NUMERIC(6,3)          DEFAULT 0.85,
   exit_quick_trim2_gross_pct   NUMERIC(6,3)          DEFAULT 1.25,
   exit_safety_buffer_pct       NUMERIC(6,3)          DEFAULT 0.10,
+  exit_profit_harvest_hours    NUMERIC(5,1)          DEFAULT 4.0,
+  exit_profit_harvest_size_pct NUMERIC(5,2)          DEFAULT 25.0,
   addon_min_dip_pct            NUMERIC(6,3)          DEFAULT 1.0,
   addon_size_mult              NUMERIC(5,3)          DEFAULT 0.5,
   buy_cooldown_ms              INTEGER               DEFAULT 1800000,
