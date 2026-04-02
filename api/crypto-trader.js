@@ -1062,7 +1062,7 @@ module.exports = async function handler(req, res) {
     if (action === 'diagnostic-export' && req.method === 'GET') {
       const hours  = Math.min(Number(req.query.hours) || 24, 72);
       const since  = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-      const COINS  = ['BTC', 'ETH', 'SOL'];
+      const COINS  = ['BTC', 'ETH'];
       const safe   = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
 
       const [
@@ -1347,7 +1347,7 @@ module.exports = async function handler(req, res) {
     if (action === 'trade-verification' && req.method === 'GET') {
       const hours = Math.min(Number(req.query.hours) || 24, 168);
       const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-      const COINS = (req.query.coins ? req.query.coins.split(',') : ['BTC', 'ETH', 'SOL']).map((c) => c.toUpperCase());
+      const COINS = (req.query.coins ? req.query.coins.split(',') : ['BTC', 'ETH']).map((c) => c.toUpperCase());
       const safe  = async (q) => { try { const r = await q; return r; } catch (_) { return { data: null }; } };
 
       // KST helper — all displayed times in Korea Standard Time
@@ -1790,7 +1790,7 @@ module.exports = async function handler(req, res) {
       const hours  = Math.min(Number(req.query.hours) || 24, 72);
       const since  = new Date(Date.now() - hours * 3600000).toISOString();
       const until  = new Date().toISOString();
-      const COINS  = ['BTC', 'ETH', 'SOL'];
+      const COINS  = ['BTC', 'ETH'];
       const safe   = async (q) => { try { return await q; } catch (_) { return { data: null }; } };
 
       // Korea Standard Time helper (UTC+9)

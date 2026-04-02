@@ -308,7 +308,7 @@ runCycleV2._modeLogged = false;
 async function reconcile(trigger = 'scheduled') {
   try {
     const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
-    const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
+    const coins = cfg.coins ?? ['BTC', 'ETH'];
     const result = await reconEngine.runReconciliation(supabase, coins, trigger);
     if (!result.passed) {
       await writeLog('warn', 'reconcile',
@@ -337,7 +337,7 @@ async function reconcile(trigger = 'scheduled') {
  */
 async function startupSequence() {
   const cfg   = await traderV2.getV2Config(supabase).catch(() => ({}));
-  const coins = cfg.coins ?? ['BTC', 'ETH', 'SOL'];
+  const coins = cfg.coins ?? ['BTC', 'ETH'];
 
   console.log(`\n${'═'.repeat(64)}`);
   console.log('  STARTUP SEQUENCE — V2 LIVE ENGINE');
