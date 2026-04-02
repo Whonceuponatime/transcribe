@@ -6,4 +6,4 @@
 
 ALTER TABLE bot_config
   ADD COLUMN IF NOT EXISTS exit_profit_harvest_hours    NUMERIC(5,1) DEFAULT 4.0,
-  ADD COLUMN IF NOT EXISTS exit_profit_harvest_size_pct NUMERIC(5,2) DEFAULT 25.0;
+  ADD COLUMN IF NOT EXISTS exit_profit_harvest_size_pct NUMERIC(5,2) DEFAULT 15.0;

@@ -31,7 +31,7 @@
 +  const harvestHours    = cfg.exit_profit_harvest_hours    ?? 4;
 +  const harvestSizePct  = cfg.exit_profit_harvest_size_pct ?? 25;
 +  const harvestFired    = firedTrims.includes('harvest');
-+  if (!harvestFired && !firedTrims.includes('trim1') && heldHours >= harvestHours) {
++  if (!harvestFired && !firedTrims.includes('trim1') && heldHours >= harvestHours && gainPct < trim1Target) {
 +    exits.push({
 +      asset,
 +      side:    'sell',
@@ -83,6 +83,7 @@ A new **`harvest`** exit fires between the net gate and trim1:
 2. `heldHours >= exit_profit_harvest_hours` (default: **4 hours**)
 3. `fired_trims` does NOT include `harvest` (one-shot guard)
 4. `fired_trims` does NOT include `trim1` (harvest is pre-trim1 only; once trim1 fires, harvest is irrelevant)
+5. `gainPct < trim1Target` — gross gain is still below the trim1 threshold; if trim1 is already reachable, trim1 fires instead (no competition)
 
 **Action:** sell `exit_profit_harvest_size_pct`% of the position (default: **25%**)
 
@@ -113,7 +114,7 @@ Example: `harvest_0.18pct_net_5h`
 |----------|-------------|-------------|
 | grossPnL 0.70%, held 5h | `above_edge_no_exit_condition_met` | harvest fires → 25% sold |
 | grossPnL 0.90%, held 1h | trim1 fires → 25% sold | trim1 fires → 25% sold (unchanged) |
-| grossPnL 0.90%, held 5h | trim1 fires → 25% sold | harvest fires first (25%), trim1 next cycle |
+| grossPnL 0.90%, held 5h | trim1 fires → 25% sold | trim1 fires → 25% sold (harvest skipped: gainPct >= trim1Target) |
 | grossPnL 0.30%, held 5h | below net gate, no exit | below net gate, no exit (unchanged) |
 | grossPnL 0.70%, held 2h | `above_edge_no_exit_condition_met` | `above_edge_no_exit_condition_met` (harvest waits for 4h) |
 
@@ -135,7 +136,7 @@ ALTER TABLE bot_config
 UPDATE bot_config
 SET
   exit_profit_harvest_hours    = 4.0,
-  exit_profit_harvest_size_pct = 25.0
+  exit_profit_harvest_size_pct = 15.0
 WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 ```
 
@@ -158,7 +159,7 @@ WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 | Field | Default | Tunable |
 |-------|---------|---------|
 | `exit_profit_harvest_hours` | 4.0 h | Yes — lower to harvest sooner, raise to be more patient |
-| `exit_profit_harvest_size_pct` | 25.0 % | Yes — lower for smaller realized gains, raise for bigger exits |
+| `exit_profit_harvest_size_pct` | 15.0 % | Yes — lower for smaller realized gains, raise for bigger exits |
 
 The code uses `cfg.exit_profit_harvest_hours ?? 4` and `cfg.exit_profit_harvest_size_pct ?? 25`, so the columns are optional — hardcoded defaults apply if the columns don't exist yet.
 
