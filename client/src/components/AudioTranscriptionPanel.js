@@ -39,42 +39,20 @@ const AudioTranscriptionPanel = () => {
     setTranscription('');
 
     try {
-      // Step 1 – get a signed Supabase upload URL (tiny request, no file payload)
-      setProgress(10);
-      const urlRes = await fetch('/api/audio-upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: selectedFile.name }),
-      });
-      if (!urlRes.ok) {
-        const err = await urlRes.json();
-        throw new Error(err.error || 'Could not get upload URL');
-      }
-      const { storagePath, signedUrl } = await urlRes.json();
-
-      // Step 2 – upload audio directly to Supabase Storage (bypasses Vercel size limits)
-      setProgress(30);
-      const uploadRes = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
-        body: selectedFile,
-      });
-      if (!uploadRes.ok) {
-        throw new Error(`Storage upload failed (HTTP ${uploadRes.status})`);
+      const formData = new FormData();
+      formData.append('audio', selectedFile);
+      if (selectedLanguage !== 'auto') {
+        formData.append('language', selectedLanguage);
       }
 
-      // Step 3 – ask the serverless function to transcribe from Supabase
-      setProgress(60);
+      setProgress(20);
+
       const response = await fetch('/api/transcribe-audio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storagePath,
-          language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
-        }),
+        body:   formData,
       });
 
-      setProgress(90);
+      setProgress(80);
 
       if (!response.ok) {
         const errorData = await response.json();
