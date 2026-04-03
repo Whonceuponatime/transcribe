@@ -767,6 +767,15 @@ CREATE TABLE IF NOT EXISTS bot_config (
   -- Applied to the starter budget when probing an existing tactical position.
   -- NULL = 1.0 (same as a flat-portfolio starter). Set <1 to make smaller.
   starter_addon_size_mult       NUMERIC(5,3) DEFAULT NULL,
+  -- Downtrend reclaim starter (migration 038)
+  -- Cautious probe entry for BTC/ETH only in DOWNTREND; off by default.
+  -- Size: dt_reclaim_size_mult × 30% × max_risk_per_signal_pct (default ~0.09% NAV).
+  -- Add-ons into existing positions are never attempted via this path.
+  dt_reclaim_starter_enabled    BOOLEAN      NOT NULL DEFAULT false,
+  dt_reclaim_bb_max             NUMERIC(5,3) NOT NULL DEFAULT 0.20,
+  dt_reclaim_rsi_min            NUMERIC(5,2) NOT NULL DEFAULT 30.0,
+  dt_reclaim_rsi_max            NUMERIC(5,2) NOT NULL DEFAULT 48.0,
+  dt_reclaim_size_mult          NUMERIC(5,3) NOT NULL DEFAULT 0.15,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
