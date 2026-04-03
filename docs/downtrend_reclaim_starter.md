@@ -40,10 +40,10 @@
 +  const rsiMax = cfg.dt_reclaim_rsi_max ?? 48.0;
 +  if (rsi14 == null || rsi14 < rsiMin || rsi14 > rsiMax) return null;
 +
-+  const maxRiskPct = cfg.max_risk_per_signal_pct ?? 2;
-+  const sizeMult   = cfg.dt_reclaim_size_mult ?? 0.15;
-+  const budgetKrw  = Math.max(0, navKrw * (maxRiskPct / 100) * 0.30 * sizeMult);
-+  if (budgetKrw < 5000) return null;
++  const maxRiskPct   = cfg.max_risk_per_signal_pct ?? 2;
++  const sizeMult     = cfg.dt_reclaim_size_mult ?? 0.15;
++  const rawBudgetKrw = navKrw * (maxRiskPct / 100) * 0.30 * sizeMult;
++  const budgetKrw    = Math.max(5000, rawBudgetKrw); // floor at Upbit minimum
 +
 +  return {
 +    asset,
@@ -164,8 +164,10 @@ Fires when **all** of the following hold:
 | RSI within reclaim band | 30–48 | `dt_reclaim_rsi_min` / `dt_reclaim_rsi_max` |
 | Budget ≥ 5,000 KRW | hardcoded (Upbit min) | — |
 
-**Sizing:** `navKrw × (max_risk_per_signal_pct/100) × 0.30 × dt_reclaim_size_mult`
-- Defaults: `NAV × 2% × 30% × 0.15 = 0.09% NAV` (e.g., ≈9,000 KRW on 10M NAV)
+**Sizing:** `Math.max(5000, navKrw × (max_risk_per_signal_pct/100) × 0.30 × dt_reclaim_size_mult)`
+- The raw formula (`NAV × 2% × 30% × 0.15 = 0.09% NAV`) can fall below Upbit's 5,000 KRW minimum on small accounts. The `Math.max(5000, raw)` floor guarantees the order is always placeable; the downstream free-KRW and risk-engine checks still apply after this floor.
+- Defaults on a small account: 5,000 KRW (floor)
+- Defaults on a large account (e.g. 10M NAV): ≈9,000 KRW (formula wins)
 - Compare: normal range starter = `NAV × 2% × 40% × 0.25 = 0.20% NAV` — 2× larger
 - Compare: downtrend pullback entry = `NAV × 2% × 30% = 0.60% NAV` — 7× larger
 
@@ -212,20 +214,23 @@ ALTER TABLE bot_config
 ### 2. Enable and tune (after observing diagnostics)
 
 ```sql
--- Enable with defaults (conservative: %B < 0.20, RSI 30–48, 0.09% NAV per entry)
+-- Enable with defaults (conservative: %B < 0.20, RSI 30–48, floored at 5000 KRW)
 UPDATE bot_config
 SET dt_reclaim_starter_enabled = true
-WHERE true;
+WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 
 -- Optional tuning examples:
 -- Widen RSI band slightly (RSI 28–50):
-UPDATE bot_config SET dt_reclaim_rsi_min = 28, dt_reclaim_rsi_max = 50 WHERE true;
+UPDATE bot_config SET dt_reclaim_rsi_min = 28, dt_reclaim_rsi_max = 50
+WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 
 -- Tighten %B gate (require deeper in lower band):
-UPDATE bot_config SET dt_reclaim_bb_max = 0.15 WHERE true;
+UPDATE bot_config SET dt_reclaim_bb_max = 0.15
+WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 
--- Make entries even smaller (0.10% NAV):
-UPDATE bot_config SET dt_reclaim_size_mult = 0.10 WHERE true;
+-- Make entries even smaller (0.10× multiplier; 5000 KRW floor still applies):
+UPDATE bot_config SET dt_reclaim_size_mult = 0.10
+WHERE id = 'cd8b5fea-4c43-4642-8b63-d1c3a95dc5ab';
 ```
 
 ### 3. Verify diagnostics after enabling
