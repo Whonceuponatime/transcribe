@@ -49,8 +49,7 @@ const AudioTranscriptionPanel = () => {
 
       setProgress(20);
       
-      const serverUrl = window.location.origin.replace(/:\d+$/, ':3000');
-      const response = await fetch(`${serverUrl}/api/transcribe-audio`, {
+      const response = await fetch(`/api/transcribe-audio`, {
         method: 'POST',
         body: formData
       });

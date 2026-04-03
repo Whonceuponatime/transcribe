@@ -221,7 +221,7 @@ body {
   max-width: var(--content-max-width);
   margin: 0 auto;
   width: 100%;
-  padding: 0.5rem var(--layout-px);
+  padding: 0.75rem var(--layout-px);
   padding-left: max(var(--layout-px), var(--safe-left));
   padding-right: max(var(--layout-px), var(--safe-right));
   display: flex;
@@ -282,7 +282,7 @@ body {
   background: var(--bg-page);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.3rem 0.4rem;
+  padding: 0.5rem 0.6rem;
 }
 
 /* Tool button row inside the panel */
@@ -672,8 +672,8 @@ button:active:not(:disabled) {
 
   /* Desktop: submenu wraps cleanly inside the panel, tighter heights */
   .nav-wrap-inner {
-    padding-top: 0.55rem;
-    padding-bottom: 0.55rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
   }
   .nav-submenu {
     justify-content: center;
