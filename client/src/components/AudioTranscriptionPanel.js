@@ -39,22 +39,42 @@ const AudioTranscriptionPanel = () => {
     setTranscription('');
 
     try {
-      const formData = new FormData();
-      formData.append('audio', selectedFile);
-      
-      // Add language preference if not auto
-      if (selectedLanguage !== 'auto') {
-        formData.append('language', selectedLanguage);
+      // Step 1 – get a signed Supabase upload URL (tiny request, no file payload)
+      setProgress(10);
+      const urlRes = await fetch('/api/audio-upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: selectedFile.name }),
+      });
+      if (!urlRes.ok) {
+        const err = await urlRes.json();
+        throw new Error(err.error || 'Could not get upload URL');
+      }
+      const { storagePath, signedUrl } = await urlRes.json();
+
+      // Step 2 – upload audio directly to Supabase Storage (bypasses Vercel size limits)
+      setProgress(30);
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+        body: selectedFile,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Storage upload failed (HTTP ${uploadRes.status})`);
       }
 
-      setProgress(20);
-      
-      const response = await fetch(`/api/transcribe-audio`, {
+      // Step 3 – ask the serverless function to transcribe from Supabase
+      setProgress(60);
+      const response = await fetch('/api/transcribe-audio', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storagePath,
+          language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
+        }),
       });
 
-      setProgress(80);
+      setProgress(90);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -62,7 +82,7 @@ const AudioTranscriptionPanel = () => {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.transcription) {
         setTranscription(result.transcription);
         setProgress(100);
