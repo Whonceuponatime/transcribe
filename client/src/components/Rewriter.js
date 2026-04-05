@@ -10,6 +10,7 @@ const LANGUAGES = [
 const CHANNELS = [
   { value: 'email', label: 'Email' },
   { value: 'messenger', label: 'Messenger' },
+  { value: 'report', label: 'Report' },
 ];
 
 const FORMALITY = [

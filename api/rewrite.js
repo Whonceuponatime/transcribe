@@ -34,6 +34,7 @@ Style constraints:
 Channel formatting:
 - If Channel = Email: greeting, then short paragraphs in logical order, and a clear closing line.
 - If Channel = Messenger/Announcement: shorter sentences, fewer formalities, but still respectful and clear, with ideas in a sensible order.
+- If Channel = Report: objective, structured prose suitable for a written report or briefing. No personal greeting or sign-off. Use clear section flow (background/context → findings/key points → conclusion or recommended action). Use numbered or bulleted lists only where the draft itself lists distinct items. Maintain a formal, third-person-compatible tone regardless of the Formality setting (Informal still means clear and plain, not casual).
 
 Rewrite strength:
 - Light: fix grammar and small clarity edits; still reorder if the draft is clearly out of flow.
@@ -55,6 +56,7 @@ Style constraints:
 Channel formatting:
 - Email: "안녕하십니까/안녕하세요" + 논리적 순서의 본문 단락 + "감사합니다" 마무리.
 - Messenger/Announcement: 문장을 더 짧게, 핵심 위주로 순서 정리하되 공손함 유지.
+- Report: 보고서·브리핑 형식. 개인적 인사말·마무리 불필요. 배경/맥락 → 핵심 내용/결과 → 결론 또는 조치 사항 순으로 구조화. 초안에 목록형 항목이 있을 경우에만 번호/기호 목록 사용. 격식(Formality) 설정에 관계없이 객관적이고 명확한 문어체 유지.
 
 Rewrite strength:
 - Light: 맞춤법/문장 다듬기 + 흐름이 어긋나 있으면 순서만 정리
@@ -105,7 +107,7 @@ module.exports = async function handler(req, res) {
     }
 
     const langLabel = language === 'ko' ? 'Korean' : 'English';
-    const channelLabel = channel === 'messenger' ? 'Messenger/Announcement' : 'Email';
+    const channelLabel = channel === 'messenger' ? 'Messenger/Announcement' : channel === 'report' ? 'Report' : 'Email';
     const inputHeader = `Mode: ${langLabel}, Channel: ${channelLabel}, Formality: ${formality}, Strength: ${strength}\n\nDraft:\n`;
     const userInput = inputHeader + draftTrimmed;
 
