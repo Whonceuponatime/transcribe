@@ -707,6 +707,9 @@ CREATE TABLE IF NOT EXISTS bot_config (
   -- Reclaim starter early partial exit (migration 039); sub-hour hold, smaller than trim1
   exit_reclaim_harvest_hours    NUMERIC(5,2)         DEFAULT 0.75,
   exit_reclaim_harvest_size_pct NUMERIC(5,2)         DEFAULT 12.0,
+  -- Tactical profit floor (migration 040); non-reclaim tactical, before generic harvest
+  exit_tactical_profit_floor_hours    NUMERIC(5,2)   DEFAULT 2.5,
+  exit_tactical_profit_floor_size_pct NUMERIC(5,2)   DEFAULT 12.0,
   addon_min_dip_pct            NUMERIC(6,3)          DEFAULT 1.0,
   addon_size_mult              NUMERIC(5,3)          DEFAULT 0.5,
   buy_cooldown_ms              INTEGER               DEFAULT 1800000,
