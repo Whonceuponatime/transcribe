@@ -293,6 +293,11 @@ module.exports = async function handler(req, res) {
           starter_cooldown_ms_effective:     bc.starter_cooldown_ms_effective     ?? null,
           existing_position_strategy_tag:    bc.existing_position_strategy_tag    ?? null,
           route_to_existing_position:        bc.route_to_existing_position        ?? null,
+          // Tactical profit-floor (lib/cryptoTraderV2 sell_checks) — explicit for exports/dashboard
+          tactical_profit_floor_considered: sc.tactical_profit_floor_considered ?? null,
+          tactical_profit_floor_blocker:    sc.tactical_profit_floor_blocker    ?? null,
+          tactical_profit_floor_would_fire: sc.tactical_profit_floor_would_fire ?? null,
+          tactical_profit_floor_fired:      sc.tactical_profit_floor_fired      ?? null,
         };
       });
       return res.status(200).json({ diagnostics });
@@ -1172,6 +1177,7 @@ module.exports = async function handler(req, res) {
             krw: ord.krw_requested, error: ord.error_message ?? null,
           })) : null;
 
+          const sc = cx.sell_checks ?? {};
           return {
             timestamp:         ev.created_at,
             symbol:            sym,
@@ -1184,6 +1190,12 @@ module.exports = async function handler(req, res) {
             cooldown_remaining: cx.cooldown_remaining ?? null,
             buy_checks:        cx.buy_checks  ?? null,
             sell_checks:       cx.sell_checks ?? null,
+            sell_blocker:      sc.final_sell_blocker ?? null,
+            buy_blocker:       (cx.buy_checks && !cx.buy_checks.final_buy_eligible) ? (cx.final_reason ?? null) : null,
+            tactical_profit_floor_considered: sc.tactical_profit_floor_considered ?? null,
+            tactical_profit_floor_blocker:    sc.tactical_profit_floor_blocker    ?? null,
+            tactical_profit_floor_would_fire: sc.tactical_profit_floor_would_fire ?? null,
+            tactical_profit_floor_fired:      sc.tactical_profit_floor_fired      ?? null,
             final_action:      cx.final_action,
             final_reason:      cx.final_reason,
             order_attempt:     orderAttempt,
@@ -1214,7 +1226,17 @@ module.exports = async function handler(req, res) {
               exits_triggered:     cx.exits_triggered ?? [],
               final_sell_eligible: cx.eligible ?? false,
               final_sell_blocker:  cx.blocker_summary ?? null,
+              tactical_profit_floor_considered: cx.tactical_profit_floor_considered ?? null,
+              tactical_profit_floor_blocker:    cx.tactical_profit_floor_blocker    ?? null,
+              tactical_profit_floor_would_fire: cx.tactical_profit_floor_would_fire ?? null,
+              tactical_profit_floor_in_exits:   cx.tactical_profit_floor_in_exits   ?? null,
+              tactical_profit_floor_fired:      cx.tactical_profit_floor_fired      ?? null,
             },
+            sell_blocker: cx.blocker_summary ?? null,
+            tactical_profit_floor_considered: cx.tactical_profit_floor_considered ?? null,
+            tactical_profit_floor_blocker:    cx.tactical_profit_floor_blocker    ?? null,
+            tactical_profit_floor_would_fire: cx.tactical_profit_floor_would_fire ?? null,
+            tactical_profit_floor_fired:      cx.tactical_profit_floor_fired      ?? null,
             final_action:  cx.eligible ? 'SELL_TRIGGERED' : 'NO_ACTION',
             final_reason:  cx.blocker_summary ?? ev.message,
             order_attempt: null,
