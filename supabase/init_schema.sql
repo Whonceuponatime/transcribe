@@ -885,6 +885,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_fills_upbit_trade_uuid
 -- Idempotency: prevent duplicate synthetic fills (one per order when no trade UUID)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_fills_synthetic_order
   ON v2_fills(order_id) WHERE upbit_trade_uuid IS NULL;
+-- Non-partial unique index required so PostgREST ON CONFLICT (upbit_trade_uuid)
+-- can resolve a conflict target (PostgreSQL cannot use a partial index for bare
+-- ON CONFLICT (column) without also specifying the predicate). NULLs are distinct
+-- in PostgreSQL unique indexes, so synthetic fills are not affected.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_fills_upbit_trade_uuid_full
+  ON v2_fills(upbit_trade_uuid);
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots_v2 (
   id              BIGSERIAL PRIMARY KEY,
