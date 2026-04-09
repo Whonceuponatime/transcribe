@@ -298,6 +298,30 @@ export default function CryptoTraderDashboard() {
     setExporting(false);
   }, []);
 
+  /** Canonical structured export (bot DB source-of-truth). Falls back to crypto-trader action if /api/diagnostics/export is unavailable. */
+  const [exportingStructured, setExportingStructured] = useState(false);
+  const downloadStructuredDiagnostic = useCallback(async (hours = 24) => {
+    setExportingStructured(true); setError(null);
+    try {
+      let res = await fetch(`${API}/api/diagnostics/export?hours=${hours}`);
+      if (res.status === 404) {
+        res = await fetch(`${API}/api/crypto-trader?action=structured-export&hours=${hours}`);
+      }
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `diagnostics-${hours}h.json`; a.click();
+      URL.revokeObjectURL(url);
+      setMsg(`Diagnostics JSON (${hours}h) downloaded — diagnostics-${hours}h.json`);
+    } catch (e) { setError(e.message); }
+    setExportingStructured(false);
+  }, []);
+
   const [exportingDiag, setExportingDiag] = useState(false);
   const exportDiagnostic = useCallback(async (hours = 24) => {
     setExportingDiag(true); setError(null);
@@ -628,32 +652,46 @@ export default function CryptoTraderDashboard() {
       <div className="ct__section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
           <h3 className="ct__section-title" style={{ margin: 0 }}>Pi Trader</h3>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
               onClick={deployPi} disabled={deploying || !piOnline}
               title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
               {deploying ? 'Deploying…' : '↓ Pull & Restart'}
             </button>
-            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
-              onClick={exportLogs} disabled={exporting}
-              title="Download last 7 days of bot logs as JSON for AI analysis">
-              {exporting ? 'Exporting…' : '⬇ Export Logs'}
+            <button className="ct__btn ct__btn--primary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
+              onClick={() => downloadStructuredDiagnostic(24)} disabled={exportingStructured}
+              title="Canonical structured export (bot_config, positions, decisions, fills, blockers) — diagnostics-24h.json">
+              {exportingStructured ? 'Downloading…' : '⬇ Download diagnostic JSON (24h)'}
             </button>
-            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(234,179,8,0.12)', color: '#facc15' }}
-              onClick={() => exportDiagnostic(24)} disabled={exportingDiag}
-              title="Download 24h missed-trade decision audit (BTC/ETH/SOL)">
-              {exportingDiag ? 'Exporting…' : '🔍 Diagnostic (24h)'}
-            </button>
-            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(34,197,94,0.1)', color: '#4ade80' }}
-              onClick={() => exportTradeVerification(24)} disabled={exportingVerification}
-              title="Download 24h trade verification report — matches each Upbit fill to its decision trail">
-              {exportingVerification ? 'Exporting…' : '✓ Verify Trades (24h)'}
-            </button>
-            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(251,146,60,0.12)', color: '#fb923c' }}
-              onClick={() => exportTuning(24)} disabled={exportingTuning}
-              title="Download 24h strategy tuning validation — near-misses, blockers, trim activity, realized P&L">
-              {exportingTuning ? 'Exporting…' : '📊 Tuning Audit (24h)'}
-            </button>
+            <details style={{ fontSize: '0.72rem' }}>
+              <summary style={{ cursor: 'pointer', color: '#94a3b8', userSelect: 'none' }}>Advanced / legacy tools</summary>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
+                <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+                  type="button"
+                  onClick={exportLogs} disabled={exporting}
+                  title="Download last 7 days of bot logs as JSON for AI analysis">
+                  {exporting ? 'Exporting…' : '⬇ Export Logs'}
+                </button>
+                <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(234,179,8,0.12)', color: '#facc15' }}
+                  type="button"
+                  onClick={() => exportDiagnostic(24)} disabled={exportingDiag}
+                  title="Legacy 24h missed-trade decision audit (BTC/ETH)">
+                  {exportingDiag ? 'Exporting…' : '🔍 Diagnostic (24h)'}
+                </button>
+                <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(34,197,94,0.1)', color: '#4ade80' }}
+                  type="button"
+                  onClick={() => exportTradeVerification(24)} disabled={exportingVerification}
+                  title="Trade verification report — matches Upbit fills to decision trail">
+                  {exportingVerification ? 'Exporting…' : '✓ Verify Trades (24h)'}
+                </button>
+                <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(251,146,60,0.12)', color: '#fb923c' }}
+                  type="button"
+                  onClick={() => exportTuning(24)} disabled={exportingTuning}
+                  title="Strategy tuning validation export">
+                  {exportingTuning ? 'Exporting…' : '📊 Tuning Audit (24h)'}
+                </button>
+              </div>
+            </details>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
