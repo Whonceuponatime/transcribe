@@ -279,7 +279,7 @@ async function runCycleV2(opts = {}, label = 'v2_auto') {
 
     // Log mode prominently on first run
     if (!runCycleV2._modeLogged) {
-      const mode = result.mode ?? 'paper';
+      const mode = result.mode ?? result.execution_mode ?? 'unknown';
       console.log(`\n${'═'.repeat(60)}`);
       console.log(`  V2 ENGINE MODE: ${mode.toUpperCase()}`);
       if (mode === 'paper')  console.log('  Paper mode — decisions logged, NO orders sent to exchange');
