@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const reconEngine = require('../lib/reconciliationEngine');
+const { buildStructuredDiagnosticsExport } = require('../lib/diagnosticStructuredExport');
 // V1 (cryptoTrader.js) import removed. V2 is the only engine.
 
 function getSupabase() {
@@ -2192,7 +2193,16 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(tuningExport);
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    // ── GET structured export — canonical DB rows only (no PM2 text logs) ───────
+    // Same payload as GET /api/diagnostics/export — download diagnostics-{hours}h.json
+    if (action === 'structured-export' && req.method === 'GET') {
+      const hours = Math.min(Number(req.query.hours) || 24, 168);
+      const payload = await buildStructuredDiagnosticsExport(supabase, { hours });
+      res.setHeader('Content-Disposition', `attachment; filename="diagnostics-${hours}h.json"`);
+      return res.status(200).json(payload);
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|structured-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

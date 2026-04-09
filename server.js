@@ -2227,6 +2227,26 @@ app.all('/api/analyzer', (req, res) => analyzerHandler(req, res));
 const cryptoTraderHandler = require('./api/crypto-trader');
 app.all('/api/crypto-trader', (req, res) => cryptoTraderHandler(req, res));
 
+// ─── Unified structured diagnostics (canonical DB export; same as ?action=structured-export)
+const { buildStructuredDiagnosticsExport } = require('./lib/diagnosticStructuredExport');
+app.get('/api/diagnostics/export', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return res.status(503).json({ error: 'Supabase not configured' });
+  try {
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(url, key);
+    const hours = Math.min(Number(req.query.hours) || 24, 168);
+    const payload = await buildStructuredDiagnosticsExport(supabase, { hours });
+    res.setHeader('Content-Disposition', `attachment; filename="diagnostics-${hours}h.json"`);
+    return res.status(200).json(payload);
+  } catch (err) {
+    console.error('diagnostics/export', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Live Trading (KRW→USD) ─────────────────────────────────────────────
 const liveTrading = require('./lib/liveTrading');
 
