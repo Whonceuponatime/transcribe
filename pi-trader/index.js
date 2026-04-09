@@ -28,6 +28,7 @@ const traderV2    = require('../lib/cryptoTraderV2');
 const riskEngine  = require('../lib/riskEngine');
 const adopter     = require('../lib/portfolioAdopter');
 const reconEngine = require('../lib/reconciliationEngine');
+const { buildTraderRuntimeSnapshot } = require('../lib/traderRuntimeSnapshot');
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'UPBIT_ACCESS_KEY', 'UPBIT_SECRET_KEY'];
 for (const key of required) {
@@ -35,6 +36,23 @@ for (const key of required) {
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function persistTraderRuntimeMetadata() {
+  try {
+    const value = buildTraderRuntimeSnapshot();
+    await supabase.from('app_settings').upsert({
+      key: 'trader_runtime_metadata',
+      value,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' });
+    console.log('[pi-trader] trader_runtime_metadata written');
+  } catch (err) {
+    console.warn('[pi-trader] trader_runtime_metadata failed:', err.message);
+  }
+}
+void persistTraderRuntimeMetadata();
+setInterval(persistTraderRuntimeMetadata, 15 * 60 * 1000);
+
 let runningV2    = false;
 let adoptionDone = false; // set true after startup adoption completes
 let lastCycleCompletedAt = null; // written after every successful cycle for dashboard freshness
