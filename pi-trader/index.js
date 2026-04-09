@@ -73,10 +73,12 @@ async function hourlyDigest() {
     const trades = hourlyTrades.splice(0); // drain accumulator
 
     // Current portfolio snapshot for P&L reference
-    const { data: snapRow } = await Promise.resolve(
-      supabase.from('app_settings').select('value')
-        .eq('key', 'crypto_portfolio_snapshot').single()
-    ).catch(() => ({ data: null }));
+    let snapRow = null;
+    try {
+      const { data } = await supabase.from('app_settings').select('value')
+        .eq('key', 'crypto_portfolio_snapshot').single();
+      snapRow = data;
+    } catch (_) {}
     const snap = snapRow?.value ?? null;
 
     const totalKrw   = snap?.totalValueKrw ?? null;
@@ -94,10 +96,13 @@ async function hourlyDigest() {
 
     // Fetch recent sell_diag for near-miss info
     const since1h = new Date(Date.now() - 3600000).toISOString();
-    const { data: diagLogs } = await supabase.from('crypto_bot_logs')
-      .select('meta').eq('tag', 'sell_diag').gte('created_at', since1h)
-      .order('created_at', { ascending: false }).limit(3)
-      .catch(() => ({ data: [] }));
+    let diagLogs = [];
+    try {
+      const { data: _diagData } = await supabase.from('crypto_bot_logs')
+        .select('meta').eq('tag', 'sell_diag').gte('created_at', since1h)
+        .order('created_at', { ascending: false }).limit(3);
+      diagLogs = _diagData ?? [];
+    } catch (_) {}
 
     const nearMisses = [];
     for (const log of (diagLogs || [])) {
