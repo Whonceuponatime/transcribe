@@ -55,6 +55,11 @@ setInterval(persistTraderRuntimeMetadata, 15 * 60 * 1000);
 
 let runningV2    = false;
 let adoptionDone = false; // set true after startup adoption completes
+// Startup buy gate: remains false until reconciliation has run (pass or freeze).
+// Prevents the 1-min cron from firing buys while adoption has completed but
+// reconciliation is still in progress — the window where duplicate position rows
+// can be created on top of existing core positions.
+let startupReconciliationComplete = false;
 let lastCycleCompletedAt = null; // written after every successful cycle for dashboard freshness
 
 // Hourly digest accumulator (V2 fills, not V1 trades)
@@ -291,9 +296,14 @@ async function runCycleV2(opts = {}, label = 'v2_auto') {
   // The freeze check in executeCycleV2 itself will skip the cycle if frozen.
   // This in-process check is a fast path to avoid even loading config.
 
+  const skipBuys = !startupReconciliationComplete;
+  if (skipBuys) {
+    console.log(`[buy][${label}] skipped — startup reconciliation not yet complete`);
+  }
+
   runningV2 = true;
   try {
-    const result = await traderV2.executeCycleV2(supabase, opts);
+    const result = await traderV2.executeCycleV2(supabase, { ...opts, skipBuys });
 
     // Log mode prominently on first run
     if (!runCycleV2._modeLogged) {
@@ -489,6 +499,12 @@ async function startupSequence() {
     await reconEngine.setFreeze(supabase, [`reconciliation_error: ${err.message}`]);
     await writeLog('error', 'reconcile', `Reconciliation failed: ${err.message}`);
   }
+
+  // Lift the buy gate regardless of pass/freeze — what matters is that reconciliation
+  // has now run and the system is in a known state. The freeze gate in executeCycleV2
+  // handles the frozen case; this flag only prevents the race on startup.
+  startupReconciliationComplete = true;
+  console.log('[startup] Buy gate lifted — startup reconciliation complete');
 
   // Build concise per-check summary for crypto_bot_logs
   const cr = reconResult.checkResults ?? {};
