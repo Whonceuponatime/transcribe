@@ -722,7 +722,7 @@ CREATE TABLE IF NOT EXISTS bot_config (
   max_sol_pct              NUMERIC(5,2) NOT NULL DEFAULT 10,
   max_risk_per_signal_pct  NUMERIC(5,2) NOT NULL DEFAULT 2,
   max_entries_per_coin_24h INTEGER      NOT NULL DEFAULT 3,
-  daily_turnover_cap_pct   NUMERIC(5,2) NOT NULL DEFAULT 35,
+  daily_turnover_cap_pct   NUMERIC(5,2) NOT NULL DEFAULT 150,
   loss_streak_limit        INTEGER      NOT NULL DEFAULT 5,
   drawdown_7d_threshold    NUMERIC(5,2) NOT NULL DEFAULT -4,
   stop_loss_pct            NUMERIC(5,2) NOT NULL DEFAULT 0,
