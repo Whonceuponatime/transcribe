@@ -506,6 +506,39 @@ async function startupSequence() {
   startupReconciliationComplete = true;
   console.log('[startup] Buy gate lifted — startup reconciliation complete');
 
+  // ── Restore persisted re-entry cooldowns ──────────────────────────────────
+  // On PM2 restart, _coreExitCooldownUntil is empty. Query the most recent
+  // REENTRY_COOLDOWN_SET events per asset and restore any that haven't expired.
+  try {
+    const { data: cooldownEvents } = await supabase
+      .from('bot_events')
+      .select('context_json')
+      .eq('event_type', 'REENTRY_COOLDOWN_SET')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (cooldownEvents && cooldownEvents.length > 0) {
+      const seen = new Set();
+      for (const evt of cooldownEvents) {
+        const ctx = evt.context_json;
+        if (!ctx?.symbol || seen.has(ctx.symbol)) continue;
+        seen.add(ctx.symbol);
+        const untilMs = ctx.cooldown_until_ms;
+        if (untilMs && untilMs > Date.now()) {
+          traderV2.restoreCooldown(ctx.symbol, untilMs);
+          const remainMs = untilMs - Date.now();
+          const remainH  = Math.floor(remainMs / 3_600_000);
+          const remainM  = Math.ceil((remainMs % 3_600_000) / 60_000);
+          console.log(`[startup] REENTRY_COOLDOWN_RESTORED: ${ctx.symbol} — ${remainH}h ${remainM}min remaining`);
+        } else {
+          console.log(`[startup] REENTRY_COOLDOWN_EXPIRED: ${ctx.symbol} — already passed, skipping`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[startup] Cooldown restore failed (non-fatal):', err.message);
+  }
+
   // Build concise per-check summary for crypto_bot_logs
   const cr = reconResult.checkResults ?? {};
   const checkSummary = [
