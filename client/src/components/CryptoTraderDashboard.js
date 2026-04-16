@@ -400,7 +400,26 @@ export default function CryptoTraderDashboard() {
   const termScrollRef = useRef(null);
   const termInputRef = useRef(null);
 
-  const termUnlock = useCallback((pin) => {
+  const [termPinError, setTermPinError] = useState('');
+  const termUnlock = useCallback(async (pin) => {
+    setTermPinError('');
+    try {
+      const r = await fetch(`${API}/api/crypto-trader?action=terminal-exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, cmd: 'echo ok' }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        setTermPinError(j.error || 'Invalid PIN');
+        setTermPinInput('');
+        return;
+      }
+    } catch (e) {
+      setTermPinError(e.message);
+      setTermPinInput('');
+      return;
+    }
     sessionStorage.setItem('piTermPin', pin);
     setTermPin(pin);
     setTermUnlocked(true);
@@ -782,6 +801,7 @@ export default function CryptoTraderDashboard() {
                       color: '#e2e8f0', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center' }} />
                   <button type="submit" className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}>Unlock</button>
                 </form>
+                {termPinError && <div style={{ color: '#f87171', marginTop: '0.4rem', fontSize: '0.75rem' }}>{termPinError}</div>}
               </div>
             ) : (
               <>
