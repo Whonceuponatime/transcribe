@@ -280,6 +280,52 @@ async function pollDeploy() {
   }
 }
 
+// ─── Remote terminal — execute shell commands from the dashboard ──────────────
+const MAX_TERMINAL_OUTPUT = 10000; // chars — truncate to avoid Supabase jsonb overflow
+
+async function pollTerminal() {
+  try {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'terminal_command').single();
+    if (!data?.value?.pending) return;
+
+    const { cmd, id } = data.value;
+    await supabase.from('app_settings').upsert({
+      key: 'terminal_command',
+      value: { ...data.value, pending: false, startedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' });
+
+    console.log(`[terminal] Executing: ${cmd}`);
+    const { execSync } = require('child_process');
+    let output = '';
+    let exitCode = 0;
+    try {
+      output = execSync(cmd, {
+        cwd: '/home/t3r3n0/transcribe',
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (execErr) {
+      output = (execErr.stdout || '') + (execErr.stderr || '') + (execErr.message || '');
+      exitCode = execErr.status ?? 1;
+    }
+
+    if (output.length > MAX_TERMINAL_OUTPUT) {
+      output = output.slice(0, MAX_TERMINAL_OUTPUT) + '\n… (truncated)';
+    }
+
+    await supabase.from('app_settings').upsert({
+      key: 'terminal_result',
+      value: { cmd, output: output.trim(), exit_code: exitCode, id, completedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' });
+    console.log(`[terminal] Done (exit ${exitCode}): ${cmd}`);
+  } catch (err) {
+    console.error('[terminal] Poll error:', err.message);
+  }
+}
+
 async function pollReconcileTrigger() {
   try {
     const { data } = await supabase.from('app_settings').select('value').eq('key', 'reconcile_trigger').single();
@@ -631,6 +677,7 @@ refreshFearGreed(); // initial fetch on startup
 setInterval(pollTrigger,          10_000);
 setInterval(pollDeploy,           10_000);
 setInterval(pollReconcileTrigger, 10_000);
+setInterval(pollTerminal,          2_000); // faster polling for terminal responsiveness
 
 // Heartbeat every 1 min for dashboard freshness
 setInterval(heartbeat, 60_000);

@@ -375,34 +375,86 @@ export default function CryptoTraderDashboard() {
   }, []);
 
   const [deploying, setDeploying] = useState(false);
-  const [deployResult, setDeployResult] = useState(null);
-  const pollDeployStatus = useCallback(async (retries = 8, delayMs = 3000) => {
-    for (let i = 0; i < retries; i++) {
-      await new Promise((r) => setTimeout(r, delayMs));
-      try {
-        const res = await fetch(`${API}/api/crypto-trader?action=deploy-status`);
-        const j = await res.json();
-        if (j.ok && j.result) {
-          const age = Date.now() - new Date(j.result.completedAt).getTime();
-          if (age < 120_000) { setDeployResult(j.result); return; }
-        }
-      } catch (_) {}
-    }
-  }, []);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
-    setDeploying(true); setError(null); setMsg(null); setDeployResult(null);
+    setDeploying(true); setError(null); setMsg(null);
     try {
       const res = await fetch(`${API}/api/crypto-trader?action=deploy`, { method: 'POST' });
       const j = await res.json();
       if (j.ok) {
-        setMsg('Deploy triggered — waiting for result…');
-        pollDeployStatus();
+        setMsg('Deploy triggered — Pi is pulling code and restarting.');
         setTimeout(fetchStatus, 20000);
       } else { setError(j.error); }
     } catch (e) { setError(e.message); }
     setDeploying(false);
-  }, [fetchStatus, pollDeployStatus]);
+  }, [fetchStatus]);
+
+  // ── Pi Remote Terminal ──────────────────────────────────────────────────
+  const [termOpen, setTermOpen] = useState(false);
+  const [termPin, setTermPin] = useState(() => sessionStorage.getItem('piTermPin') || '');
+  const [termUnlocked, setTermUnlocked] = useState(() => !!sessionStorage.getItem('piTermPin'));
+  const [termPinInput, setTermPinInput] = useState('');
+  const [termCmd, setTermCmd] = useState('');
+  const [termHistory, setTermHistory] = useState([]);
+  const [termBusy, setTermBusy] = useState(false);
+  const termScrollRef = useRef(null);
+  const termInputRef = useRef(null);
+
+  const termUnlock = useCallback((pin) => {
+    sessionStorage.setItem('piTermPin', pin);
+    setTermPin(pin);
+    setTermUnlocked(true);
+    setTermPinInput('');
+  }, []);
+
+  const termExec = useCallback(async (cmd) => {
+    if (!cmd.trim() || termBusy) return;
+    const command = cmd.trim();
+    setTermHistory((h) => [...h, { type: 'cmd', text: command }]);
+    setTermCmd('');
+    setTermBusy(true);
+    try {
+      const execRes = await fetch(`${API}/api/crypto-trader?action=terminal-exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: termPin, cmd: command }),
+      });
+      const execJ = await execRes.json();
+      if (!execJ.ok) {
+        setTermHistory((h) => [...h, { type: 'err', text: execJ.error || 'Request failed' }]);
+        setTermBusy(false);
+        return;
+      }
+      const cmdId = execJ.id;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          const pollRes = await fetch(`${API}/api/crypto-trader?action=terminal-result`);
+          const pollJ = await pollRes.json();
+          if (pollJ.ok && pollJ.result && pollJ.result.id === cmdId) {
+            const r = pollJ.result;
+            setTermHistory((h) => [...h, {
+              type: r.exit_code === 0 ? 'out' : 'err',
+              text: r.output || '(no output)',
+              exitCode: r.exit_code,
+            }]);
+            setTermBusy(false);
+            return;
+          }
+        } catch (_) {}
+      }
+      setTermHistory((h) => [...h, { type: 'err', text: 'Timed out waiting for response from Pi' }]);
+    } catch (e) {
+      setTermHistory((h) => [...h, { type: 'err', text: e.message }]);
+    }
+    setTermBusy(false);
+  }, [termPin, termBusy]);
+
+  useEffect(() => {
+    if (termScrollRef.current) {
+      termScrollRef.current.scrollTop = termScrollRef.current.scrollHeight;
+    }
+  }, [termHistory, termBusy]);
 
   const killSwitch     = status?.killSwitch ?? false;
   const positions      = status?.positions ?? [];
@@ -673,24 +725,13 @@ export default function CryptoTraderDashboard() {
               title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
               {deploying ? 'Deploying…' : '↓ Pull & Restart'}
             </button>
-            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(99,102,241,0.12)', color: '#a5b4fc' }}
-              onClick={async () => {
-                try {
-                  const r = await fetch(`${API}/api/crypto-trader?action=deploy-status`);
-                  const j = await r.json();
-                  if (j.ok && j.result) setDeployResult(j.result);
-                  else setError('No deploy result found');
-                } catch (e) { setError(e.message); }
-              }}
-              title="Fetch last deploy result: git log + pm2 logs">
-              View Deploy Log
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem',
+              background: termOpen ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.12)',
+              color: termOpen ? '#34d399' : '#a5b4fc' }}
+              onClick={() => { setTermOpen((o) => !o); }}
+              title="Open remote terminal to run commands on the Pi">
+              {termOpen ? '✕ Close Terminal' : '>_ Terminal'}
             </button>
-            {deployResult && (
-              <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(16,185,129,0.12)', color: '#34d399' }}
-                onClick={() => setDeployResult(null)} title="Dismiss deploy result">
-                {deployResult.status === 'success' ? 'Deploy OK' : 'Deploy FAILED'} — dismiss
-              </button>
-            )}
             <button className="ct__btn ct__btn--primary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
               onClick={() => downloadStructuredDiagnostic(24)} disabled={exportingStructured}
               title="Canonical structured export (bot_config, positions, decisions, fills, blockers) — diagnostics-24h.json">
@@ -727,34 +768,72 @@ export default function CryptoTraderDashboard() {
             </details>
           </div>
         </div>
-        {deployResult && (
-          <div style={{ background: deployResult.status === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${deployResult.status === 'success' ? '#065f46' : '#7f1d1d'}`,
-            borderRadius: '6px', padding: '0.6rem 0.8rem', marginBottom: '0.6rem', fontSize: '0.75rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.3rem', color: deployResult.status === 'success' ? '#34d399' : '#f87171' }}>
-              Deploy {deployResult.status === 'success' ? 'Succeeded' : 'Failed'}
-              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '0.6rem' }}>{deployResult.completedAt ? new Date(deployResult.completedAt).toLocaleString() : ''}</span>
-            </div>
-            {deployResult.error && <div style={{ color: '#f87171', marginBottom: '0.3rem' }}>Error: {deployResult.error}</div>}
-            {deployResult.pull_output && (
-              <div style={{ marginBottom: '0.3rem' }}>
-                <span style={{ color: '#94a3b8' }}>git pull: </span>
-                <span style={{ color: '#e2e8f0' }}>{deployResult.pull_output}</span>
+        {termOpen && (
+          <div style={{ background: '#0a0e17', border: '1px solid #1e293b', borderRadius: '8px',
+            marginBottom: '0.6rem', overflow: 'hidden', fontSize: '0.75rem' }}>
+            {!termUnlocked ? (
+              <div style={{ padding: '1rem', textAlign: 'center' }}>
+                <div style={{ color: '#94a3b8', marginBottom: '0.5rem' }}>Enter PIN to unlock terminal</div>
+                <form onSubmit={(e) => { e.preventDefault(); termUnlock(termPinInput); }}
+                  style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                  <input type="password" value={termPinInput} onChange={(e) => setTermPinInput(e.target.value)}
+                    placeholder="PIN" autoFocus
+                    style={{ width: '120px', padding: '0.35rem 0.6rem', background: '#111827', border: '1px solid #374151',
+                      color: '#e2e8f0', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center' }} />
+                  <button type="submit" className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}>Unlock</button>
+                </form>
               </div>
-            )}
-            {deployResult.git_log && (
-              <div style={{ marginBottom: '0.4rem' }}>
-                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>git log --oneline -5:</div>
-                <pre style={{ margin: 0, padding: '0.4rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '4px',
-                  color: '#e2e8f0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{deployResult.git_log}</pre>
-              </div>
-            )}
-            {deployResult.pm2_logs && (
-              <div>
-                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>pm2 logs crypto-trader --lines 20:</div>
-                <pre style={{ margin: 0, padding: '0.4rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '4px',
-                  color: '#e2e8f0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: '220px', overflowY: 'auto' }}>{deployResult.pm2_logs}</pre>
-              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '0.35rem', padding: '0.4rem 0.6rem', borderBottom: '1px solid #1e293b',
+                  flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.68rem', marginRight: '0.3rem' }}>Quick:</span>
+                  {[
+                    ['git log', 'git log --oneline -5'],
+                    ['pm2 logs', 'pm2 logs crypto-trader --nostream --lines 20'],
+                    ['pm2 status', 'pm2 status'],
+                    ['disk', 'df -h /'],
+                    ['uptime', 'uptime'],
+                  ].map(([label, cmd]) => (
+                    <button key={label} className="ct__btn" disabled={termBusy}
+                      style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem', background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}
+                      onClick={() => termExec(cmd)}>{label}</button>
+                  ))}
+                  <button className="ct__btn" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem',
+                    background: 'rgba(239,68,68,0.1)', color: '#f87171', marginLeft: 'auto' }}
+                    onClick={() => setTermHistory([])}>Clear</button>
+                </div>
+                <div ref={termScrollRef} style={{ height: '300px', overflowY: 'auto', padding: '0.5rem 0.7rem',
+                  fontFamily: '"Fira Code", "Cascadia Code", "Consolas", monospace', fontSize: '0.72rem', lineHeight: 1.6 }}>
+                  {termHistory.length === 0 && !termBusy && (
+                    <div style={{ color: '#475569' }}>Pi remote terminal ready. Type a command or use a quick button above.</div>
+                  )}
+                  {termHistory.map((entry, i) => (
+                    <div key={i}>
+                      {entry.type === 'cmd' && (
+                        <div style={{ color: '#34d399' }}><span style={{ color: '#64748b' }}>$ </span>{entry.text}</div>
+                      )}
+                      {entry.type === 'out' && (
+                        <pre style={{ margin: 0, color: '#e2e8f0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{entry.text}</pre>
+                      )}
+                      {entry.type === 'err' && (
+                        <pre style={{ margin: 0, color: '#f87171', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{entry.text}
+                          {entry.exitCode != null && entry.exitCode !== 0 && <span style={{ color: '#64748b' }}>{` (exit ${entry.exitCode})`}</span>}
+                        </pre>
+                      )}
+                    </div>
+                  ))}
+                  {termBusy && <div style={{ color: '#f59e0b' }}>Running…</div>}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); termExec(termCmd); }}
+                  style={{ display: 'flex', borderTop: '1px solid #1e293b' }}>
+                  <span style={{ padding: '0.45rem 0 0.45rem 0.7rem', color: '#34d399', fontFamily: 'monospace', fontSize: '0.78rem' }}>$</span>
+                  <input ref={termInputRef} type="text" value={termCmd} onChange={(e) => setTermCmd(e.target.value)}
+                    disabled={termBusy} placeholder={termBusy ? 'waiting…' : 'type command…'} autoFocus
+                    style={{ flex: 1, padding: '0.45rem 0.5rem', background: 'transparent', border: 'none', outline: 'none',
+                      color: '#e2e8f0', fontFamily: '"Fira Code", "Cascadia Code", "Consolas", monospace', fontSize: '0.78rem' }} />
+                </form>
+              </>
             )}
           </div>
         )}

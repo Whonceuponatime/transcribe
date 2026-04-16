@@ -226,6 +226,30 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, result: { ...data.value, updated_at: data.updated_at } });
     }
 
+    // ── POST terminal-exec — queue a shell command for the Pi to execute ──
+    if (action === 'terminal-exec' && req.method === 'POST') {
+      const pin = process.env.PI_TERMINAL_PIN;
+      if (!pin) return res.status(503).json({ ok: false, error: 'PI_TERMINAL_PIN not configured on server' });
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      if (!body.pin || body.pin !== pin) return res.status(403).json({ ok: false, error: 'Invalid PIN' });
+      const cmd = (body.cmd || '').trim();
+      if (!cmd) return res.status(400).json({ ok: false, error: 'Empty command' });
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      await supabase.from('app_settings').upsert({
+        key: 'terminal_command',
+        value: { pending: true, cmd, id, requestedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      return res.status(200).json({ ok: true, id });
+    }
+
+    // ── GET terminal-result — read the last command output from the Pi ─────
+    if (action === 'terminal-result' && req.method === 'GET') {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'terminal_result').single();
+      if (!data) return res.status(200).json({ ok: true, result: null });
+      return res.status(200).json({ ok: true, result: data.value });
+    }
+
     // ── GET bot logs ────────────────────────────────────────────────────────
     // ── GET V2 bot event logs ─────────────────────────────────────────────
     // Reads from bot_events (V2 structured table).
