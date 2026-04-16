@@ -240,16 +240,13 @@ async function pollDeploy() {
       const gitLog = execSync('git log --oneline -5', { cwd: REPO_DIR, encoding: 'utf8' }).trim();
       console.log('[deploy] Recent commits:\n' + gitLog);
 
-      let pm2Logs = null;
-      try { pm2Logs = execSync('pm2 logs crypto-trader --nostream --lines 20 2>&1', { encoding: 'utf8', timeout: 5000 }).trim(); } catch (_) {}
-
       await supabase.from('app_settings').upsert({
         key: 'deploy_result',
         value: {
           status:      'success',
           git_log:     gitLog,
           pull_output: pullOutput,
-          pm2_logs:    pm2Logs,
+          pm2_logs:    '(restarting — logs will appear after boot)',
           completedAt: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -639,10 +636,28 @@ setInterval(pollReconcileTrigger, 10_000);
 setInterval(heartbeat, 60_000);
 heartbeat();
 
-// Startup: adoption → reconciliation → first V2 cycle
+// Startup: adoption → reconciliation → first V2 cycle, then backfill PM2 logs into deploy_result
 setTimeout(async () => {
   await startupSequence();
   await runCycleV2({}, 'startup');
+
+  // After startup completes, capture PM2 logs and patch deploy_result so the
+  // dashboard "View Deploy Log" button shows real post-restart output.
+  try {
+    const { execSync } = require('child_process');
+    const pm2Logs = execSync('pm2 logs crypto-trader --nostream --lines 20 2>&1', { encoding: 'utf8', timeout: 8000 }).trim();
+    if (pm2Logs) {
+      const { data: existing } = await supabase.from('app_settings').select('value').eq('key', 'deploy_result').single();
+      if (existing?.value) {
+        await supabase.from('app_settings').upsert({
+          key: 'deploy_result',
+          value: { ...existing.value, pm2_logs: pm2Logs, logsUpdatedAt: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+        console.log('[deploy] PM2 logs backfilled into deploy_result');
+      }
+    }
+  } catch (_) {}
 }, 5000);
 
 // Load risk engine state from DB
