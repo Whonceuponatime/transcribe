@@ -225,22 +225,19 @@ async function pollDeploy() {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
 
-      await writeLog('info', 'deploy', 'git pull triggered — pulling latest code…');
-      console.log('[deploy] Running git pull…');
+      await writeLog('info', 'deploy', 'git pull origin main triggered…');
+      console.log('[deploy] Running git pull origin main…');
 
       const { execSync } = require('child_process');
-      const root = require('path').resolve(__dirname, '..');
+      const REPO_DIR = '/home/t3r3n0/transcribe';
 
-      execSync('git pull', { cwd: root, stdio: 'inherit' });
+      execSync('git pull origin main', { cwd: REPO_DIR, stdio: 'inherit' });
 
-      // Install any new npm packages added since the last deploy.
-      // This ensures executionEngine (uuid), etc. are always available.
       console.log('[deploy] Running npm install…');
-      execSync('npm install --omit=dev', { cwd: root, stdio: 'inherit' });
+      execSync('npm install --omit=dev', { cwd: REPO_DIR, stdio: 'inherit' });
 
-      await writeLog('info', 'deploy', 'git pull + npm install complete — exiting so PM2 restarts with new code');
-      console.log('[deploy] Done — exiting for PM2 restart');
-      setTimeout(() => process.exit(0), 500);
+      console.log('[deploy] Running pm2 restart crypto-trader…');
+      execSync('pm2 restart crypto-trader', { stdio: 'inherit' });
     }
   } catch (err) {
     await writeLog('error', 'deploy', `Deploy failed: ${err.message}`);
