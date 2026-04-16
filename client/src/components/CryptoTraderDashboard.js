@@ -440,7 +440,16 @@ export default function CryptoTraderDashboard() {
       });
       const execJ = await execRes.json();
       if (!execJ.ok) {
-        setTermHistory((h) => [...h, { type: 'err', text: execJ.error || 'Request failed' }]);
+        const errMsg = execJ.error || 'Request failed';
+        if (errMsg.includes('Invalid PIN') || errMsg.includes('not configured')) {
+          sessionStorage.removeItem('piTermPin');
+          setTermPin('');
+          setTermUnlocked(false);
+          setTermPinError(errMsg);
+          setTermHistory([]);
+        } else {
+          setTermHistory((h) => [...h, { type: 'err', text: errMsg }]);
+        }
         setTermBusy(false);
         return;
       }
@@ -822,6 +831,10 @@ export default function CryptoTraderDashboard() {
                   <button className="ct__btn" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem',
                     background: 'rgba(239,68,68,0.1)', color: '#f87171', marginLeft: 'auto' }}
                     onClick={() => setTermHistory([])}>Clear</button>
+                  <button className="ct__btn" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem',
+                    background: 'rgba(239,68,68,0.08)', color: '#94a3b8' }}
+                    onClick={() => { sessionStorage.removeItem('piTermPin'); setTermPin(''); setTermUnlocked(false); setTermHistory([]); }}
+                    title="Lock terminal and re-enter PIN">Lock</button>
                 </div>
                 <div ref={termScrollRef} style={{ height: '300px', overflowY: 'auto', padding: '0.5rem 0.7rem',
                   fontFamily: '"Fira Code", "Cascadia Code", "Consolas", monospace', fontSize: '0.72rem', lineHeight: 1.6 }}>
