@@ -375,19 +375,34 @@ export default function CryptoTraderDashboard() {
   }, []);
 
   const [deploying, setDeploying] = useState(false);
+  const [deployResult, setDeployResult] = useState(null);
+  const pollDeployStatus = useCallback(async (retries = 8, delayMs = 3000) => {
+    for (let i = 0; i < retries; i++) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      try {
+        const res = await fetch(`${API}/api/crypto-trader?action=deploy-status`);
+        const j = await res.json();
+        if (j.ok && j.result) {
+          const age = Date.now() - new Date(j.result.completedAt).getTime();
+          if (age < 120_000) { setDeployResult(j.result); return; }
+        }
+      } catch (_) {}
+    }
+  }, []);
   const deployPi = useCallback(async () => {
     if (!window.confirm('Pull latest code and restart the Pi trader? It will be offline for ~15 seconds.')) return;
-    setDeploying(true); setError(null); setMsg(null);
+    setDeploying(true); setError(null); setMsg(null); setDeployResult(null);
     try {
       const res = await fetch(`${API}/api/crypto-trader?action=deploy`, { method: 'POST' });
       const j = await res.json();
       if (j.ok) {
-        setMsg('Deploy triggered — Pi is pulling code and restarting. Check logs in ~15s.');
-        setTimeout(fetchStatus, 20000); // auto-refresh after 20s
+        setMsg('Deploy triggered — waiting for result…');
+        pollDeployStatus();
+        setTimeout(fetchStatus, 20000);
       } else { setError(j.error); }
     } catch (e) { setError(e.message); }
     setDeploying(false);
-  }, [fetchStatus]);
+  }, [fetchStatus, pollDeployStatus]);
 
   const killSwitch     = status?.killSwitch ?? false;
   const positions      = status?.positions ?? [];
@@ -658,6 +673,12 @@ export default function CryptoTraderDashboard() {
               title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
               {deploying ? 'Deploying…' : '↓ Pull & Restart'}
             </button>
+            {deployResult && (
+              <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(16,185,129,0.12)', color: '#34d399' }}
+                onClick={() => setDeployResult(null)} title="Dismiss deploy result">
+                {deployResult.status === 'success' ? 'Deploy OK' : 'Deploy FAILED'} — click to dismiss
+              </button>
+            )}
             <button className="ct__btn ct__btn--primary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
               onClick={() => downloadStructuredDiagnostic(24)} disabled={exportingStructured}
               title="Canonical structured export (bot_config, positions, decisions, fills, blockers) — diagnostics-24h.json">
@@ -694,6 +715,30 @@ export default function CryptoTraderDashboard() {
             </details>
           </div>
         </div>
+        {deployResult && (
+          <div style={{ background: deployResult.status === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${deployResult.status === 'success' ? '#065f46' : '#7f1d1d'}`,
+            borderRadius: '6px', padding: '0.6rem 0.8rem', marginBottom: '0.6rem', fontSize: '0.75rem' }}>
+            <div style={{ fontWeight: 700, marginBottom: '0.3rem', color: deployResult.status === 'success' ? '#34d399' : '#f87171' }}>
+              Deploy {deployResult.status === 'success' ? 'Succeeded' : 'Failed'}
+              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '0.6rem' }}>{deployResult.completedAt ? new Date(deployResult.completedAt).toLocaleString() : ''}</span>
+            </div>
+            {deployResult.error && <div style={{ color: '#f87171', marginBottom: '0.3rem' }}>Error: {deployResult.error}</div>}
+            {deployResult.pull_output && (
+              <div style={{ marginBottom: '0.3rem' }}>
+                <span style={{ color: '#94a3b8' }}>git pull: </span>
+                <span style={{ color: '#e2e8f0' }}>{deployResult.pull_output}</span>
+              </div>
+            )}
+            {deployResult.git_log && (
+              <div>
+                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>Recent commits:</div>
+                <pre style={{ margin: 0, padding: '0.4rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '4px',
+                  color: '#e2e8f0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{deployResult.git_log}</pre>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
           <div>
             <div style={{ color: piOnline ? '#22c55e' : '#ef4444', fontWeight: 700, marginBottom: '0.2rem' }}>

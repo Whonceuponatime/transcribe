@@ -231,15 +231,50 @@ async function pollDeploy() {
       const { execSync } = require('child_process');
       const REPO_DIR = '/home/t3r3n0/transcribe';
 
-      execSync('git pull origin main', { cwd: REPO_DIR, stdio: 'inherit' });
+      const pullOutput = execSync('git pull origin main', { cwd: REPO_DIR, encoding: 'utf8' }).trim();
+      console.log('[deploy] git pull:', pullOutput);
 
       console.log('[deploy] Running npm install…');
       execSync('npm install --omit=dev', { cwd: REPO_DIR, stdio: 'inherit' });
+
+      const gitLog = execSync('git log --oneline -5', { cwd: REPO_DIR, encoding: 'utf8' }).trim();
+      console.log('[deploy] Recent commits:\n' + gitLog);
+
+      // Write deploy result so the dashboard can show it immediately
+      await supabase.from('app_settings').upsert({
+        key: 'deploy_result',
+        value: {
+          status:     'success',
+          git_log:    gitLog,
+          pull_output: pullOutput,
+          completedAt: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
 
       console.log('[deploy] Running pm2 restart crypto-trader…');
       execSync('pm2 restart crypto-trader', { stdio: 'inherit' });
     }
   } catch (err) {
+    const { execSync } = require('child_process');
+    const REPO_DIR = '/home/t3r3n0/transcribe';
+    let gitLog = null;
+    let pm2Status = null;
+    try { gitLog = execSync('git log --oneline -5', { cwd: REPO_DIR, encoding: 'utf8' }).trim(); } catch (_) {}
+    try { pm2Status = execSync('pm2 jlist', { encoding: 'utf8' }).trim(); } catch (_) {}
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'deploy_result',
+        value: {
+          status:      'failed',
+          error:       err.message,
+          git_log:     gitLog,
+          pm2_status:  pm2Status,
+          completedAt: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (_) {}
     await writeLog('error', 'deploy', `Deploy failed: ${err.message}`);
     console.error('[deploy] Error:', err.message);
   }

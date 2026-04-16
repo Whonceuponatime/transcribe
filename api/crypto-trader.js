@@ -219,6 +219,13 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'Deploy triggered — Pi will git pull and restart within 10 seconds' });
     }
 
+    // ── GET deploy-status — show last deploy result (git log, pm2 status) ──
+    if (action === 'deploy-status' && req.method === 'GET') {
+      const { data } = await supabase.from('app_settings').select('value, updated_at').eq('key', 'deploy_result').single();
+      if (!data) return res.status(200).json({ ok: true, result: null });
+      return res.status(200).json({ ok: true, result: { ...data.value, updated_at: data.updated_at } });
+    }
+
     // ── GET bot logs ────────────────────────────────────────────────────────
     // ── GET V2 bot event logs ─────────────────────────────────────────────
     // Reads from bot_events (V2 structured table).
