@@ -240,13 +240,16 @@ async function pollDeploy() {
       const gitLog = execSync('git log --oneline -5', { cwd: REPO_DIR, encoding: 'utf8' }).trim();
       console.log('[deploy] Recent commits:\n' + gitLog);
 
-      // Write deploy result so the dashboard can show it immediately
+      let pm2Logs = null;
+      try { pm2Logs = execSync('pm2 logs crypto-trader --nostream --lines 20 2>&1', { encoding: 'utf8', timeout: 5000 }).trim(); } catch (_) {}
+
       await supabase.from('app_settings').upsert({
         key: 'deploy_result',
         value: {
-          status:     'success',
-          git_log:    gitLog,
+          status:      'success',
+          git_log:     gitLog,
           pull_output: pullOutput,
+          pm2_logs:    pm2Logs,
           completedAt: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -259,9 +262,9 @@ async function pollDeploy() {
     const { execSync } = require('child_process');
     const REPO_DIR = '/home/t3r3n0/transcribe';
     let gitLog = null;
-    let pm2Status = null;
+    let pm2Logs = null;
     try { gitLog = execSync('git log --oneline -5', { cwd: REPO_DIR, encoding: 'utf8' }).trim(); } catch (_) {}
-    try { pm2Status = execSync('pm2 jlist', { encoding: 'utf8' }).trim(); } catch (_) {}
+    try { pm2Logs = execSync('pm2 logs crypto-trader --nostream --lines 20 2>&1', { encoding: 'utf8', timeout: 5000 }).trim(); } catch (_) {}
     try {
       await supabase.from('app_settings').upsert({
         key: 'deploy_result',
@@ -269,7 +272,7 @@ async function pollDeploy() {
           status:      'failed',
           error:       err.message,
           git_log:     gitLog,
-          pm2_status:  pm2Status,
+          pm2_logs:    pm2Logs,
           completedAt: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),

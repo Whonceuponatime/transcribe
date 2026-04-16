@@ -673,10 +673,22 @@ export default function CryptoTraderDashboard() {
               title={piOnline ? 'Pull latest code from GitHub and restart the bot' : 'Pi must be online to deploy'}>
               {deploying ? 'Deploying…' : '↓ Pull & Restart'}
             </button>
+            <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(99,102,241,0.12)', color: '#a5b4fc' }}
+              onClick={async () => {
+                try {
+                  const r = await fetch(`${API}/api/crypto-trader?action=deploy-status`);
+                  const j = await r.json();
+                  if (j.ok && j.result) setDeployResult(j.result);
+                  else setError('No deploy result found');
+                } catch (e) { setError(e.message); }
+              }}
+              title="Fetch last deploy result: git log + pm2 logs">
+              View Deploy Log
+            </button>
             {deployResult && (
               <button className="ct__btn" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', background: 'rgba(16,185,129,0.12)', color: '#34d399' }}
                 onClick={() => setDeployResult(null)} title="Dismiss deploy result">
-                {deployResult.status === 'success' ? 'Deploy OK' : 'Deploy FAILED'} — click to dismiss
+                {deployResult.status === 'success' ? 'Deploy OK' : 'Deploy FAILED'} — dismiss
               </button>
             )}
             <button className="ct__btn ct__btn--primary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem' }}
@@ -731,10 +743,17 @@ export default function CryptoTraderDashboard() {
               </div>
             )}
             {deployResult.git_log && (
-              <div>
-                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>Recent commits:</div>
+              <div style={{ marginBottom: '0.4rem' }}>
+                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>git log --oneline -5:</div>
                 <pre style={{ margin: 0, padding: '0.4rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '4px',
                   color: '#e2e8f0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{deployResult.git_log}</pre>
+              </div>
+            )}
+            {deployResult.pm2_logs && (
+              <div>
+                <div style={{ color: '#94a3b8', marginBottom: '0.15rem' }}>pm2 logs crypto-trader --lines 20:</div>
+                <pre style={{ margin: 0, padding: '0.4rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '4px',
+                  color: '#e2e8f0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: '220px', overflowY: 'auto' }}>{deployResult.pm2_logs}</pre>
               </div>
             )}
           </div>
