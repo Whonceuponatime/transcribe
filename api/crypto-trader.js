@@ -2,6 +2,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const reconEngine = require('../lib/reconciliationEngine');
 const { buildStructuredDiagnosticsExport } = require('../lib/diagnosticStructuredExport');
+const { executeSell } = require('../lib/executionEngine');
 // V1 (cryptoTrader.js) import removed. V2 is the only engine.
 
 function getSupabase() {
@@ -2312,7 +2313,187 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, key, value });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|structured-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile|bot-config' });
+    // ── POST manual-sell — PIN-protected manual partial sell ────────────────
+    if (action === 'manual-sell' && req.method === 'POST') {
+      const pin = process.env.PI_TERMINAL_PIN;
+      if (!pin) return res.status(503).json({ ok: false, error: 'PI_TERMINAL_PIN not configured' });
+
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      const { asset, pct, pin: userPin } = body;
+
+      if (!userPin || userPin !== pin) return res.status(403).json({ ok: false, error: 'Invalid PIN' });
+      if (!asset || !['BTC', 'ETH', 'SOL'].includes(asset)) return res.status(400).json({ ok: false, error: 'Invalid asset' });
+      if (pct == null || pct < 1 || pct > 95) return res.status(400).json({ ok: false, error: 'pct must be 1–95' });
+
+      const { data: posRow } = await supabase.from('positions')
+        .select('position_id, asset, qty_open, avg_cost_krw, strategy_tag, state')
+        .eq('asset', asset).eq('managed', true).in('state', ['open', 'adopted', 'partial'])
+        .order('created_at', { ascending: false }).limit(1).single();
+
+      if (!posRow || Number(posRow.qty_open) <= 0) {
+        return res.status(400).json({ ok: false, error: `No open position for ${asset}` });
+      }
+
+      const sellQty = Number(posRow.qty_open) * (pct / 100);
+      const upbit = require('../lib/upbit');
+      let ticker;
+      try {
+        const tickers = await upbit.getTicker([`KRW-${asset}`]);
+        ticker = tickers?.[0];
+      } catch (_) {}
+      const currentPrice = ticker?.trade_price ?? 0;
+      const estimatedKrw = sellQty * currentPrice;
+
+      if (estimatedKrw < 5000) {
+        return res.status(400).json({ ok: false, error: `Order too small: ≈₩${Math.round(estimatedKrw)} (min ₩5,000)` });
+      }
+
+      const exit = { asset, sellPct: pct, reason: `manual_withdrawal_${pct}%` };
+      const result = await executeSell(supabase, exit, posRow, currentPrice, { regime: null });
+
+      if (!result.ok) {
+        return res.status(500).json({ ok: false, error: result.error || 'Sell failed' });
+      }
+
+      // Apply fill to position (qty_open update)
+      const filledQty = result.fills?.reduce((s, f) => s + Number(f.qty || 0), 0) || sellQty;
+      const newQtyOpen = Math.max(0, Number(posRow.qty_open) - filledQty);
+      const pnl = (currentPrice - (posRow.avg_cost_krw ?? 0)) * filledQty;
+      await supabase.from('positions').update({
+        qty_open: newQtyOpen,
+        realized_pnl: (Number(posRow.realized_pnl ?? 0) + pnl),
+        state: newQtyOpen <= 0 ? 'closed' : 'partial',
+        closed_at: newQtyOpen <= 0 ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }).eq('position_id', posRow.position_id);
+
+      await supabase.from('bot_events').insert({
+        event_type: 'MANUAL_WITHDRAWAL',
+        severity: 'warn',
+        subsystem: 'manual',
+        message: `Manual sell ${pct}% of ${asset} — ${filledQty.toFixed(8)} ${asset} ≈₩${Math.round(estimatedKrw).toLocaleString()}`,
+        context_json: {
+          asset, pct, sellQty: +sellQty.toFixed(8), filledQty: +filledQty.toFixed(8),
+          estimatedKrw: Math.round(estimatedKrw), newQtyOpen: +newQtyOpen.toFixed(8),
+          orderId: result.orderId, fills: result.fills?.length ?? 0,
+        },
+      });
+
+      return res.status(200).json({
+        ok: true, success: true,
+        soldQty: +filledQty.toFixed(8),
+        estimatedKrw: Math.round(estimatedKrw),
+        newQtyOpen: +newQtyOpen.toFixed(8),
+      });
+    }
+
+    // ── GET weekly-summary — pre-aggregated 7-day performance ──────────────
+    if (action === 'weekly-summary' && req.method === 'GET') {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [fillsRes, closedRes, cfgRes] = await Promise.all([
+        supabase.from('v2_fills')
+          .select('side,price_krw,qty,fee_krw,entry_reason,executed_at')
+          .gte('executed_at', since)
+          .order('executed_at', { ascending: true }),
+        supabase.from('positions')
+          .select('realized_pnl,avg_cost_krw,opened_at,closed_at')
+          .eq('state', 'closed')
+          .gte('closed_at', since),
+        supabase.from('bot_config')
+          .select('target_deployment_pct,target_entries_per_position,krw_min_reserve_pct')
+          .limit(1).single(),
+      ]);
+
+      const fills = fillsRes.data || [];
+      const closed = closedRes.data || [];
+      const cfg = cfgRes.data || {};
+
+      // Daily P&L from sells (gross - fee per fill, grouped by date)
+      const dailyPnl = {};
+      const dailyBuys = {};
+      const dailySells = {};
+      const rungStats = {};
+      const buyRsiValues = [];
+
+      for (const f of fills) {
+        const day = f.executed_at?.slice(0, 10) || 'unknown';
+        if (!dailyBuys[day]) { dailyBuys[day] = 0; dailySells[day] = 0; dailyPnl[day] = 0; }
+
+        if (f.side === 'buy') {
+          dailyBuys[day]++;
+          const rsiMatch = f.entry_reason?.match(/RSI[=:]?([\d.]+)/i);
+          if (rsiMatch) buyRsiValues.push(Number(rsiMatch[1]));
+        } else if (f.side === 'sell') {
+          dailySells[day]++;
+          const gross = Number(f.price_krw || 0) * Number(f.qty || 0);
+          const fee = Number(f.fee_krw || 0);
+          const net = gross - fee;
+          dailyPnl[day] += net;
+
+          // Parse rung from entry_reason
+          const reason = f.entry_reason || '';
+          const rungMatch = reason.match(/^([a-z_]+?)(?:_[\d.]+|$)/);
+          const rung = rungMatch ? rungMatch[1] : reason.split('_').slice(0, 2).join('_') || 'unknown';
+          if (!rungStats[rung]) rungStats[rung] = { fires: 0, totalNet: 0 };
+          rungStats[rung].fires++;
+          rungStats[rung].totalNet += net;
+        }
+      }
+
+      // Build daily array for last 7 days
+      const dailyArr = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        dailyArr.push({
+          date: d,
+          pnl: Math.round(dailyPnl[d] || 0),
+          buys: dailyBuys[d] || 0,
+          sells: dailySells[d] || 0,
+        });
+      }
+
+      // Rung performance table
+      const rungTable = Object.entries(rungStats)
+        .map(([rung, s]) => ({ rung, fires: s.fires, totalNet: Math.round(s.totalNet), avgNet: Math.round(s.totalNet / s.fires) }))
+        .sort((a, b) => b.fires - a.fires);
+
+      // Closed positions stats
+      const holdHours = closed
+        .filter(p => p.opened_at && p.closed_at)
+        .map(p => (new Date(p.closed_at) - new Date(p.opened_at)) / 3_600_000);
+      const avgHoldHours = holdHours.length > 0 ? holdHours.reduce((a, b) => a + b, 0) / holdHours.length : null;
+
+      // Summary stats
+      const totalRealized = dailyArr.reduce((s, d) => s + d.pnl, 0);
+      const bestDay = dailyArr.reduce((best, d) => d.pnl > best.pnl ? d : best, dailyArr[0]);
+      const worstDay = dailyArr.reduce((worst, d) => d.pnl < worst.pnl ? d : worst, dailyArr[0]);
+      const avgDailyPnl = Math.round(totalRealized / 7);
+      const avgBuyRsi = buyRsiValues.length > 0 ? +(buyRsiValues.reduce((a, b) => a + b, 0) / buyRsiValues.length).toFixed(1) : null;
+
+      return res.status(200).json({
+        daily: dailyArr,
+        summary: {
+          totalRealized: Math.round(totalRealized),
+          bestDay: { date: bestDay?.date, pnl: bestDay?.pnl },
+          worstDay: { date: worstDay?.date, pnl: worstDay?.pnl },
+          avgDailyPnl,
+        },
+        rungTable,
+        entryQuality: {
+          avgBuyRsi,
+          avgHoldHours: avgHoldHours != null ? +avgHoldHours.toFixed(1) : null,
+          positionsClosed: closed.length,
+        },
+        config: {
+          target_deployment_pct: cfg.target_deployment_pct,
+          target_entries_per_position: cfg.target_entries_per_position,
+          krw_min_reserve_pct: cfg.krw_min_reserve_pct,
+        },
+      });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|structured-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile|bot-config|weekly-summary|manual-sell' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });

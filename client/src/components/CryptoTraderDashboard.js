@@ -88,6 +88,17 @@ export default function CryptoTraderDashboard() {
   const [cfgSaving, setCfgSaving] = useState({});     // { key: true }
   const [cfgResult, setCfgResult] = useState({});     // { key: 'ok' | 'err:msg' }
 
+  // Weekly Summary
+  const [weeklyOpen, setWeeklyOpen] = useState(false);
+  const [weeklyData, setWeeklyData] = useState(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+
+  // Manual sell / withdraw
+  const [withdrawCoin, setWithdrawCoin] = useState(null);   // coin with form open
+  const [withdrawPct, setWithdrawPct]   = useState('');
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawMsg, setWithdrawMsg]   = useState(null);    // { type: 'ok'|'err', text }
+
   // V1 cfg state removed. V2 controls are in v2TradingEnabled/v2BuysEnabled/v2SellsEnabled.
 
   // silent=true skips the loading spinner and error state — used for background auto-refresh.
@@ -230,6 +241,46 @@ export default function CryptoTraderDashboard() {
       setCfgResult((r) => ({ ...r, [key]: `err:${e.message}` }));
     }
     setCfgSaving((s) => { const n = { ...s }; delete n[key]; return n; });
+  }, [fetchStatus]);
+
+  const fetchWeeklySummary = useCallback(async () => {
+    setWeeklyLoading(true);
+    try {
+      const res = await fetch(`${API}/api/crypto-trader?action=weekly-summary`);
+      if (res.ok) setWeeklyData(await res.json());
+    } catch (_) { /* silent */ }
+    setWeeklyLoading(false);
+  }, []);
+
+  const executeManualSell = useCallback(async (asset, pct) => {
+    const storedPin = sessionStorage.getItem('piTermPin');
+    if (!storedPin) {
+      setWithdrawMsg({ type: 'err', text: 'Unlock the terminal PIN first (scroll to Pi Trader section)' });
+      return;
+    }
+    setWithdrawBusy(true);
+    setWithdrawMsg(null);
+    try {
+      const r = await fetch(`${API}/api/crypto-trader?action=manual-sell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset, pct: Number(pct), pin: storedPin }),
+      });
+      const j = await r.json();
+      if (j.ok || j.success) {
+        setWithdrawMsg({ type: 'ok', text: `Sold ${j.soldQty} ${asset} ≈₩${(j.estimatedKrw ?? 0).toLocaleString()}` });
+        setWithdrawPct('');
+        await fetchStatus({ silent: true });
+      } else {
+        if (j.error?.includes('Invalid PIN')) {
+          sessionStorage.removeItem('piTermPin');
+        }
+        setWithdrawMsg({ type: 'err', text: j.error || 'Sell failed' });
+      }
+    } catch (e) {
+      setWithdrawMsg({ type: 'err', text: e.message });
+    }
+    setWithdrawBusy(false);
   }, [fetchStatus]);
 
   // Trigger a V2 cycle manually (replaces V1 execute/forceDca logic)
@@ -786,6 +837,59 @@ export default function CryptoTraderDashboard() {
                     if (ind.macdBear) pills.push(pill('md', 'MACD', '↓', '#ef4444'));
                     return pills;
                   })()}
+                </div>
+              )}
+
+              {/* Manual withdraw */}
+              {pos.balance > 0 && (
+                <div className="ct__withdraw-section">
+                  {withdrawCoin !== pos.coin ? (
+                    <button className="ct__withdraw-toggle" onClick={() => { setWithdrawCoin(pos.coin); setWithdrawPct(''); setWithdrawMsg(null); }}>
+                      Withdraw %
+                    </button>
+                  ) : (
+                    <div className="ct__withdraw-form">
+                      <div className="ct__withdraw-row">
+                        <span className="ct__withdraw-label">Sell</span>
+                        <input
+                          className="ct__withdraw-input"
+                          type="number" min="1" max="95" step="1"
+                          value={withdrawPct}
+                          onChange={(e) => setWithdrawPct(e.target.value)}
+                          placeholder="%" autoFocus disabled={withdrawBusy}
+                        />
+                        <span className="ct__withdraw-label">% of {pos.coin}</span>
+                        <button
+                          className="ct__withdraw-close"
+                          onClick={() => { setWithdrawCoin(null); setWithdrawMsg(null); }}
+                        >✕</button>
+                      </div>
+                      {withdrawPct && Number(withdrawPct) >= 1 && Number(withdrawPct) <= 95 && pos.currentPrice && (
+                        <div className="ct__withdraw-est">
+                          ≈ {navMasked ? M : `₩${fmt(Math.round(pos.balance * (Number(withdrawPct) / 100) * pos.currentPrice))}`}
+                          {' · '}{fmtCoin(pos.balance * (Number(withdrawPct) / 100))} {pos.coin}
+                        </div>
+                      )}
+                      <button
+                        className="ct__withdraw-confirm"
+                        disabled={withdrawBusy || !withdrawPct || Number(withdrawPct) < 1 || Number(withdrawPct) > 95}
+                        onClick={() => {
+                          const qty = pos.balance * (Number(withdrawPct) / 100);
+                          const est = Math.round(qty * (pos.currentPrice ?? 0));
+                          if (window.confirm(`This will sell ${fmtCoin(qty)} ${pos.coin} (≈₩${est.toLocaleString()}). Proceeds go to your KRW balance. Confirm?`)) {
+                            executeManualSell(pos.coin, withdrawPct);
+                          }
+                        }}
+                      >
+                        {withdrawBusy ? 'Selling…' : 'Confirm Sell'}
+                      </button>
+                      {withdrawMsg && (
+                        <div className={`ct__withdraw-msg ${withdrawMsg.type === 'ok' ? 'ct__withdraw-msg--ok' : 'ct__withdraw-msg--err'}`}>
+                          {withdrawMsg.text}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1707,6 +1811,115 @@ export default function CryptoTraderDashboard() {
             </div>
           );
         })()}
+      </div>
+
+      {/* ═══ WEEKLY SUMMARY ═══ */}
+      <div className="ct__section">
+        <h4
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => { setWeeklyOpen((o) => !o); if (!weeklyData && !weeklyLoading) fetchWeeklySummary(); }}
+        >
+          {weeklyOpen ? '▾' : '▸'} Weekly Summary
+        </h4>
+
+        {weeklyOpen && (weeklyLoading ? (
+          <p className="ct__muted">Loading weekly data…</p>
+        ) : weeklyData ? (() => {
+          const wd = weeklyData;
+          const maxAbsPnl = Math.max(...wd.daily.map(d => Math.abs(d.pnl)), 1);
+          const fmtKrw = (v) => navMasked ? M : `₩${Number(v).toLocaleString()}`;
+          return (
+            <div className="ct__weekly-panel">
+              {/* Row 1 — Daily P&L bars */}
+              <div className="ct__weekly-bars">
+                {wd.daily.map(d => {
+                  const pct = Math.abs(d.pnl) / maxAbsPnl * 100;
+                  const isProfit = d.pnl >= 0;
+                  return (
+                    <div key={d.date} className="ct__weekly-bar-col">
+                      <span className="ct__weekly-bar-label">{navMasked ? Ms : fmtKrw(d.pnl)}</span>
+                      <div className="ct__weekly-bar-track">
+                        <div
+                          className={`ct__weekly-bar-fill ${isProfit ? 'ct__weekly-bar-fill--up' : 'ct__weekly-bar-fill--down'}`}
+                          style={{ height: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+                      <span className="ct__weekly-bar-date">{d.date.slice(5)}</span>
+                      <span className="ct__weekly-bar-counts">{d.buys}B / {d.sells}S</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Row 2 — Summary stats */}
+              <div className="ct__weekly-stats">
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Total Realized</span>
+                  <span className={`ct__weekly-stat-value ${wd.summary.totalRealized >= 0 ? 'ct__pnl--up' : 'ct__pnl--down'}`}>{fmtKrw(wd.summary.totalRealized)}</span>
+                </div>
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Best Day</span>
+                  <span className="ct__weekly-stat-value ct__pnl--up">{wd.summary.bestDay?.date?.slice(5)} — {fmtKrw(wd.summary.bestDay?.pnl)}</span>
+                </div>
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Worst Day</span>
+                  <span className="ct__weekly-stat-value ct__pnl--down">{wd.summary.worstDay?.date?.slice(5)} — {fmtKrw(wd.summary.worstDay?.pnl)}</span>
+                </div>
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Avg Daily P&L</span>
+                  <span className={`ct__weekly-stat-value ${wd.summary.avgDailyPnl >= 0 ? 'ct__pnl--up' : 'ct__pnl--down'}`}>{fmtKrw(wd.summary.avgDailyPnl)}</span>
+                </div>
+              </div>
+
+              {/* Row 3 — Sell rung performance */}
+              {wd.rungTable.length > 0 && (
+                <div className="ct__weekly-rung-table">
+                  <h5 className="ct__weekly-sub-title">Sell Rung Performance</h5>
+                  <table className="ct__weekly-table">
+                    <thead>
+                      <tr>
+                        <th>Rung</th>
+                        <th>Fires</th>
+                        <th>Avg Net</th>
+                        <th>Total Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wd.rungTable.map(r => (
+                        <tr key={r.rung}>
+                          <td className="ct__weekly-rung-name">{r.rung}</td>
+                          <td>{r.fires}</td>
+                          <td className={r.avgNet >= 0 ? 'ct__pnl--up' : 'ct__pnl--down'}>{fmtKrw(r.avgNet)}</td>
+                          <td className={r.totalNet >= 0 ? 'ct__pnl--up' : 'ct__pnl--down'}>{fmtKrw(r.totalNet)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Row 4 — Entry quality */}
+              <div className="ct__weekly-stats">
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Avg Entry RSI</span>
+                  <span className="ct__weekly-stat-value">{wd.entryQuality.avgBuyRsi ?? '—'}</span>
+                </div>
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Avg Hold Time</span>
+                  <span className="ct__weekly-stat-value">{wd.entryQuality.avgHoldHours != null ? `${wd.entryQuality.avgHoldHours}h` : '—'}</span>
+                </div>
+                <div className="ct__weekly-stat">
+                  <span className="ct__weekly-stat-label">Positions Closed</span>
+                  <span className="ct__weekly-stat-value">{wd.entryQuality.positionsClosed}</span>
+                </div>
+              </div>
+
+              <button className="ct__weekly-refresh-btn" onClick={fetchWeeklySummary} disabled={weeklyLoading}>
+                ↻ Refresh
+              </button>
+            </div>
+          );
+        })() : <p className="ct__muted">No data available</p>)}
       </div>
 
       {/* ═══ DANGER ZONE ═══ */}

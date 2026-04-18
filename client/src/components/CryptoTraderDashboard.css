@@ -365,3 +365,125 @@
 .ct__cfg-save-btn:hover:not(:disabled) { background: #00e5ff; color: #0d0d0d; border-color: #00e5ff; }
 .ct__cfg-save-btn:disabled { opacity: 0.4; cursor: default; }
 .ct__cfg-err { font-size: 0.62rem; color: #f59e0b; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Weekly Summary Panel ────────────────────────────────────────────────── */
+.ct__weekly-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* Daily P&L bar chart */
+.ct__weekly-bars {
+  display: flex; gap: 0.5rem; justify-content: space-between; align-items: flex-end;
+  padding: 0.75rem 0; min-height: 160px;
+}
+.ct__weekly-bar-col {
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex: 1;
+}
+.ct__weekly-bar-label {
+  font-size: 0.62rem; font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  color: #94a3b8; white-space: nowrap;
+}
+.ct__weekly-bar-track {
+  width: 100%; max-width: 40px; height: 100px; background: #1a1a24; border-radius: 4px;
+  display: flex; align-items: flex-end; overflow: hidden; border: 1px solid #2a2a3a;
+}
+.ct__weekly-bar-fill {
+  width: 100%; border-radius: 0 0 3px 3px; transition: height 0.3s ease;
+}
+.ct__weekly-bar-fill--up   { background: linear-gradient(to top, #ef4444, #f87171); }
+.ct__weekly-bar-fill--down { background: linear-gradient(to top, #3b82f6, #60a5fa); }
+.ct__weekly-bar-date {
+  font-size: 0.62rem; color: #64748b;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+.ct__weekly-bar-counts { font-size: 0.56rem; color: #475569; }
+
+/* Summary stat grid */
+.ct__weekly-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.ct__weekly-stat {
+  background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 6px;
+  padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.2rem;
+}
+.ct__weekly-stat-label {
+  font-size: 0.62rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+.ct__weekly-stat-value {
+  font-size: 0.85rem; font-weight: 600; color: #e2e8f0;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+
+/* P&L color helpers */
+.ct__pnl--up   { color: #ef4444; }
+.ct__pnl--down { color: #3b82f6; }
+
+/* Rung performance table */
+.ct__weekly-rung-table { overflow-x: auto; }
+.ct__weekly-sub-title {
+  margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+.ct__weekly-table {
+  width: 100%; border-collapse: collapse; font-size: 0.72rem;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+.ct__weekly-table th {
+  text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #2a2a3a;
+  color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+.ct__weekly-table td {
+  padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e2a; color: #94a3b8;
+}
+.ct__weekly-table tbody tr:hover { background: rgba(0,229,255,0.03); }
+.ct__weekly-rung-name { color: #e2e8f0; font-weight: 500; }
+
+/* Refresh button */
+.ct__weekly-refresh-btn {
+  align-self: flex-start; padding: 0.3rem 0.8rem;
+  border: 1px solid #2a2a3a; border-radius: 4px; background: #1a1a24;
+  color: #94a3b8; font-size: 0.68rem; cursor: pointer; transition: all 0.15s;
+}
+.ct__weekly-refresh-btn:hover:not(:disabled) { background: #00e5ff; color: #0d0d0d; border-color: #00e5ff; }
+.ct__weekly-refresh-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Manual Withdraw / Sell ──────────────────────────────────────────────── */
+.ct__withdraw-section { margin-top: 0.5rem; border-top: 1px solid #2a2a3a; padding-top: 0.4rem; }
+.ct__withdraw-toggle {
+  background: none; border: 1px solid #2a2a3a; border-radius: 4px;
+  color: #64748b; font-size: 0.62rem; padding: 0.2rem 0.5rem;
+  cursor: pointer; transition: all 0.15s;
+}
+.ct__withdraw-toggle:hover { color: #ef4444; border-color: #ef4444; }
+.ct__withdraw-form { display: flex; flex-direction: column; gap: 0.35rem; }
+.ct__withdraw-row {
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+}
+.ct__withdraw-label { font-size: 0.65rem; color: #94a3b8; }
+.ct__withdraw-input {
+  width: 52px; padding: 0.2rem 0.3rem; border: 1px solid #2a2a3a; border-radius: 4px;
+  background: #0d0d0d; color: #e2e8f0; font-size: 0.72rem; text-align: center;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+.ct__withdraw-input:focus { outline: none; border-color: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,0.15); }
+.ct__withdraw-close {
+  background: none; border: none; color: #64748b; cursor: pointer;
+  font-size: 0.72rem; padding: 0 0.2rem; margin-left: auto;
+}
+.ct__withdraw-close:hover { color: #e2e8f0; }
+.ct__withdraw-est {
+  font-size: 0.62rem; color: #94a3b8;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+.ct__withdraw-confirm {
+  padding: 0.25rem 0.6rem; border: 1px solid #ef4444; border-radius: 4px;
+  background: rgba(239,68,68,0.1); color: #ef4444; font-size: 0.65rem;
+  cursor: pointer; transition: all 0.15s; align-self: flex-start;
+}
+.ct__withdraw-confirm:hover:not(:disabled) { background: #ef4444; color: #fff; }
+.ct__withdraw-confirm:disabled { opacity: 0.4; cursor: default; }
+.ct__withdraw-msg { font-size: 0.62rem; padding: 0.2rem 0; }
+.ct__withdraw-msg--ok  { color: #00e5ff; }
+.ct__withdraw-msg--err { color: #f59e0b; }
