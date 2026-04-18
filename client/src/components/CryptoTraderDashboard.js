@@ -71,6 +71,12 @@ export default function CryptoTraderDashboard() {
   const [classifyingId, setClassifyingId] = useState(null);   // position_id currently being classified
   const [classifyForm, setClassifyForm]   = useState({});     // { [position_id]: { costBasis, note } }
 
+  // Bot Config settings panel
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [cfgEdits, setCfgEdits] = useState({});       // { key: editedValue }
+  const [cfgSaving, setCfgSaving] = useState({});     // { key: true }
+  const [cfgResult, setCfgResult] = useState({});     // { key: 'ok' | 'err:msg' }
+
   // V1 cfg state removed. V2 controls are in v2TradingEnabled/v2BuysEnabled/v2SellsEnabled.
 
   // silent=true skips the loading spinner and error state — used for background auto-refresh.
@@ -188,6 +194,32 @@ export default function CryptoTraderDashboard() {
     } catch (e) { setError(e.message); }
     setV2SavingControl(false);
   }, [fetchV2Data]);
+
+  // Save a single bot_config field via PATCH
+  const saveBotConfig = useCallback(async (key, rawValue) => {
+    setCfgSaving((s) => ({ ...s, [key]: true }));
+    setCfgResult((r) => { const n = { ...r }; delete n[key]; return n; });
+    try {
+      const value = rawValue === '' ? null : isNaN(Number(rawValue)) ? rawValue : Number(rawValue);
+      const res = await fetch(`${API}/api/crypto-trader?action=bot-config`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      });
+      const j = await res.json();
+      if (j.success) {
+        setCfgResult((r) => ({ ...r, [key]: 'ok' }));
+        setCfgEdits((e) => { const n = { ...e }; delete n[key]; return n; });
+        await fetchStatus({ silent: true });
+        setTimeout(() => setCfgResult((r) => { const n = { ...r }; delete n[key]; return n; }), 3000);
+      } else {
+        setCfgResult((r) => ({ ...r, [key]: `err:${j.error}` }));
+      }
+    } catch (e) {
+      setCfgResult((r) => ({ ...r, [key]: `err:${e.message}` }));
+    }
+    setCfgSaving((s) => { const n = { ...s }; delete n[key]; return n; });
+  }, [fetchStatus]);
 
   // Trigger a V2 cycle manually (replaces V1 execute/forceDca logic)
   const execute = useCallback(async () => {
@@ -1562,6 +1594,100 @@ export default function CryptoTraderDashboard() {
             })}
           </div>
         )}
+      </div>
+
+      {/* ═══ BOT CONFIG SETTINGS ═══ */}
+      <div className="ct__section">
+        <h4
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setCfgOpen((o) => !o)}
+        >
+          {cfgOpen ? '▾' : '▸'} Bot Config
+        </h4>
+
+        {cfgOpen && (() => {
+          const bc = status?.botConfig ?? {};
+          const msToMin = (v) => v != null ? `${Math.round(v / 60000)} min` : '';
+          const CFG_GROUPS = [
+            { label: 'Capital Deployment', fields: [
+              { key: 'target_deployment_pct',     label: 'Target deployment per asset', suffix: '%' },
+              { key: 'target_entries_per_position', label: 'Target entries per position' },
+              { key: 'krw_min_reserve_pct',       label: 'KRW min reserve', suffix: '%' },
+              { key: 'daily_turnover_cap_pct',    label: 'Daily turnover cap', suffix: '%' },
+            ]},
+            { label: 'Entry Thresholds', fields: [
+              { key: 'entry_rsi_min_uptrend', label: 'RSI min (uptrend)' },
+              { key: 'entry_rsi_max_uptrend', label: 'RSI max (uptrend)' },
+              { key: 'entry_bb_pct_uptrend',  label: 'BB %B threshold (uptrend)' },
+              { key: 'ob_imbalance_min',      label: 'OB imbalance min' },
+              { key: 'starter_ob_imbalance_min', label: 'Starter OB imbalance min' },
+            ]},
+            { label: 'Exit Thresholds', fields: [
+              { key: 'exit_quick_trim1_gross_pct',       label: 'Trim 1 gross target', suffix: '%' },
+              { key: 'exit_quick_trim2_gross_pct',       label: 'Trim 2 gross target', suffix: '%' },
+              { key: 'exit_tactical_final_exit_hours',   label: 'Tactical final exit hours', suffix: 'h' },
+              { key: 'exit_tactical_final_exit_min_net_pct', label: 'Tactical final exit min net', suffix: '%' },
+              { key: 'exit_core_final_exit_hours',       label: 'Core final exit hours', suffix: 'h' },
+              { key: 'exit_core_time_stop_hours',        label: 'Core time stop hours', suffix: 'h' },
+              { key: 'exit_tactical_time_stop_hours',    label: 'Tactical time stop hours', suffix: 'h' },
+            ]},
+            { label: 'Timing / Cooldowns', fields: [
+              { key: 'buy_cooldown_ms',              label: 'Buy cooldown', suffix: 'ms', helper: msToMin },
+              { key: 'core_exit_reentry_cooldown_ms', label: 'Re-entry cooldown after exit', suffix: 'ms', helper: msToMin },
+            ]},
+            { label: 'Risk Controls', fields: [
+              { key: 'max_addons_per_position', label: 'Max add-ons per position' },
+              { key: 'max_btc_pct',             label: 'Max BTC exposure', suffix: '%' },
+              { key: 'max_eth_pct',             label: 'Max ETH exposure', suffix: '%' },
+              { key: 'loss_streak_limit',       label: 'Loss streak limit' },
+            ]},
+          ];
+
+          return (
+            <div className="ct__cfg-panel">
+              {CFG_GROUPS.map((grp) => (
+                <div key={grp.label} className="ct__cfg-group">
+                  <h5 className="ct__cfg-group-title">{grp.label}</h5>
+                  {grp.fields.map((f) => {
+                    const liveVal  = bc[f.key];
+                    const editVal  = cfgEdits[f.key];
+                    const saving   = cfgSaving[f.key];
+                    const result   = cfgResult[f.key];
+                    const dirty    = editVal !== undefined && String(editVal) !== String(liveVal ?? '');
+                    return (
+                      <div key={f.key} className="ct__cfg-row">
+                        <label className="ct__cfg-label">{f.label}</label>
+                        <div className="ct__cfg-input-wrap">
+                          <input
+                            className="ct__cfg-input"
+                            type="text"
+                            value={editVal !== undefined ? editVal : (liveVal ?? '')}
+                            onChange={(e) => setCfgEdits((ed) => ({ ...ed, [f.key]: e.target.value }))}
+                            disabled={saving}
+                          />
+                          {f.suffix && <span className="ct__cfg-suffix">{f.suffix}</span>}
+                          {f.helper && liveVal != null && (
+                            <span className="ct__cfg-helper">{f.helper(editVal !== undefined ? Number(editVal) : liveVal)}</span>
+                          )}
+                        </div>
+                        <button
+                          className="ct__cfg-save-btn"
+                          disabled={!dirty || saving}
+                          onClick={() => saveBotConfig(f.key, cfgEdits[f.key])}
+                        >
+                          {saving ? '...' : result === 'ok' ? '\u2713' : result?.startsWith('err:') ? '\u2717' : 'Save'}
+                        </button>
+                        {result?.startsWith('err:') && (
+                          <span className="ct__cfg-err">{result.slice(4)}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ═══ DANGER ZONE ═══ */}

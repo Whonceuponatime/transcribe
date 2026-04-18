@@ -149,6 +149,8 @@ module.exports = async function handler(req, res) {
             engine:       'V2',
           };
         }),
+        // Full bot_config row for settings panel
+        botConfig:     v2Cfg,
         // V1-era fields explicitly nulled so dashboard knows to ignore them
         config:        null,
         signalScore:   null,
@@ -2275,7 +2277,42 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(payload);
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|structured-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile' });
+    // ── PATCH bot-config — update a single tunable field ─────────────────────
+    if (action === 'bot-config' && req.method === 'PATCH') {
+      const body = req.body ?? {};
+      const { key, value } = body;
+      if (!key || value === undefined) {
+        return res.status(400).json({ error: 'Body must include { key, value }' });
+      }
+      const ALLOWLIST = [
+        // Capital deployment
+        'target_deployment_pct', 'target_entries_per_position', 'krw_min_reserve_pct', 'daily_turnover_cap_pct',
+        // Entry thresholds
+        'entry_rsi_min_uptrend', 'entry_rsi_max_uptrend', 'entry_bb_pct_uptrend',
+        'ob_imbalance_min', 'starter_ob_imbalance_min',
+        // Exit thresholds
+        'exit_quick_trim1_gross_pct', 'exit_quick_trim2_gross_pct',
+        'exit_tactical_final_exit_hours', 'exit_tactical_final_exit_min_net_pct',
+        'exit_core_final_exit_hours', 'exit_core_time_stop_hours', 'exit_tactical_time_stop_hours',
+        // Timing / cooldowns
+        'buy_cooldown_ms', 'core_exit_reentry_cooldown_ms',
+        // Risk controls
+        'max_addons_per_position', 'max_btc_pct', 'max_eth_pct', 'loss_streak_limit',
+      ];
+      if (!ALLOWLIST.includes(key)) {
+        return res.status(400).json({ error: `Key "${key}" is not in the allowlist`, allowed: ALLOWLIST });
+      }
+      const { data: cfgRow } = await supabase.from('bot_config').select('id').limit(1).single();
+      if (!cfgRow?.id) return res.status(500).json({ error: 'bot_config row not found' });
+      const { error: updErr } = await supabase
+        .from('bot_config')
+        .update({ [key]: value, updated_at: new Date().toISOString() })
+        .eq('id', cfgRow.id);
+      if (updErr) return res.status(500).json({ error: updErr.message });
+      return res.status(200).json({ success: true, key, value });
+    }
+
+    return res.status(400).json({ error: 'Unknown action. Use ?action=status|execute|config|v2-config|kill-switch|logs|diagnostics|export|diagnostic-export|structured-export|trade-verification|tuning-export|regime|positions|classify-position|orders|nav|circuit-breakers|adoption|clear-freeze|reconcile|bot-config' });
   } catch (err) {
     console.error('crypto-trader', err);
     res.status(500).json({ ok: false, error: err.message });
