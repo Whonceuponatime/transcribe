@@ -599,7 +599,7 @@ export default function CryptoTraderDashboard() {
             total incl. cash{totalValueUsd != null ? ` · ${fmtUsd(totalValueUsd, 0)}` : ''}
           </div>
           {totalCostKrw > 0 && (
-            <div className="ct__portfolio-pnl" style={{ color: totalPnlKrw >= 0 ? '#22c55e' : '#ef4444' }}>
+            <div className="ct__portfolio-pnl" style={{ color: totalPnlKrw >= 0 ? '#ef4444' : '#3b82f6' }}>
               P&L {totalPnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnlKrw))}
               {' '}unrealised
             </div>
@@ -1249,7 +1249,7 @@ export default function CryptoTraderDashboard() {
                     <tbody>
                       {tactical.map((p) => {
                         const pnl = p.unrealized_pnl_pct;
-                        const pnlColor = pnl == null ? '#666' : pnl >= 0 ? '#22c55e' : '#ef4444';
+                        const pnlColor = pnl == null ? '#666' : pnl >= 0 ? '#ef4444' : '#3b82f6';
                         const ageMs  = p.opened_at ? Date.now() - new Date(p.opened_at).getTime() : null;
                         const ageStr = ageMs == null ? '—' : ageMs > 86400000
                           ? `${Math.floor(ageMs / 86400000)}d ${Math.floor((ageMs % 86400000) / 3600000)}h`
@@ -1322,7 +1322,7 @@ export default function CryptoTraderDashboard() {
             {totalPnlKrw != null && (
               <div className="ct__telem-card">
                 <div className="ct__telem-label">Unrealized P&amp;L</div>
-                <div className="ct__telem-val" style={{ color: totalPnlKrw >= 0 ? '#22c55e' : '#ef4444' }}>
+                <div className="ct__telem-val" style={{ color: totalPnlKrw >= 0 ? '#ef4444' : '#3b82f6' }}>
                   {totalPnlKrw >= 0 ? '+' : ''}₩{Math.round(totalPnlKrw).toLocaleString()}
                 </div>
               </div>
@@ -1402,8 +1402,8 @@ export default function CryptoTraderDashboard() {
                   const isSubmitted = ['BUY_SUBMITTED', 'ADD_ON_SUBMITTED', 'STARTER_SUBMITTED'].includes(d.final_action);
                   const isSell      = d.final_action === 'SELL_TRIGGERED';
                   const isElig      = ['BUY_ELIGIBLE', 'ADD_ON_ELIGIBLE', 'STARTER_ELIGIBLE'].includes(d.final_action);
-                  const chipBg    = isSubmitted ? 'rgba(34,197,94,0.15)' : isSell ? 'rgba(245,158,11,0.13)' : isElig ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)';
-                  const chipColor = isSubmitted ? '#22c55e' : isSell ? '#f59e0b' : isElig ? '#60a5fa' : '#444';
+                  const chipBg    = isSubmitted ? 'rgba(239,68,68,0.15)' : isSell ? 'rgba(59,130,246,0.13)' : isElig ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)';
+                  const chipColor = isSubmitted ? '#ef4444' : isSell ? '#3b82f6' : isElig ? '#f87171' : '#555';
                   const obBlocked = d.ob_imbalance != null && d.effective_ob_threshold != null && d.ob_imbalance < d.effective_ob_threshold;
                   const bbBlocked = d.bb_pctB != null && d.effective_bb_threshold != null && d.bb_pctB >= d.effective_bb_threshold;
                   const dr = d.regime ? regStyle(d.regime) : null;
@@ -1674,6 +1674,7 @@ export default function CryptoTraderDashboard() {
                           className="ct__cfg-save-btn"
                           disabled={!dirty || saving}
                           onClick={() => saveBotConfig(f.key, cfgEdits[f.key])}
+                          style={result === 'ok' ? { color: '#00e5ff', borderColor: '#00e5ff' } : result?.startsWith('err:') ? { color: '#f59e0b', borderColor: '#f59e0b' } : undefined}
                         >
                           {saving ? '...' : result === 'ok' ? '\u2713' : result?.startsWith('err:') ? '\u2717' : 'Save'}
                         </button>

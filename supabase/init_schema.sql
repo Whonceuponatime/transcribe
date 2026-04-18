@@ -782,6 +782,13 @@ CREATE TABLE IF NOT EXISTS bot_config (
   dt_reclaim_rsi_min            NUMERIC(5,2) NOT NULL DEFAULT 30.0,
   dt_reclaim_rsi_max            NUMERIC(5,2) NOT NULL DEFAULT 48.0,
   dt_reclaim_size_mult          NUMERIC(5,3) NOT NULL DEFAULT 0.15,
+  -- NAV-proportional sizing + tactical exit config (migration 044)
+  target_deployment_pct         NUMERIC DEFAULT 30,
+  target_entries_per_position   INTEGER DEFAULT 8,
+  exit_tactical_final_exit_hours     NUMERIC DEFAULT 4.0,
+  exit_tactical_final_exit_min_net_pct NUMERIC DEFAULT 0.5,
+  exit_tactical_time_stop_hours      NUMERIC DEFAULT 72.0,
+  max_addons_per_position       INTEGER DEFAULT 6,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
