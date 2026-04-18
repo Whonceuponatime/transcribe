@@ -41,7 +41,6 @@ export default function CryptoTraderDashboard() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [executing, setExecuting] = useState(false);
-  // saving/cfg removed — V1 Bot Settings panel retired
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const [triggerPending, setTriggerPending] = useState(false);
@@ -49,6 +48,18 @@ export default function CryptoTraderDashboard() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  // NAV privacy mask — persisted to localStorage
+  const [navMasked, setNavMasked] = useState(() => localStorage.getItem('navMasked') === 'true');
+  const toggleMask = useCallback(() => {
+    setNavMasked((prev) => {
+      const next = !prev;
+      localStorage.setItem('navMasked', String(next));
+      return next;
+    });
+  }, []);
+  const M  = navMasked ? '₩ ••••••' : null; // large currency mask
+  const Ms = navMasked ? '••••'     : null; // small value mask
 
   // V2 state
   const [v2Regime, setV2Regime]               = useState(null);
@@ -591,17 +602,22 @@ export default function CryptoTraderDashboard() {
       {/* ═══ PORTFOLIO TOTAL ═══ */}
       <div className="ct__portfolio-hero">
         <div className="ct__portfolio-total">
-          <div className="ct__portfolio-label">Total Portfolio</div>
+          <div className="ct__portfolio-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            Total Portfolio
+            <span onClick={toggleMask} style={{ cursor: 'pointer', fontSize: '0.72rem', opacity: 0.5, userSelect: 'none' }}
+              title={navMasked ? 'Show values' : 'Hide values'}>
+              {navMasked ? '\u{1F441}\u200D\u{1F5E8}' : '\u{1F441}'}
+            </span>
+          </div>
           <div className="ct__portfolio-value">
-            {status?.totalValueKrw != null ? `₩${fmt(status.totalValueKrw)}` : '—'}
+            {M || (status?.totalValueKrw != null ? `₩${fmt(status.totalValueKrw)}` : '—')}
           </div>
           <div className="ct__portfolio-krw">
-            total incl. cash{totalValueUsd != null ? ` · ${fmtUsd(totalValueUsd, 0)}` : ''}
+            total incl. cash{!navMasked && totalValueUsd != null ? ` · ${fmtUsd(totalValueUsd, 0)}` : ''}
           </div>
           {totalCostKrw > 0 && (
             <div className="ct__portfolio-pnl" style={{ color: totalPnlKrw >= 0 ? '#ef4444' : '#3b82f6' }}>
-              P&L {totalPnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(totalPnlKrw))}
-              {' '}unrealised
+              {M ? `P&L ${Ms} unrealised` : `P&L ${totalPnlKrw >= 0 ? '+' : ''}₩${fmt(Math.abs(totalPnlKrw))} unrealised`}
             </div>
           )}
           {/* Snapshot freshness — source: status.snapshotAt from v2_portfolio_snapshot.
@@ -661,8 +677,8 @@ export default function CryptoTraderDashboard() {
         {/* KRW Cash card */}
         <div className="ct__krw-card">
           <div className="ct__krw-card-label">KRW Cash</div>
-          <div className="ct__krw-card-value">₩{fmt(krwBalance)}</div>
-          {usdKrw && <div className="ct__krw-card-usd">{fmtUsd(krwBalance / usdKrw, 0)}</div>}
+          <div className="ct__krw-card-value">{M || `₩${fmt(krwBalance)}`}</div>
+          {usdKrw && <div className="ct__krw-card-usd">{navMasked ? Ms : fmtUsd(krwBalance / usdKrw, 0)}</div>}
           <div className="ct__krw-card-sub" style={{ marginTop: '0.4rem' }}>
             {v2TradingEnabled ? 'V2 live — signal-driven entries' : 'Trading paused'}
           </div>
@@ -688,7 +704,7 @@ export default function CryptoTraderDashboard() {
 
               <div className="ct__coin-price">
                 {pos.balance > 0 && pos.currentValueKrw != null
-                  ? `₩${fmt(pos.currentValueKrw)}`
+                  ? (M || `₩${fmt(pos.currentValueKrw)}`)
                   : '—'}
               </div>
               {pos.currentPrice != null && (
@@ -706,20 +722,22 @@ export default function CryptoTraderDashboard() {
               {pos.balance > 0 && pos.currentValueKrw != null && (
                 <div className="ct__coin-row">
                   <span className="ct__coin-label">Holding value</span>
-                  <span className="ct__coin-value">₩{fmt(pos.currentValueKrw)}</span>
+                  <span className="ct__coin-value">{M || `₩${fmt(pos.currentValueKrw)}`}</span>
                 </div>
               )}
               {pos.avgBuyKrw > 0 && (
                 <div className="ct__coin-row">
                   <span className="ct__coin-label">Avg buy</span>
-                  <span className="ct__coin-value" style={{ color: '#666' }}>₩{fmt(pos.avgBuyKrw)}</span>
+                  <span className="ct__coin-value" style={{ color: '#666' }}>{M || `₩${fmt(pos.avgBuyKrw)}`}</span>
                 </div>
               )}
 
               {pnlKrw != null && pos.balance > 0 && (
                 <div className={`ct__coin-pnl-abs ct__coin-pnl-abs--${cardMod}`}>
-                  P&L {pnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(pnlKrw))}
-                  {g != null && <span style={{ opacity: 0.75 }}> · {pct(g)}</span>}
+                  {navMasked
+                    ? `P&L ${Ms}`
+                    : <>P&L {pnlKrw >= 0 ? '+' : ''}₩{fmt(Math.abs(pnlKrw))}{g != null && <span style={{ opacity: 0.75 }}> · {pct(g)}</span>}</>
+                  }
                 </div>
               )}
               {pos.balance <= 0 && <div style={{ fontSize: '0.72rem', color: '#444', marginTop: '0.2rem' }}>No position</div>}
@@ -1323,7 +1341,7 @@ export default function CryptoTraderDashboard() {
               <div className="ct__telem-card">
                 <div className="ct__telem-label">Unrealized P&amp;L</div>
                 <div className="ct__telem-val" style={{ color: totalPnlKrw >= 0 ? '#ef4444' : '#3b82f6' }}>
-                  {totalPnlKrw >= 0 ? '+' : ''}₩{Math.round(totalPnlKrw).toLocaleString()}
+                  {navMasked ? Ms : `${totalPnlKrw >= 0 ? '+' : ''}₩${Math.round(totalPnlKrw).toLocaleString()}`}
                 </div>
               </div>
             )}
@@ -1516,10 +1534,10 @@ export default function CryptoTraderDashboard() {
                           {t.side === 'buy' ? '↑ BUY' : '↓ SELL'}
                         </span>
                       </td>
-                      <td>{t.gross_krw ? `₩${fmt(t.gross_krw)}` : '—'}</td>
-                      <td className="ct__bl-fee">{t.fee_krw ? `₩${fmt(t.fee_krw)}` : '—'}</td>
+                      <td>{navMasked ? Ms : (t.gross_krw ? `₩${fmt(t.gross_krw)}` : '—')}</td>
+                      <td className="ct__bl-fee">{navMasked ? Ms : (t.fee_krw ? `₩${fmt(t.fee_krw)}` : '—')}</td>
                       <td style={{ fontWeight: 600, color: t.side === 'sell' ? '#4ade80' : '#60a5fa' }}>
-                        {t.net_krw != null ? `₩${fmt(t.net_krw)}` : '—'}
+                        {navMasked ? Ms : (t.net_krw != null ? `₩${fmt(t.net_krw)}` : '—')}
                       </td>
                       <td>{t.coin_amount ? fmtCoin(t.coin_amount) : '—'}</td>
                       <td className="ct__bl-price">{t.price_krw ? `₩${fmt(t.price_krw)}` : '—'}</td>
