@@ -13,6 +13,8 @@ function getSupabase() {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   const action = req.query.action || '';
 
   const supabase = getSupabase();
