@@ -2,7 +2,6 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const reconEngine = require('../lib/reconciliationEngine');
 const { buildStructuredDiagnosticsExport } = require('../lib/diagnosticStructuredExport');
-const { executeSell } = require('../lib/executionEngine');
 // V1 (cryptoTrader.js) import removed. V2 is the only engine.
 
 function getSupabase() {
@@ -2348,6 +2347,7 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ ok: false, error: `Order too small: ≈₩${Math.round(estimatedKrw)} (min ₩5,000)` });
       }
 
+      const { executeSell } = require('../lib/executionEngine');
       const exit = { asset, sellPct: pct, reason: `manual_withdrawal_${pct}%` };
       const result = await executeSell(supabase, exit, posRow, currentPrice, { regime: null });
 
