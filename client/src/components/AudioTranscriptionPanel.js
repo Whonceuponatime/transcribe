@@ -1,6 +1,79 @@
 import React, { useState, useRef } from 'react';
 import './AudioTranscriptionPanel.css';
 
+// Whisper transcribes at 16 kHz mono internally, so downsampling here is
+// effectively lossless for transcription and shrinks payload ~10×.
+const TARGET_SAMPLE_RATE = 16000;
+const CHUNK_SECONDS      = 60;
+const CHUNK_SAMPLES      = TARGET_SAMPLE_RATE * CHUNK_SECONDS; // ~1.92 MB per WAV chunk
+
+// Decode any browser-supported audio file (MP3/M4A/WAV/OGG/FLAC/WebM/...)
+// to a single Float32 PCM buffer at 16 kHz mono.
+async function decodeToMono16k(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const AudioCtx    = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) throw new Error('AudioContext is not supported in this browser');
+  const ctx       = new AudioCtx();
+  let decoded;
+  try {
+    decoded = await ctx.decodeAudioData(arrayBuffer);
+  } finally {
+    ctx.close();
+  }
+
+  const numChannels = decoded.numberOfChannels;
+  const length      = decoded.length;
+  const mono        = new Float32Array(length);
+  for (let ch = 0; ch < numChannels; ch++) {
+    const data = decoded.getChannelData(ch);
+    for (let i = 0; i < length; i++) mono[i] += data[i] / numChannels;
+  }
+
+  const srcRate = decoded.sampleRate;
+  if (srcRate === TARGET_SAMPLE_RATE) return mono;
+
+  const ratio     = srcRate / TARGET_SAMPLE_RATE;
+  const outLength = Math.floor(length / ratio);
+  const out       = new Float32Array(outLength);
+  for (let i = 0; i < outLength; i++) {
+    const srcIdx = i * ratio;
+    const lo     = Math.floor(srcIdx);
+    const hi     = Math.min(lo + 1, length - 1);
+    const frac   = srcIdx - lo;
+    out[i]       = mono[lo] * (1 - frac) + mono[hi] * frac;
+  }
+  return out;
+}
+
+function encodeWav(pcm, sampleRate) {
+  const numSamples = pcm.length;
+  const dataSize   = numSamples * 2;
+  const buffer     = new ArrayBuffer(44 + dataSize);
+  const view       = new DataView(buffer);
+  const writeStr   = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);              // PCM
+  view.setUint16(22, 1, true);              // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true);              // block align
+  view.setUint16(34, 16, true);             // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let i = 0; i < numSamples; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 const AudioTranscriptionPanel = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -39,44 +112,57 @@ const AudioTranscriptionPanel = () => {
     setTranscription('');
 
     try {
-      const formData = new FormData();
-      formData.append('audio', selectedFile);
-      if (selectedLanguage !== 'auto') {
-        formData.append('language', selectedLanguage);
-      }
-
-      setProgress(20);
-
-      const response = await fetch('/api/transcribe-audio', {
-        method: 'POST',
-        body:   formData,
-      });
-
-      setProgress(80);
-
-      const rawBody = await response.text();
-      let result    = null;
+      // Decode in the browser, then split into 60 s WAV chunks and POST each
+      // to the edge function. Vercel caps request bodies at 4.5 MB, so we
+      // avoid hitting FUNCTION_PAYLOAD_TOO_LARGE by chunking client-side.
+      setProgress(5);
+      let pcm;
       try {
-        result = rawBody ? JSON.parse(rawBody) : null;
-      } catch {
-        // Non-JSON response (HTML error page, plain text, empty body, etc.)
-        const snippet = rawBody.slice(0, 200).replace(/\s+/g, ' ').trim();
-        throw new Error(
-          `Server returned non-JSON response (status ${response.status})` +
-          (snippet ? `: ${snippet}` : '')
-        );
+        pcm = await decodeToMono16k(selectedFile);
+      } catch (decodeErr) {
+        throw new Error(`Could not decode audio file (${decodeErr.message || 'unsupported codec'})`);
+      }
+      if (pcm.length === 0) throw new Error('Decoded audio is empty');
+      setProgress(15);
+
+      const numChunks      = Math.ceil(pcm.length / CHUNK_SAMPLES);
+      const transcriptions = [];
+
+      for (let i = 0; i < numChunks; i++) {
+        const start    = i * CHUNK_SAMPLES;
+        const end      = Math.min(start + CHUNK_SAMPLES, pcm.length);
+        const chunkPcm = pcm.subarray(start, end);
+        const wavBlob  = encodeWav(chunkPcm, TARGET_SAMPLE_RATE);
+
+        const fd = new FormData();
+        fd.append('audio', wavBlob, `chunk-${i}.wav`);
+        if (selectedLanguage !== 'auto') fd.append('language', selectedLanguage);
+
+        const response = await fetch('/api/transcribe-audio', { method: 'POST', body: fd });
+        const rawBody  = await response.text();
+        let result;
+        try {
+          result = rawBody ? JSON.parse(rawBody) : null;
+        } catch {
+          const snippet = rawBody.slice(0, 200).replace(/\s+/g, ' ').trim();
+          throw new Error(
+            `Chunk ${i + 1}/${numChunks}: non-JSON response (status ${response.status})` +
+            (snippet ? `: ${snippet}` : '')
+          );
+        }
+        if (!response.ok) {
+          throw new Error(`Chunk ${i + 1}/${numChunks}: ${result?.error || `status ${response.status}`}`);
+        }
+        if (!result?.success || typeof result.transcription !== 'string') {
+          throw new Error(`Chunk ${i + 1}/${numChunks}: no transcription returned`);
+        }
+
+        transcriptions.push(result.transcription.trim());
+        setProgress(15 + Math.round(((i + 1) / numChunks) * 85));
       }
 
-      if (!response.ok) {
-        throw new Error(result?.error || `Transcription failed (status ${response.status})`);
-      }
-
-      if (result?.success && result.transcription) {
-        setTranscription(result.transcription);
-        setProgress(100);
-      } else {
-        throw new Error('No transcription result received');
-      }
+      setTranscription(transcriptions.filter(Boolean).join(' '));
+      setProgress(100);
 
     } catch (error) {
       console.error('Transcription error:', error);
