@@ -54,14 +54,24 @@ const AudioTranscriptionPanel = () => {
 
       setProgress(80);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Transcription failed');
+      const rawBody = await response.text();
+      let result    = null;
+      try {
+        result = rawBody ? JSON.parse(rawBody) : null;
+      } catch {
+        // Non-JSON response (HTML error page, plain text, empty body, etc.)
+        const snippet = rawBody.slice(0, 200).replace(/\s+/g, ' ').trim();
+        throw new Error(
+          `Server returned non-JSON response (status ${response.status})` +
+          (snippet ? `: ${snippet}` : '')
+        );
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || `Transcription failed (status ${response.status})`);
+      }
 
-      if (result.success && result.transcription) {
+      if (result?.success && result.transcription) {
         setTranscription(result.transcription);
         setProgress(100);
       } else {
