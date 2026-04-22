@@ -2299,7 +2299,7 @@ module.exports = async function handler(req, res) {
         // Timing / cooldowns
         'buy_cooldown_ms', 'core_exit_reentry_cooldown_ms',
         // Risk controls
-        'max_addons_per_position', 'max_btc_pct', 'max_eth_pct', 'loss_streak_limit',
+        'max_addons_per_position', 'max_btc_pct', 'max_eth_pct', 'max_xrp_pct', 'loss_streak_limit',
       ];
       if (!ALLOWLIST.includes(key)) {
         return res.status(400).json({ error: `Key "${key}" is not in the allowlist`, allowed: ALLOWLIST });
@@ -2323,7 +2323,7 @@ module.exports = async function handler(req, res) {
       const { asset, pct, pin: userPin } = body;
 
       if (!userPin || userPin !== pin) return res.status(403).json({ ok: false, error: 'Invalid PIN' });
-      if (!asset || !['BTC', 'ETH', 'SOL'].includes(asset)) return res.status(400).json({ ok: false, error: 'Invalid asset' });
+      if (!asset || !['BTC', 'ETH', 'XRP', 'SOL'].includes(asset)) return res.status(400).json({ ok: false, error: 'Invalid asset' });
       if (pct == null || pct < 1 || pct > 95) return res.status(400).json({ ok: false, error: 'pct must be 1–95' });
 
       const { data: posRow } = await supabase.from('positions')

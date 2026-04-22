@@ -1761,6 +1761,7 @@ export default function CryptoTraderDashboard() {
               { key: 'max_addons_per_position', label: 'Max add-ons per position' },
               { key: 'max_btc_pct',             label: 'Max BTC exposure', suffix: '%' },
               { key: 'max_eth_pct',             label: 'Max ETH exposure', suffix: '%' },
+              { key: 'max_xrp_pct',             label: 'Max XRP exposure', suffix: '%' },
               { key: 'loss_streak_limit',       label: 'Loss streak limit' },
             ]},
           ];

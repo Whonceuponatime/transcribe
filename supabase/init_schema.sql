@@ -719,6 +719,7 @@ CREATE TABLE IF NOT EXISTS bot_config (
   regime_ema_range_pct     NUMERIC(5,3) NOT NULL DEFAULT 0.02,
   max_btc_pct              NUMERIC(5,2) NOT NULL DEFAULT 35,
   max_eth_pct              NUMERIC(5,2) NOT NULL DEFAULT 25,
+  max_xrp_pct              NUMERIC(5,2) NOT NULL DEFAULT 35,
   max_sol_pct              NUMERIC(5,2) NOT NULL DEFAULT 10,
   max_risk_per_signal_pct  NUMERIC(5,2) NOT NULL DEFAULT 2,
   max_entries_per_coin_24h INTEGER      NOT NULL DEFAULT 3,
