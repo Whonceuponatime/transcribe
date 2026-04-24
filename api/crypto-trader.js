@@ -2300,6 +2300,10 @@ module.exports = async function handler(req, res) {
         'buy_cooldown_ms', 'core_exit_reentry_cooldown_ms',
         // Risk controls
         'max_addons_per_position', 'max_btc_pct', 'max_eth_pct', 'max_xrp_pct', 'loss_streak_limit',
+        // Underwater zombie exit
+        'exit_ladder_exhausted_underwater_enabled',
+        'exit_ladder_exhausted_underwater_min_loss_pct',
+        'exit_ladder_exhausted_underwater_min_age_hours',
       ];
       if (!ALLOWLIST.includes(key)) {
         return res.status(400).json({ error: `Key "${key}" is not in the allowlist`, allowed: ALLOWLIST });

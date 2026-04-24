@@ -222,7 +222,10 @@ export default function CryptoTraderDashboard() {
     setCfgSaving((s) => ({ ...s, [key]: true }));
     setCfgResult((r) => { const n = { ...r }; delete n[key]; return n; });
     try {
-      const value = rawValue === '' ? null : isNaN(Number(rawValue)) ? rawValue : Number(rawValue);
+      const value = rawValue === '' ? null
+                  : (rawValue === 'true' || rawValue === true)   ? true
+                  : (rawValue === 'false' || rawValue === false) ? false
+                  : isNaN(Number(rawValue)) ? rawValue : Number(rawValue);
       const res = await fetch(`${API}/api/crypto-trader?action=bot-config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1763,6 +1766,11 @@ export default function CryptoTraderDashboard() {
               { key: 'max_eth_pct',             label: 'Max ETH exposure', suffix: '%' },
               { key: 'max_xrp_pct',             label: 'Max XRP exposure', suffix: '%' },
               { key: 'loss_streak_limit',       label: 'Loss streak limit' },
+            ]},
+            { label: 'Underwater Zombie Exit', fields: [
+              { key: 'exit_ladder_exhausted_underwater_enabled',     label: 'Underwater exit enabled' },
+              { key: 'exit_ladder_exhausted_underwater_min_loss_pct', label: 'Underwater min loss', suffix: '%' },
+              { key: 'exit_ladder_exhausted_underwater_min_age_hours', label: 'Underwater min age', suffix: 'h' },
             ]},
           ];
 
