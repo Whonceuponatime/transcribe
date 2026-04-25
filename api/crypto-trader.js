@@ -2304,6 +2304,9 @@ module.exports = async function handler(req, res) {
         'exit_ladder_exhausted_underwater_enabled',
         'exit_ladder_exhausted_underwater_min_loss_pct',
         'exit_ladder_exhausted_underwater_min_age_hours',
+        // Cash poller (Phase A)
+        'cash_poller_enabled', 'cash_poll_interval_ms', 'cash_backfill_window_days',
+        'cash_settled_states_deposit', 'cash_settled_states_withdraw',
       ];
       if (!ALLOWLIST.includes(key)) {
         return res.status(400).json({ error: `Key "${key}" is not in the allowlist`, allowed: ALLOWLIST });

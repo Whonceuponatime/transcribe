@@ -29,6 +29,7 @@ const riskEngine  = require('../lib/riskEngine');
 const adopter     = require('../lib/portfolioAdopter');
 const reconEngine = require('../lib/reconciliationEngine');
 const { buildTraderRuntimeSnapshot } = require('../lib/traderRuntimeSnapshot');
+const { pollCashMovements } = require('../lib/cashPoller');
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'UPBIT_ACCESS_KEY', 'UPBIT_SECRET_KEY'];
 for (const key of required) {
@@ -52,6 +53,30 @@ async function persistTraderRuntimeMetadata() {
 }
 void persistTraderRuntimeMetadata();
 setInterval(persistTraderRuntimeMetadata, 15 * 60 * 1000);
+
+// Cash movements poller (Phase A). Reads cadence from bot_config at startup;
+// changes to cash_poll_interval_ms take effect after process restart.
+// pollCashMovements never throws; the .catch is belt-and-suspenders.
+async function bootstrapCashPoller() {
+  let intervalMs = 300_000; // matches bot_config default
+  try {
+    const { data } = await supabase
+      .from('bot_config')
+      .select('cash_poll_interval_ms')
+      .limit(1)
+      .single();
+    if (data?.cash_poll_interval_ms) intervalMs = Number(data.cash_poll_interval_ms);
+  } catch (err) {
+    console.warn('[cash-poller] bot_config interval read failed; defaulting to 300000ms:', err.message);
+  }
+  console.log(`[cash-poller] startup — interval=${intervalMs}ms (interval changes require process restart)`);
+  pollCashMovements(supabase).catch((err) => console.error('[cash-poller]', err.message));
+  setInterval(
+    () => pollCashMovements(supabase).catch((err) => console.error('[cash-poller]', err.message)),
+    intervalMs
+  );
+}
+void bootstrapCashPoller();
 
 let runningV2    = false;
 let adoptionDone = false; // set true after startup adoption completes

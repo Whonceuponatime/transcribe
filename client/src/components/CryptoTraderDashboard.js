@@ -218,14 +218,19 @@ export default function CryptoTraderDashboard() {
   }, [fetchV2Data]);
 
   // Save a single bot_config field via PATCH
-  const saveBotConfig = useCallback(async (key, rawValue) => {
+  const saveBotConfig = useCallback(async (key, rawValue, type) => {
     setCfgSaving((s) => ({ ...s, [key]: true }));
     setCfgResult((r) => { const n = { ...r }; delete n[key]; return n; });
     try {
-      const value = rawValue === '' ? null
-                  : (rawValue === 'true' || rawValue === true)   ? true
-                  : (rawValue === 'false' || rawValue === false) ? false
-                  : isNaN(Number(rawValue)) ? rawValue : Number(rawValue);
+      let value;
+      if (type === 'text[]') {
+        value = String(rawValue ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+      } else {
+        value = rawValue === '' ? null
+              : (rawValue === 'true' || rawValue === true)   ? true
+              : (rawValue === 'false' || rawValue === false) ? false
+              : isNaN(Number(rawValue)) ? rawValue : Number(rawValue);
+      }
       const res = await fetch(`${API}/api/crypto-trader?action=bot-config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1772,6 +1777,13 @@ export default function CryptoTraderDashboard() {
               { key: 'exit_ladder_exhausted_underwater_min_loss_pct', label: 'Underwater min loss', suffix: '%' },
               { key: 'exit_ladder_exhausted_underwater_min_age_hours', label: 'Underwater min age', suffix: 'h' },
             ]},
+            { label: 'Cash Poller', fields: [
+              { key: 'cash_poller_enabled',          label: 'Cash poller enabled' },
+              { key: 'cash_poll_interval_ms',        label: 'Poll interval',           suffix: 'ms', helper: msToMin },
+              { key: 'cash_backfill_window_days',    label: 'Backfill window',         suffix: 'd' },
+              { key: 'cash_settled_states_deposit',  label: 'Settled deposit states',  type: 'text[]', helper: () => 'comma-separated' },
+              { key: 'cash_settled_states_withdraw', label: 'Settled withdraw states', type: 'text[]', helper: () => 'comma-separated' },
+            ]},
           ];
 
           return (
@@ -1780,11 +1792,12 @@ export default function CryptoTraderDashboard() {
                 <div key={grp.label} className="ct__cfg-group">
                   <h5 className="ct__cfg-group-title">{grp.label}</h5>
                   {grp.fields.map((f) => {
-                    const liveVal  = bc[f.key];
-                    const editVal  = cfgEdits[f.key];
-                    const saving   = cfgSaving[f.key];
-                    const result   = cfgResult[f.key];
-                    const dirty    = editVal !== undefined && String(editVal) !== String(liveVal ?? '');
+                    const liveVal    = bc[f.key];
+                    const displayVal = Array.isArray(liveVal) ? liveVal.join(', ') : (liveVal ?? '');
+                    const editVal    = cfgEdits[f.key];
+                    const saving     = cfgSaving[f.key];
+                    const result     = cfgResult[f.key];
+                    const dirty      = editVal !== undefined && String(editVal) !== String(displayVal);
                     return (
                       <div key={f.key} className="ct__cfg-row">
                         <label className="ct__cfg-label">{f.label}</label>
@@ -1792,7 +1805,7 @@ export default function CryptoTraderDashboard() {
                           <input
                             className="ct__cfg-input"
                             type="text"
-                            value={editVal !== undefined ? editVal : (liveVal ?? '')}
+                            value={editVal !== undefined ? editVal : displayVal}
                             onChange={(e) => setCfgEdits((ed) => ({ ...ed, [f.key]: e.target.value }))}
                             disabled={saving}
                           />
@@ -1804,7 +1817,7 @@ export default function CryptoTraderDashboard() {
                         <button
                           className="ct__cfg-save-btn"
                           disabled={!dirty || saving}
-                          onClick={() => saveBotConfig(f.key, cfgEdits[f.key])}
+                          onClick={() => saveBotConfig(f.key, cfgEdits[f.key], f.type)}
                           style={result === 'ok' ? { color: '#00e5ff', borderColor: '#00e5ff' } : result?.startsWith('err:') ? { color: '#f59e0b', borderColor: '#f59e0b' } : undefined}
                         >
                           {saving ? '...' : result === 'ok' ? '\u2713' : result?.startsWith('err:') ? '\u2717' : 'Save'}
