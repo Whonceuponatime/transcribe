@@ -178,6 +178,29 @@ body {
   line-height: 1.2;
 }
 
+/* Brand title hosts the logo image alongside the wordmark text */
+.App-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.App-header__logo {
+  width: 32px;
+  height: 32px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 769px) {
+  .App-header__logo {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 .App-header__tagline {
   color: var(--text-muted);
   font-family: var(--font-ui);

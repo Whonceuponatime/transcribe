@@ -99,7 +99,10 @@ function App() {
       <header className="App-header">
         <div className="App-header__inner">
           <div className="App-header__brand">
-            <h1>🗡️ Sad Dagger</h1>
+            <h1 className="App-header__title">
+              <img src="/logo.png" alt="" className="App-header__logo" />
+              <span>Sad Dagger</span>
+            </h1>
             <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
           </div>
 

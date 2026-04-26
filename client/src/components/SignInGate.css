@@ -29,6 +29,18 @@
   margin: 0 0 0.5rem 0;
   color: var(--text, white);
   font-family: var(--font-brand, inherit);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sign-in-gate__logo {
+  width: 80px;
+  height: 80px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 .sign-in-gate__subtitle {
