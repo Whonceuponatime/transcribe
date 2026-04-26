@@ -16,6 +16,7 @@ import Rewriter from './components/Rewriter';
 import ImageToText from './components/ImageToText';
 import CryptoTraderDashboard from './components/CryptoTraderDashboard';
 import VideoTranscribePage from './components/VideoTranscribePage';
+import HomePage from './components/HomePage';
 import InstallAppBanner from './components/InstallAppBanner';
 
 function App() {
@@ -90,7 +91,7 @@ function App() {
 
       <main className="App-main">
         <Routes>
-          <Route path="/" element={<Navigate to="/trader" replace />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/trader" element={<CryptoTraderDashboard />} />
           <Route path="/video-transcribe" element={<VideoTranscribePage />} />
           <Route path="/audio-transcribe" element={<AudioTranscriptionPanel />} />

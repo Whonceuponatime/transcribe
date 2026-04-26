@@ -1,0 +1,240 @@
+/* HomePage — class-prefixed .home-* so nothing collides with global styles.
+   Reuses tokens from App.css (--bg-surface, --border, --text, --accent, etc).
+   No new color tokens introduced. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-spacer {
+  height: 1.5rem;
+}
+
+/* ───────── Trader glance card ───────── */
+
+.home-glance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.home-glance__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.home-glance__title {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.home-glance__pills {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.home-glance__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.home-glance__pill--kill {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--destructive);
+}
+
+.home-glance__pill--frozen {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.home-glance__pill--status {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+}
+
+.home-glance__pill--status.is-online {
+  color: var(--accent);
+}
+
+.home-glance__pill--status.is-offline {
+  color: var(--destructive);
+}
+
+.home-glance__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.home-glance__pill--status.is-online .home-glance__dot {
+  background: var(--accent);
+  box-shadow: 0 0 5px var(--accent);
+}
+
+.home-glance__pill--status.is-offline .home-glance__dot {
+  background: var(--destructive);
+}
+
+.home-glance__hero {
+  font-family: var(--font-brand);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 769px) {
+  .home-glance__hero {
+    font-size: 2.5rem;
+  }
+}
+
+.home-glance__sub {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.home-glance__recent {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.home-glance__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.home-glance__updated {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--text-hint);
+}
+
+.home-glance__link {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.home-glance__link:hover {
+  color: var(--accent-hover);
+}
+
+.home-glance__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ───────── Tool grid ───────── */
+
+.home-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.home-section__title {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem 0;
+}
+
+.home-section__cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 480px) {
+  .home-section__cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .home-section__cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .home-section__cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.home-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-surface-hover);
+}
+
+.home-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.home-card__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.home-card__title {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.home-card__desc {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
