@@ -1,4 +1,5 @@
 import React from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 
 const CATEGORIES = {
   dashboard: {
@@ -6,7 +7,7 @@ const CATEGORIES = {
     icon: '📊',
     shortLabel: 'Home',
     tools: [
-      { id: 'crypto-trader', label: 'Upbit Bot', icon: '🤖' },
+      { id: 'crypto-trader', label: 'Upbit Bot', icon: '🤖', path: '/trader' },
     ],
   },
   language: {
@@ -14,12 +15,12 @@ const CATEGORIES = {
     icon: '🌐',
     shortLabel: 'Language',
     tools: [
-      { id: 'transcription', label: 'Video Transcribe', icon: '🎬' },
-      { id: 'audio', label: 'Audio Transcribe', icon: '🎵' },
-      { id: 'translator', label: 'Live Translate', icon: '🌐' },
-      { id: 'image-to-text', label: 'Image to Text', icon: '📷' },
-      { id: 'rewriter', label: 'Rewriter', icon: '✉️' },
-      { id: 'tts', label: 'Text to Speech', icon: '📖' },
+      { id: 'transcription',  label: 'Video Transcribe', icon: '🎬', path: '/video-transcribe' },
+      { id: 'audio',          label: 'Audio Transcribe', icon: '🎵', path: '/audio-transcribe' },
+      { id: 'translator',     label: 'Live Translate',   icon: '🌐', path: '/translate' },
+      { id: 'image-to-text',  label: 'Image to Text',    icon: '📷', path: '/image-to-text' },
+      { id: 'rewriter',       label: 'Rewriter',         icon: '✉️', path: '/rewriter' },
+      { id: 'tts',            label: 'Text to Speech',   icon: '📖', path: '/tts' },
     ],
   },
   files: {
@@ -27,10 +28,10 @@ const CATEGORIES = {
     icon: '📁',
     shortLabel: 'Files',
     tools: [
-      { id: 'converter', label: 'Image Convert', icon: '🖼️' },
-      { id: 'markdown-csv', label: 'Markdown/CSV', icon: '📊' },
-      { id: 'zigzag', label: 'Zigzag PDF', icon: '📄' },
-      { id: 'metadata', label: 'Metadata', icon: '🛡️' },
+      { id: 'converter',    label: 'Image Convert', icon: '🖼️', path: '/image-convert' },
+      { id: 'markdown-csv', label: 'Markdown/CSV',  icon: '📊', path: '/markdown-csv' },
+      { id: 'zigzag',       label: 'Zigzag PDF',    icon: '📄', path: '/zigzag' },
+      { id: 'metadata',     label: 'Metadata',      icon: '🛡️', path: '/metadata' },
     ],
   },
 };
@@ -39,15 +40,16 @@ const FLAT_TOOLS = Object.values(CATEGORIES).flatMap((c) =>
   c.tools.map((t) => ({ ...t, category: c.label }))
 );
 
-function getCategoryForTab(tabId) {
+function getCategoryForPath(pathname) {
   for (const [key, cat] of Object.entries(CATEGORIES)) {
-    if (cat.tools.some((t) => t.id === tabId)) return key;
+    if (cat.tools.some((t) => t.path === pathname)) return key;
   }
-  return 'transcription';
+  return 'dashboard';
 }
 
-export default function AppNav({ activeTab, onSelectTab, activeCategory, setActiveCategory }) {
+export default function AppNav({ activeCategory, setActiveCategory }) {
   const category = CATEGORIES[activeCategory];
+  const { pathname } = useLocation();
 
   return (
     <>
@@ -56,25 +58,27 @@ export default function AppNav({ activeTab, onSelectTab, activeCategory, setActi
         <div className="nav-wrap-inner">
           <div className="nav-submenu-panel">
             <div className="nav-submenu" role="tablist" aria-label="Tools">
-              {category.tools.map((tool) => (
-                <button
-                  key={tool.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tool.id}
-                  className={`nav-tool-btn ${activeTab === tool.id ? 'active' : ''}`}
-                  onClick={() => onSelectTab(tool.id)}
-                >
-                  <span aria-hidden>{tool.icon}</span>
-                  <span className="nav-tool-btn__label">{tool.label}</span>
-                </button>
-              ))}
+              {category.tools.map((tool) => {
+                const isActive = pathname === tool.path;
+                return (
+                  <NavLink
+                    key={tool.id}
+                    to={tool.path}
+                    role="tab"
+                    aria-selected={isActive}
+                    className={`nav-tool-btn ${isActive ? 'active' : ''}`}
+                  >
+                    <span aria-hidden>{tool.icon}</span>
+                    <span className="nav-tool-btn__label">{tool.label}</span>
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile-only bottom bar — categories */}
+      {/* Mobile-only bottom bar — categories (UI filter, does not navigate) */}
       <nav className="nav-bottom" aria-label="Category shortcuts">
         {Object.entries(CATEGORIES).map(([key, cat]) => (
           <button
@@ -92,4 +96,4 @@ export default function AppNav({ activeTab, onSelectTab, activeCategory, setActi
   );
 }
 
-export { CATEGORIES, FLAT_TOOLS, getCategoryForTab };
+export { CATEGORIES, FLAT_TOOLS, getCategoryForPath };
