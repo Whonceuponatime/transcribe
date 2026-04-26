@@ -89,3 +89,9 @@ config.json
 
 # Ignore permission-related files
 fix-permissions.sh
+
+# Agent worktree / scratch state
+.claude/
+
+# ChatGPT-generated brand source drops (re-encoded into client/public/)
+ChatGPT Image *.png
