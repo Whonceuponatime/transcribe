@@ -1,6 +1,6 @@
 ═══════════════════════════════════════════════════════════════
  API KEYS REQUIRED — KRW→USD→Crypto Advisor
- (Jack of Clubs / joclubs project)
+ (Sad Dagger project)
 ═══════════════════════════════════════════════════════════════
 
 This file lists every external API the app uses, whether a key

@@ -1,7 +1,7 @@
 {
-  "name": "jack-of-clubs",
+  "name": "saddagger",
   "version": "1.0.0",
-  "description": "Jack of clubs - A comprehensive media processing suite for transcription, metadata removal, and image conversion",
+  "description": "Sad Dagger - A comprehensive media processing suite for transcription, metadata removal, and image conversion",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

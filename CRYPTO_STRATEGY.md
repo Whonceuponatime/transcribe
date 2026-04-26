@@ -302,6 +302,6 @@ Your wealth grows through:
 
 ---
 
-*Document generated from the Jack of Clubs project.*
+*Document generated from the Sad Dagger project.*
 *App lives at: /api/analyzer + client/src/components/AnalyzerDashboard.js*
 *For API setup see: API_REQUIREMENTS.txt*

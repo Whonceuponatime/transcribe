@@ -1,5 +1,5 @@
 // Minimal service worker for PWA installability (Add to Home Screen / Install app)
-const CACHE_NAME = 'joclubs-v1';
+const CACHE_NAME = 'saddagger-v1';
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
