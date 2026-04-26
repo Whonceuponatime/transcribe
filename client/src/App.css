@@ -401,14 +401,75 @@ body {
   .nav-bottom-btn__label {
     white-space: nowrap;
   }
-  .nav-bottom-btn.active,
-  .nav-bottom-btn:active {
+  .nav-bottom-btn.active {
     color: var(--accent);
     background: var(--accent-muted);
   }
+  /* Press-flash: subtle bg lift only on tap of an unselected button.
+     Previously the rule was a comma-list with .active, so every tap
+     briefly looked "selected". Now :active without .active is a quiet
+     tap feedback; only the routed-to button gets the accent fill. */
+  .nav-bottom-btn:active:not(.active) {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── Mobile: flip nav content ──
+     Top sticky band shows CATEGORIES (UI filter, no navigation).
+     Bottom fixed bar shows TOOLS as NavLinks (the actual destinations).
+     The desktop tool sub-strip (.nav-submenu-panel) is hidden, and the
+     desktop header categories segmented control (.App-header__inner
+     .nav-categories) is already hidden on mobile by the rule near the
+     top of this file. */
+  .nav-submenu-panel {
+    display: none;
+  }
+  .nav-categories--mobile {
+    display: flex;
+    width: 100%;
+    /* Inherits the .nav-categories segmented-control look (scroll, padding,
+       bg, border) — only the layout role changes here. */
+  }
+
+  /* Tools in the bottom bar: horizontal scroll like the desktop sub-strip.
+     Each tool keeps a min-width so labels don't crush; long labels truncate
+     with an ellipsis rather than wrap. */
+  .nav-bottom {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav-bottom::-webkit-scrollbar { display: none; }
+
+  .nav-bottom-btn--tool {
+    flex: 0 0 auto;
+    min-width: 72px;
+  }
+  .nav-bottom-btn--tool .nav-bottom-btn__label {
+    max-width: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.65rem;
+  }
+
   .App-main {
     padding-bottom: calc(var(--touch-min) + 16px + var(--safe-bottom) + 1rem);
   }
+}
+
+/* Hide the header's categories segmented control on the home route.
+   <AppNav> isn't rendered on /, so the segmented control would be a
+   purposeless filter with no sub-strip beneath it. Higher specificity
+   (3 classes) than the desktop @media rule (2 classes), so this wins
+   inside the desktop breakpoint. On mobile .nav-categories in the header
+   is already hidden, so this is a no-op there. */
+.App--home .App-header__inner .nav-categories {
+  display: none;
+}
+
+/* Desktop: keep the new mobile-only category strip hidden. */
+.nav-categories--mobile {
+  display: none;
 }
 
 /* Shared card (Template A/B) — less padding on mobile */

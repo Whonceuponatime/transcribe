@@ -49,9 +49,12 @@ function App() {
     return <SignInGate />;
   }
 
+  const isHome = location.pathname === '/';
+
   return (
-    <div className="App">
+    <div className={`App${isHome ? ' App--home' : ''}`}>
       <InstallAppBanner />
+
       <header className="App-header">
         <div className="App-header__inner">
           <div className="App-header__brand">
@@ -84,10 +87,12 @@ function App() {
         </div>
       </header>
 
-      <AppNav
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-      />
+      {!isHome && (
+        <AppNav
+          activeCategory={activeCategory}
+          setActiveCategory={setActiveCategory}
+        />
+      )}
 
       <main className="App-main">
         <Routes>
