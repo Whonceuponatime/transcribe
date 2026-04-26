@@ -5,6 +5,14 @@
 .home {
   display: flex;
   flex-direction: column;
+  /* Subtle diagonal scanlines — texture only, must stay barely visible. */
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 24px,
+    rgba(255, 255, 255, 0.012) 24px,
+    rgba(255, 255, 255, 0.012) 25px
+  );
 }
 
 .home-spacer {
@@ -17,6 +25,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  /* Phosphor accent — marks the trader card as the headline element
+     and matches the dashboard category color identity. */
+  border-left: 3px solid var(--accent);
 }
 
 .home-glance__header {
@@ -173,6 +184,24 @@
   margin: 0 0 0.75rem 0;
 }
 
+/* Section divider bar — color resolved per section modifier below. */
+.home-section__title::after {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  margin-top: 0.4rem;
+  background: var(--border-strong);
+}
+
+.home-section--language .home-section__title::after {
+  background: var(--accent);
+}
+
+.home-section--files .home-section__title::after {
+  background: #f59e0b;
+}
+
 .home-section__cards {
   display: grid;
   grid-template-columns: 1fr;
@@ -207,7 +236,7 @@
   border-radius: var(--radius);
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .home-card:hover {
@@ -220,9 +249,46 @@
   outline-offset: 2px;
 }
 
+/* Category color identity — per-section left edge.
+   On hover, an inset 1px shadow flush against the inside of the left
+   border lifts the visible accent thickness from 3px to 4px without
+   any layout shift. The hover :hover above turns top/right/bottom green;
+   the modifier below pins the left edge to its category color. */
+
+.home-card--language {
+  border-left: 3px solid var(--accent);
+}
+
+.home-card--language:hover {
+  box-shadow: inset 1px 0 0 var(--accent);
+}
+
+.home-card--files {
+  border-left: 3px solid #f59e0b;
+}
+
+.home-card--files:hover {
+  border-left-color: #f59e0b;
+  box-shadow: inset 1px 0 0 #f59e0b;
+}
+
 .home-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28px;
   line-height: 1;
+}
+
+.home-card--language .home-card__icon {
+  background: rgba(34, 197, 94, 0.10);
+}
+
+.home-card--files .home-card__icon {
+  background: rgba(245, 158, 11, 0.10);
 }
 
 .home-card__title {

@@ -26,11 +26,15 @@ export default function ToolGrid() {
         const cat = CATEGORIES[key];
         if (!cat) return null;
         return (
-          <section key={key} className="home-section" aria-label={cat.label}>
+          <section key={key} className={`home-section home-section--${key}`} aria-label={cat.label}>
             <h2 className="home-section__title">{cat.label}</h2>
             <div className="home-section__cards">
               {cat.tools.map((tool) => (
-                <Link key={tool.id} to={tool.path} className="home-card">
+                <Link
+                  key={tool.id}
+                  to={tool.path}
+                  className={`home-card home-card--${key}`}
+                >
                   <span className="home-card__icon" aria-hidden>{tool.icon}</span>
                   <span className="home-card__title">{tool.label}</span>
                   <span className="home-card__desc">
