@@ -20,7 +20,7 @@
 }
 
 .step-done {
-  color: var(--accent, #22c55e);
+  color: var(--accent);
 }
 
 .step-active {
@@ -38,7 +38,7 @@
 }
 
 .check-done {
-  color: var(--accent, #22c55e);
+  color: var(--accent);
 }
 
 .transcription-toolbar {
@@ -165,7 +165,7 @@
   border: 1px solid var(--border);
   padding: 0.5rem;
   margin-bottom: 0.3rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .history-header {

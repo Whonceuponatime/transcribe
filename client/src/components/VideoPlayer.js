@@ -356,7 +356,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
             onClick={testVideoPlay}
             style={{ 
               padding: '0.5rem 1rem', 
-              background: '#3498db', 
+              background: 'var(--accent)', 
               color: 'white', 
               border: 'none', 
               borderRadius: '4px',
@@ -370,7 +370,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
 
       {/* Debug info in development */}
       {process.env.NODE_ENV === 'development' && (
-        <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
           Debug: Video loaded: {isVideoLoaded ? 'Yes' : 'No'} | 
           Playing: {isPlaying ? 'Yes' : 'No'} | 
           Duration: {formatTime(duration)} | 

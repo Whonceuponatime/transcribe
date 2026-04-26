@@ -479,11 +479,11 @@ const ImageConverter = () => {
                 <div className="upload-icon">📤</div>
                 <p>{isDragging ? 'Drop files here' : 'Click to select or drag & drop multiple files'}</p>
                 <p className="upload-hint">Supports: PNG, JPG, GIF, WebP, TIFF, BMP, ICO, AVIF, HEIC</p>
-                <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: '#00ff00' }}>
+                <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: 'var(--accent)' }}>
                   💡 How to select multiple files: Hold Ctrl (Windows) or Cmd (Mac) and click files, or drag & drop multiple files
                 </p>
                 {uploadedFiles.length > 0 && (
-                  <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: '#00ff00' }}>
+                  <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: 'var(--accent)' }}>
                     ✅ {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} ready to convert
                   </p>
                 )}

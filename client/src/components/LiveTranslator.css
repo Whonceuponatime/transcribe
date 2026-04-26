@@ -79,7 +79,7 @@
 /* Swap button */
 .swap-btn {
   background: var(--accent);
-  color: #0a0a0a;
+  color: var(--bg-page);
   border: none;
   border-radius: 50%;
   width: 40px;
@@ -149,7 +149,7 @@
 
 .start-btn {
   background: var(--accent);
-  color: #0a0a0a;
+  color: var(--bg-page);
 }
 
 .start-btn:hover:not(:disabled) {
@@ -339,7 +339,7 @@
 }
 
 .translation-textarea.original {
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid var(--accent);
 }
 
 .translation-textarea.translated {

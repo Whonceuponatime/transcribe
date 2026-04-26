@@ -4,7 +4,7 @@
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .converter-header {
@@ -16,13 +16,13 @@
   color: var(--text);
   margin-bottom: 10px;
   font-size: 2.2rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .converter-header p {
   color: var(--text);
   font-size: 1.1rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .format-note {
@@ -39,7 +39,7 @@
   margin: 0;
   color: var(--text);
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .converter-container {
@@ -53,14 +53,14 @@
   background: var(--bg-surface);
   border: 1px solid white;
   padding: 25px;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .upload-section h3, .settings-section h3 {
   color: var(--text);
   margin-bottom: 20px;
   font-size: 1.4rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   border-bottom: 1px solid white;
   padding-bottom: 10px;
 }
@@ -108,7 +108,7 @@
 .upload-placeholder p {
   margin: 5px 0;
   color: var(--text);
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .upload-area:hover .upload-placeholder p {
@@ -118,7 +118,7 @@
 .upload-hint {
   font-size: 0.9rem;
   color: var(--text);
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .upload-area:hover .upload-hint {
@@ -133,7 +133,7 @@
   color: white !important;
   margin-bottom: 15px;
   font-size: 1.1rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .image-converter .files-container {
@@ -141,7 +141,7 @@
   overflow-y: auto;
   border: 1px solid white;
   padding: 10px;
-  background-color: #191919 !important;
+  background-color: var(--bg-elevated);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -154,8 +154,8 @@
   padding: 10px;
   transition: background-color 0.2s ease;
   color: var(--text) !important;
-  font-family: 'Source Code Pro', monospace;
-  background-color: #191919 !important;
+  font-family: var(--font-brand);
+  background-color: var(--bg-elevated);
   border: 1px solid var(--border-strong) !important;
   border-radius: 2px;
 }
@@ -183,7 +183,7 @@
   font-weight: 500;
   color: var(--text) !important;
   margin-bottom: 2px;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   background-color: transparent !important;
 }
 
@@ -191,25 +191,25 @@
 .image-converter .file-format * {
   font-size: 0.75rem;
   color: var(--text) !important;
-  background-color: #191919 !important;
+  background-color: var(--bg-elevated);
   border: 1px solid white;
   padding: 2px 6px;
   display: inline-block;
   margin-bottom: 2px;
   width: fit-content;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .image-converter .file-size,
 .image-converter .file-size * {
   font-size: 0.85rem;
   color: var(--text) !important;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   background-color: transparent !important;
 }
 
 .image-converter .remove-file-btn {
-  background-color: #191919 !important;
+  background-color: var(--bg-elevated);
   color: white !important;
   border: 1px solid white !important;
   width: 24px;
@@ -217,7 +217,7 @@
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.2s ease;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   flex-shrink: 0;
 }
 
@@ -244,14 +244,14 @@
   font-weight: 500;
   color: var(--text);
   margin-bottom: 8px;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .setting-description {
   font-size: 0.9rem;
   color: white !important;
   margin: 5px 0 0 0;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .format-select {
@@ -261,7 +261,7 @@
   background: var(--bg-surface);
   color: var(--text);
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   cursor: pointer;
 }
 
@@ -287,7 +287,7 @@
   color: var(--text);
   text-align: center;
   margin-top: 5px;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .resize-settings {
@@ -313,7 +313,7 @@
   font-size: 0.9rem;
   color: white !important;
   margin-bottom: 5px;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .dimension-input input {
@@ -322,7 +322,7 @@
   background: var(--bg-surface);
   color: var(--text);
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .dimension-input input:focus {
@@ -344,7 +344,7 @@
   padding: 15px 20px;
   font-size: 1.1rem;
   font-weight: 600;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   cursor: pointer;
   transition: all 0.3s ease;
   margin-bottom: 20px;
@@ -417,7 +417,7 @@
   color: white !important;
   font-size: 0.9rem;
   margin: 0;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   font-weight: 500;
 }
 
@@ -432,7 +432,7 @@
   color: var(--text);
   margin-bottom: 15px;
   font-size: 1.1rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .converted-files {
@@ -448,7 +448,7 @@
   padding: 8px 0;
   border-bottom: 1px solid white;
   color: var(--text);
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
 }
 
 .converted-file-item:last-child {
@@ -462,7 +462,7 @@
   padding: 4px 12px;
   cursor: pointer;
   font-size: 0.8rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   font-weight: 600;
   transition: all 0.2s ease;
 }
@@ -480,7 +480,7 @@
   padding: 10px 15px;
   cursor: pointer;
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   font-weight: 600;
   transition: all 0.2s ease;
   margin-bottom: 15px;
@@ -499,7 +499,7 @@
   padding: 10px 15px;
   cursor: pointer;
   font-size: 0.9rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   font-weight: 600;
   transition: all 0.2s ease;
 }
@@ -523,7 +523,7 @@
   padding: 12px 20px;
   cursor: pointer;
   font-size: 1rem;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--font-brand);
   font-weight: 600;
   transition: all 0.3s ease;
 }
