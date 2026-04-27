@@ -272,21 +272,6 @@
   color: var(--text);
 }
 
-.image-to-text-placeholder {
-  color: var(--text-hint);
-  font-size: 0.9rem;
-}
-
-.image-to-text-loading {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-.image-to-text-error {
-  color: var(--destructive);
-  font-size: 0.9rem;
-}
-
 .image-to-text-actions {
   display: flex;
   flex-wrap: wrap;

@@ -142,21 +142,6 @@
   color: var(--text);
 }
 
-.rewriter-placeholder {
-  color: var(--text-hint);
-  font-size: 0.9rem;
-}
-
-.rewriter-loading {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-.rewriter-error {
-  color: var(--destructive);
-  font-size: 0.9rem;
-}
-
 .rewriter-actions {
   display: flex;
   flex-wrap: wrap;

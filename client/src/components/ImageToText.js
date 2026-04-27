@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
+import StatusMessage from './StatusMessage';
+import Spinner from './Spinner';
 import './ImageToText.css';
 import { downloadText } from '../lib/downloadText';
 
@@ -267,16 +269,14 @@ export default function ImageToText() {
           <label className="image-to-text-pane-label">Transcribed text</label>
           <div className="image-to-text-output">
             {loading && (
-              <div className="image-to-text-loading">
-                Transcribing {images.length} image{images.length !== 1 ? 's' : ''}…
-              </div>
+              <Spinner label={`Transcribing ${images.length} image${images.length !== 1 ? 's' : ''}…`} />
             )}
-            {error && <div className="image-to-text-error">{error}</div>}
+            {error && <StatusMessage kind="error">{error}</StatusMessage>}
             {!loading && result && (
               <pre className="image-to-text-plain">{result}</pre>
             )}
             {!loading && !result && !error && (
-              <span className="image-to-text-placeholder">Result will appear here.</span>
+              <StatusMessage kind="empty">Result will appear here.</StatusMessage>
             )}
           </div>
         </div>

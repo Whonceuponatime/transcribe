@@ -158,14 +158,14 @@ const MetadataPanel = () => {
   return (
     <div className="metadata-panel">
       <div className="metadata-header">
-        <h2>🛡️ Metadata Removal & Replacement</h2>
+        <h2>Metadata Removal & Replacement</h2>
         <p>Upload videos and images to remove or replace metadata for privacy protection</p>
       </div>
 
       <div className="metadata-container">
         <div className="left-section card">
           <div className="upload-section">
-            <h3>📁 Upload Files</h3>
+            <h3>Upload Files</h3>
             <div className="upload-area">
               <input
                 type="file"
@@ -176,7 +176,6 @@ const MetadataPanel = () => {
                 className="file-input"
               />
               <div className="upload-placeholder">
-                <div className="upload-icon">📤</div>
                 <p>Click to select or drag & drop</p>
                 <p className="upload-hint">Supports: MP4, AVI, MOV, JPG, PNG, GIF, etc.</p>
               </div>
@@ -208,7 +207,7 @@ const MetadataPanel = () => {
 
         <div className="right-section card">
           <div className="options-section">
-            <h3>⚙️ Metadata Options</h3>
+            <h3>Metadata Options</h3>
             
             <div className="option-group">
               <label className="option-label">
@@ -320,7 +319,7 @@ const MetadataPanel = () => {
               onClick={processFiles}
               disabled={isProcessing || uploadedFiles.length === 0}
             >
-              {isProcessing ? 'Processing...' : '🛡️ Process Metadata'}
+              {isProcessing ? 'Processing...' : 'Process Metadata'}
             </button>
 
             {isProcessing && (
@@ -337,7 +336,7 @@ const MetadataPanel = () => {
 
             {processedFiles.length > 0 && (
               <div className="results-section">
-                <h4>✅ Processed Files ({processedFiles.length})</h4>
+                <h4>Processed Files ({processedFiles.length})</h4>
                 <div className="processed-files">
                   {processedFiles.map((filename, index) => (
                     <div key={index} className="processed-file-item">
@@ -346,7 +345,7 @@ const MetadataPanel = () => {
                         className="download-btn"
                         onClick={() => downloadFile(filename)}
                       >
-                        📥 Download
+                        Download
                       </button>
                     </div>
                   ))}
@@ -355,7 +354,7 @@ const MetadataPanel = () => {
                   className="download-all-btn"
                   onClick={downloadAllFiles}
                 >
-                  📦 Download All
+                  Download All
                 </button>
               </div>
             )}
@@ -365,7 +364,7 @@ const MetadataPanel = () => {
               onClick={clearAll}
               disabled={isProcessing}
             >
-              🗑️ Clear All
+              Clear All
             </button>
           </div>
         </div>

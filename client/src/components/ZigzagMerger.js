@@ -192,14 +192,14 @@ const ZigzagMerger = () => {
   return (
     <div className="zigzag-merger">
       <div className="merger-header">
-        <h2>📄 Zigzag PDF Merger</h2>
+        <h2>Zigzag PDF Merger</h2>
         <p>Merge two PDFs by alternating pages: old page 1, new page 1, old page 2, new page 2, etc.</p>
       </div>
 
       <div className="merger-container">
         <div className="left-section card">
           <div className="merge-section">
-            <h3>📎 Zigzag Merge</h3>
+            <h3>Zigzag Merge</h3>
             
             <div className="upload-group">
               <label className="upload-label">Cover Page (Optional)</label>
@@ -217,7 +217,6 @@ const ZigzagMerger = () => {
                   className="file-input"
                 />
                 <div className="upload-placeholder">
-                  <div className="upload-icon">📄</div>
                   <p>{coverPage ? coverPage.name : 'Click to select or drag & drop (optional)'}</p>
                   {coverPage && (
                     <p className="file-size-text">{formatFileSize(coverPage.size)}</p>
@@ -242,7 +241,6 @@ const ZigzagMerger = () => {
                   className="file-input"
                 />
                 <div className="upload-placeholder">
-                  <div className="upload-icon">📄</div>
                   <p>{oldPdf ? oldPdf.name : 'Click to select or drag & drop'}</p>
                   {oldPdf && (
                     <p className="file-size-text">{formatFileSize(oldPdf.size)}</p>
@@ -267,7 +265,6 @@ const ZigzagMerger = () => {
                   className="file-input"
                 />
                 <div className="upload-placeholder">
-                  <div className="upload-icon">📄</div>
                   <p>{newPdf ? newPdf.name : 'Click to select or drag & drop'}</p>
                   {newPdf && (
                     <p className="file-size-text">{formatFileSize(newPdf.size)}</p>
@@ -281,7 +278,7 @@ const ZigzagMerger = () => {
               onClick={zigzagMerge}
               disabled={isMerging || !oldPdf || !newPdf}
             >
-              {isMerging ? 'Merging...' : '🔄 Zigzag Merge'}
+              {isMerging ? 'Merging...' : 'Zigzag Merge'}
             </button>
 
             {mergeStatus && (
@@ -295,14 +292,14 @@ const ZigzagMerger = () => {
               onClick={clearMerge}
               disabled={isMerging}
             >
-              🗑️ Clear
+              Clear
             </button>
           </div>
         </div>
 
         <div className="right-section card">
           <div className="unzigzag-section">
-            <h3>✂️ Unzigzag</h3>
+            <h3>Unzigzag</h3>
             
             <div className="upload-group">
               <label className="upload-label">Zigzagged PDF</label>
@@ -320,7 +317,6 @@ const ZigzagMerger = () => {
                   className="file-input"
                 />
                 <div className="upload-placeholder">
-                  <div className="upload-icon">📄</div>
                   <p>{zigzagPdf ? zigzagPdf.name : 'Click to select or drag & drop'}</p>
                   {zigzagPdf && (
                     <p className="file-size-text">{formatFileSize(zigzagPdf.size)}</p>
@@ -334,7 +330,7 @@ const ZigzagMerger = () => {
               onClick={unzigzag}
               disabled={isUnzigzagging || !zigzagPdf}
             >
-              {isUnzigzagging ? 'Splitting...' : '✂️ Unzigzag'}
+              {isUnzigzagging ? 'Splitting...' : 'Unzigzag'}
             </button>
 
             {unzigzagStatus && (
@@ -345,7 +341,7 @@ const ZigzagMerger = () => {
 
             {unzigzagFiles.length > 0 && (
               <div className="results-section">
-                <h4>✅ Split Files ({unzigzagFiles.length})</h4>
+                <h4>Split Files ({unzigzagFiles.length})</h4>
                 <div className="split-files">
                   {unzigzagFiles.map((filename, index) => (
                     <div key={index} className="split-file-item">
@@ -354,7 +350,7 @@ const ZigzagMerger = () => {
                         className="download-btn"
                         onClick={() => downloadFile(filename)}
                       >
-                        📥 Download
+                        Download
                       </button>
                     </div>
                   ))}
@@ -367,7 +363,7 @@ const ZigzagMerger = () => {
               onClick={clearUnzigzag}
               disabled={isUnzigzagging}
             >
-              🗑️ Clear
+              Clear
             </button>
           </div>
         </div>

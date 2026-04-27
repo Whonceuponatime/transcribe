@@ -107,20 +107,6 @@
   transform: none;
 }
 
-/* Error message */
-.error-message {
-  background: rgba(220, 38, 38, 0.1);
-  color: var(--destructive);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-left: 3px solid var(--destructive);
-  font-size: 0.9rem;
-}
-
 /* Recording controls */
 .recording-controls {
   display: flex;
@@ -228,34 +214,10 @@
   50% { opacity: 0.5; transform: scale(1.2); }
 }
 
-/* Processing indicator */
+/* Processing indicator wrapper — preserves the section-level spacing
+   that the prior .processing-indicator card provided. */
 .processing-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  background: var(--accent-muted);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: var(--radius-sm);
   margin-bottom: 1rem;
-  color: var(--accent);
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 /* Translation panels */

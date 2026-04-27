@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import StatusMessage from './StatusMessage';
 import './AudioTranscriptionPanel.css';
 
 // Whisper transcribes at 16 kHz mono internally, so downsampling here is
@@ -205,7 +206,7 @@ const AudioTranscriptionPanel = () => {
   return (
     <div className="audio-transcription-panel card">
       <div className="panel-header">
-        <h3>🎵 Audio Transcription</h3>
+        <h3>Audio Transcription</h3>
         <p className="subtitle">Direct audio-to-text transcription (no video processing)</p>
       </div>
 
@@ -265,14 +266,7 @@ const AudioTranscriptionPanel = () => {
 
       {/* Error message */}
       {error && (
-        <div className="error-message">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-          {error}
-        </div>
+        <StatusMessage kind="error">{error}</StatusMessage>
       )}
 
       {/* Progress bar */}

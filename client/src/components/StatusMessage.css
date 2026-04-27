@@ -1,0 +1,63 @@
+/* Shared status / loading / spinner styles. */
+
+.status-msg {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-msg--loading {
+  color: var(--text-muted);
+  background: var(--bg-page);
+}
+
+.status-msg--empty {
+  color: var(--text-hint);
+  background: transparent;
+  border-style: dashed;
+  justify-content: center;
+  text-align: center;
+}
+
+.status-msg--error {
+  color: var(--destructive);
+  background: rgba(220, 38, 38, 0.10);
+  border-color: var(--destructive);
+}
+
+.status-msg--success {
+  color: var(--accent);
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+
+.status-msg--info {
+  color: var(--text-muted);
+  background: var(--bg-page);
+}
+
+@keyframes status-spin {
+  to { transform: rotate(360deg); }
+}
+
+.status-spinner {
+  display: inline-block;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: status-spin 0.8s linear infinite;
+}
+
+.status-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}

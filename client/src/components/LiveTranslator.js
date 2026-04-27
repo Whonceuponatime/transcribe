@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import io from 'socket.io-client';
+import StatusMessage from './StatusMessage';
+import Spinner from './Spinner';
 import './LiveTranslator.css';
 
 const LiveTranslator = () => {
@@ -222,7 +224,7 @@ const LiveTranslator = () => {
   return (
     <div className="live-translator">
       <div className="translator-header">
-        <h3>🌐 Live Translator</h3>
+        <h3>Live Translator</h3>
         <p className="subtitle">Real-time audio translation using Whisper</p>
       </div>
 
@@ -264,14 +266,7 @@ const LiveTranslator = () => {
 
       {/* Error message */}
       {error && (
-        <div className="error-message">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-          {error}
-        </div>
+        <StatusMessage kind="error">{error}</StatusMessage>
       )}
 
       {/* Recording Controls */}
@@ -323,8 +318,7 @@ const LiveTranslator = () => {
       {/* Processing indicator */}
       {isProcessing && (
         <div className="processing-indicator">
-          <div className="spinner"></div>
-          <span>Processing audio...</span>
+          <Spinner label="Processing audio..." />
         </div>
       )}
 

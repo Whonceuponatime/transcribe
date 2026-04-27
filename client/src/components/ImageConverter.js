@@ -355,7 +355,7 @@ const ImageConverter = () => {
 
       const result = await response.json();
       setConvertedFiles(result.convertedFiles || []);
-      setConversionStatus(`✅ Conversion completed! ${result.convertedCount || result.convertedFiles.length} of ${result.totalFiles || uploadedFiles.length} files converted successfully.`);
+      setConversionStatus(`Conversion completed. ${result.convertedCount || result.convertedFiles.length} of ${result.totalFiles || uploadedFiles.length} files converted successfully.`);
       setConversionProgress(100);
 
     } catch (error) {
@@ -364,7 +364,7 @@ const ImageConverter = () => {
         clearInterval(progressInterval);
       }
       console.error('Error converting images:', error);
-      setConversionStatus(`❌ Error: ${error.message}`);
+      setConversionStatus(`Error: ${error.message}`);
       setConversionProgress(0);
     } finally {
       // Make sure to clear interval
@@ -441,7 +441,7 @@ const ImageConverter = () => {
   return (
     <div className="image-converter">
       <div className="converter-header">
-        <h2>🖼️ Image Format Converter</h2>
+        <h2>Image Format Converter</h2>
         <p>Convert images between different formats with quality and resize options</p>
         <div className="format-note">
           <p><strong>Note:</strong> SVG conversion is not supported as SVG is a vector format. Use PNG, JPEG, or WebP for best results.</p>
@@ -451,7 +451,7 @@ const ImageConverter = () => {
       <div className="converter-container">
         <div className="left-section card">
           <div className="upload-section">
-            <h3>📁 Upload Images</h3>
+            <h3>Upload Images</h3>
             <div 
               className={`upload-area ${isDragging ? 'dragging' : ''}`}
               onDragOver={handleDragOver}
@@ -472,29 +472,26 @@ const ImageConverter = () => {
                 multiple={true}
                 accept="image/*,.heic,.heif"
                 className="file-input"
-                style={{ display: 'none' }}
                 id="image-file-input"
               />
               <div className="upload-placeholder">
-                <div className="upload-icon">📤</div>
                 <p>{isDragging ? 'Drop files here' : 'Click to select or drag & drop multiple files'}</p>
                 <p className="upload-hint">Supports: PNG, JPG, GIF, WebP, TIFF, BMP, ICO, AVIF, HEIC</p>
-                <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: 'var(--accent)' }}>
-                  💡 How to select multiple files: Hold Ctrl (Windows) or Cmd (Mac) and click files, or drag & drop multiple files
+                <p className="upload-hint upload-hint--emphasis">
+                  How to select multiple files: Hold Ctrl (Windows) or Cmd (Mac) and click files, or drag & drop multiple files
                 </p>
                 {uploadedFiles.length > 0 && (
-                  <p className="upload-hint" style={{ marginTop: '10px', fontWeight: 'bold', color: 'var(--accent)' }}>
-                    ✅ {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} ready to convert
+                  <p className="upload-hint upload-hint--emphasis">
+                    {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} ready to convert
                   </p>
                 )}
               </div>
             </div>
-            <button 
+            <button
               className="bulk-select-btn"
               onClick={handleBulkSelectClick}
-              style={{ marginTop: '15px', width: '100%' }}
             >
-              📂 Select Multiple Files
+              Select Multiple Files
             </button>
           </div>
 
@@ -524,7 +521,7 @@ const ImageConverter = () => {
 
         <div className="right-section card">
           <div className="settings-section">
-            <h3>⚙️ Conversion Settings</h3>
+            <h3>Conversion Settings</h3>
             
             <div className="setting-group">
               <label className="setting-label">
@@ -635,7 +632,7 @@ const ImageConverter = () => {
               onClick={convertFiles}
               disabled={isConverting || uploadedFiles.length === 0}
             >
-              {isConverting ? 'Converting...' : '🔄 Convert Images'}
+              {isConverting ? 'Converting...' : 'Convert Images'}
             </button>
 
             {isConverting && (
@@ -652,7 +649,7 @@ const ImageConverter = () => {
 
             {convertedFiles.length > 0 && (
               <div className="results-section">
-                <h4>✅ Converted Files ({convertedFiles.length})</h4>
+                <h4>Converted Files ({convertedFiles.length})</h4>
                 <div className="converted-files">
                   {convertedFiles.map((filename, index) => (
                     <div key={index} className="converted-file-item">
@@ -661,7 +658,7 @@ const ImageConverter = () => {
                         className="download-btn"
                         onClick={() => downloadFile(filename)}
                       >
-                        📥 Download
+                        Download
                       </button>
                     </div>
                   ))}
@@ -670,7 +667,7 @@ const ImageConverter = () => {
                   className="download-all-btn"
                   onClick={downloadAllFiles}
                 >
-                  📦 Download All
+                  Download All
                 </button>
               </div>
             )}
@@ -680,7 +677,7 @@ const ImageConverter = () => {
               onClick={clearAll}
               disabled={isConverting}
             >
-              🗑️ Clear All
+              Clear All
             </button>
           </div>
         </div>

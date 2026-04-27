@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import StatusMessage from './StatusMessage';
 import './MarkdownCSVConverter.css';
 
 const MarkdownCSVConverter = () => {
@@ -157,7 +158,7 @@ Bob,35,Chicago`);
   return (
     <div className="markdown-csv-converter">
       <div className="converter-header">
-        <h2>📊 Markdown/CSV to Excel Converter</h2>
+        <h2>Markdown/CSV to Excel Converter</h2>
         <p>Convert Markdown tables or CSV files to Excel copy-pastable format (TSV)</p>
       </div>
 
@@ -165,7 +166,7 @@ Bob,35,Chicago`);
         <div className="left-section card">
           <div className="input-section">
             <div className="input-header">
-              <h3>📝 Input</h3>
+              <h3>Input</h3>
               <div className="input-type-selector">
                 <label>
                   <input
@@ -212,10 +213,10 @@ Bob,35,Chicago`);
 
             <div className="input-actions">
               <button onClick={handleExample} className="example-btn">
-                📋 Load Example
+                Load Example
               </button>
               <label className="upload-btn">
-                📁 Upload File
+                Upload File
                 <input
                   type="file"
                   accept={inputType === 'csv' ? '.csv' : '.md,.markdown'}
@@ -241,16 +242,16 @@ Bob,35,Chicago`);
         <div className="right-section card">
           <div className="output-section">
             <div className="output-header">
-              <h3>📋 Excel-Ready Output (TSV)</h3>
+              <h3>Excel-Ready Output (TSV)</h3>
               <div className="output-actions">
                 <button onClick={handleConvert} className="convert-btn">
-                  🔄 Convert
+                  Convert
                 </button>
                 <button onClick={handleCopy} className="copy-btn" disabled={!outputText}>
-                  📋 Copy to Clipboard
+                  Copy to Clipboard
                 </button>
                 <button onClick={handleClear} className="clear-btn">
-                  🗑️ Clear
+                  Clear
                 </button>
               </div>
             </div>
@@ -266,15 +267,19 @@ Bob,35,Chicago`);
             />
 
             {copyToast && (
-              <div className="copy-toast" role="status">
-                ✓ Copied to clipboard
-              </div>
+              <StatusMessage kind="success" className="copy-toast">
+                Copied to clipboard
+              </StatusMessage>
             )}
 
             {outputText && (
               <div className="output-info">
-                <p>✅ Conversion complete! Click "Copy to Clipboard" and paste into Excel.</p>
-                <p className="hint">💡 Tip: In Excel, paste using Ctrl+V. The data will automatically be separated into columns.</p>
+                <StatusMessage kind="success">
+                  Conversion complete! Click "Copy to Clipboard" and paste into Excel.
+                </StatusMessage>
+                <StatusMessage kind="info">
+                  Tip: In Excel, paste using Ctrl+V. The data will automatically be separated into columns.
+                </StatusMessage>
               </div>
             )}
           </div>

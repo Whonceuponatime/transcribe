@@ -515,6 +515,12 @@
   cursor: not-allowed;
 }
 
+.upload-hint--emphasis {
+  margin-top: 10px;
+  font-weight: bold;
+  color: var(--accent);
+}
+
 .bulk-select-btn {
   background-color: transparent;
   color: var(--text);
@@ -525,6 +531,8 @@
   font-family: var(--font-brand);
   font-weight: 600;
   transition: all 0.3s ease;
+  margin-top: 15px;
+  width: 100%;
 }
 
 .bulk-select-btn:hover {

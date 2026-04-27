@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import StatusMessage from './StatusMessage';
 import './VideoPlayer.css';
 
 const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
@@ -258,10 +259,12 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
         )}
 
         {videoError && (
-          <div className="video-error">
-            <p>⚠️ {videoError}</p>
-            <p>Supported formats: MP4, AVI, MOV, MKV, WMV, FLV, WebM</p>
-          </div>
+          <StatusMessage kind="error" className="video-error">
+            <div>
+              <p>{videoError}</p>
+              <p>Supported formats: MP4, AVI, MOV, MKV, WMV, FLV, WebM</p>
+            </div>
+          </StatusMessage>
         )}
         
         {isTranscribing && (

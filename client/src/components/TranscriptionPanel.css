@@ -72,25 +72,19 @@
   padding: 0.5rem;
 }
 
-.error-message {
-  padding: 1rem;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-surface);
-  color: var(--text);
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+.troubleshooting-block {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
 }
 
-.warning-message {
-  padding: 1rem;
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+.troubleshooting-steps {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  white-space: pre-line;
+}
+
+.progress-container--spaced {
+  margin-bottom: 1rem;
 }
 
 .debug-info {

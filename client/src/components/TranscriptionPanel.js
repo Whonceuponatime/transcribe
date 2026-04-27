@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import StatusMessage from './StatusMessage';
 import './TranscriptionPanel.css';
 
 const TranscriptionPanel = ({
@@ -271,45 +272,37 @@ const TranscriptionPanel = ({
 
       {/* Browser info */}
       {browserInfo && (
-        <div className="browser-info" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+        <div className="browser-info">
           Browser: {browserInfo} | Audio Processing: {isSupported ? 'Supported' : 'Not Supported'}
         </div>
       )}
 
       {error && (
-        <div className="error-message">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-          {error}
-          <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-            <strong>Troubleshooting steps:</strong>
-            <pre style={{ fontSize: '0.8rem', marginTop: '0.25rem', whiteSpace: 'pre-line' }}>
-              {getTroubleshootingSteps()}
-            </pre>
+        <StatusMessage kind="error">
+          <div>
+            {error}
+            <div className="troubleshooting-block">
+              <strong>Troubleshooting steps:</strong>
+              <pre className="troubleshooting-steps">
+                {getTroubleshootingSteps()}
+              </pre>
+            </div>
           </div>
-        </div>
+        </StatusMessage>
       )}
 
       {!isSupported && (
-        <div className="warning-message">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
+        <StatusMessage kind="info">
           Audio processing requires Chrome or Edge browser
-        </div>
+        </StatusMessage>
       )}
 
       {/* Progress bar */}
       {isProcessing && (
-        <div className="progress-container" style={{ marginBottom: '1rem' }}>
+        <div className="progress-container progress-container--spaced">
           <div className="progress-bar">
-            <div 
-              className="progress-fill" 
+            <div
+              className="progress-fill"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
@@ -321,7 +314,7 @@ const TranscriptionPanel = ({
 
       {/* Debug info for troubleshooting */}
       {process.env.NODE_ENV === 'development' && debugInfo && (
-        <div className="debug-info" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+        <div className="debug-info">
           Debug: {debugInfo} | Processing: {isProcessing ? 'Yes' : 'No'} | Supported: {isSupported ? 'Yes' : 'No'} | Video: {videoFile ? 'Yes' : 'No'}
         </div>
       )}
@@ -341,18 +334,21 @@ const TranscriptionPanel = ({
         {transcription.trim() && (
           <div className="transcription-actions">
             <button type="button" className="btn-secondary copy-btn" onClick={copyWithFeedback}>
-              {copySuccess ? '✓ Copied!' : 'Copy'}
+              Copy
             </button>
             <button type="button" className="btn-secondary download-btn" onClick={downloadTranscription}>
               Download TXT
             </button>
           </div>
         )}
+        {copySuccess && (
+          <StatusMessage kind="success">Copied to clipboard</StatusMessage>
+        )}
       </div>
 
       {transcriptionHistory.length > 0 && (
         <div className="transcription-history">
-          <h4>📝 History</h4>
+          <h4>History</h4>
           <div className="history-list">
             {transcriptionHistory.map((item) => (
               <div key={item.id} className="history-item">

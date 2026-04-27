@@ -154,7 +154,7 @@ const TextToSpeech = () => {
   return (
     <div className="text-to-speech">
       <div className="tts-header">
-        <h2>📖 Text to Speech</h2>
+        <h2>Text to Speech</h2>
         <p>Convert text to audio for learning on the go</p>
       </div>
 
@@ -173,7 +173,7 @@ const TextToSpeech = () => {
               className="upload-btn"
               onClick={() => fileInputRef.current.click()}
             >
-              📁 Choose File
+              Choose File
             </button>
             <span className="file-hint">Supports .txt, .md, .doc, .docx files</span>
           </div>
@@ -258,10 +258,10 @@ const TextToSpeech = () => {
               disabled={isConverting || !text.trim()}
               className="convert-btn"
             >
-              {isConverting ? '🔄 Converting...' : '🎵 Convert to Speech'}
+              {isConverting ? 'Converting...' : 'Convert to Speech'}
             </button>
             <button onClick={clearText} className="clear-btn">
-              🗑️ Clear
+              Clear
             </button>
           </div>
         </div>
@@ -279,13 +279,13 @@ const TextToSpeech = () => {
               />
               <div className="audio-controls">
                 <button onClick={playAudio} disabled={isPlaying} className="play-btn">
-                  ▶️ Play
+                  Play
                 </button>
                 <button onClick={pauseAudio} disabled={!isPlaying} className="pause-btn">
-                  ⏸️ Pause
+                  Pause
                 </button>
                 <button onClick={stopAudio} className="stop-btn">
-                  ⏹️ Stop
+                  Stop
                 </button>
               </div>
               <div className="audio-info">
@@ -305,7 +305,7 @@ const TextToSpeech = () => {
                   className="clear-all-btn"
                   title="Delete all saved texts"
                 >
-                  🗑️ Clear All
+                  Clear All
                 </button>
               )}
             </div>
@@ -328,21 +328,21 @@ const TextToSpeech = () => {
                         className="load-btn"
                         title="Load this text and audio"
                       >
-                        📂 Load
+                        Load
                       </button>
                       <button 
                         onClick={() => downloadAudio(savedText.audioUrl, `${savedText.name}.mp3`)}
                         className="download-btn"
                         title="Download audio file"
                       >
-                        💾 Download
+                        Download
                       </button>
                       <button 
                         onClick={() => deleteSavedText(savedText.id)}
                         className="delete-btn"
                         title="Delete this saved text"
                       >
-                        🗑️ Delete
+                        Delete
                       </button>
                     </div>
                   </div>

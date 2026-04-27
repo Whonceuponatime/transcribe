@@ -101,22 +101,6 @@
   color: var(--accent);
 }
 
-.error-message {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: rgba(220, 38, 38, 0.15);
-  border: 1px solid var(--destructive);
-  border-radius: 6px;
-  color: var(--destructive);
-  margin-bottom: 1rem;
-}
-
-.error-message svg {
-  flex-shrink: 0;
-}
-
 .progress-container {
   margin-bottom: 1.5rem;
 }

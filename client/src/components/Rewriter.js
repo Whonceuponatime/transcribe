@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import StatusMessage from './StatusMessage';
+import Spinner from './Spinner';
 import './Rewriter.css';
 import { downloadText } from '../lib/downloadText';
 
@@ -153,13 +155,13 @@ export default function Rewriter() {
           <label className="rewriter-pane-label">Rewritten</label>
           <div className="rewriter-output">
             {loading ? (
-              <div className="rewriter-loading">Rewriting…</div>
+              <Spinner label="Rewriting…" />
             ) : error ? (
-              <div className="rewriter-error">{error}</div>
+              <StatusMessage kind="error">{error}</StatusMessage>
             ) : rewritten ? (
               <pre className="rewriter-plain">{rewritten}</pre>
             ) : (
-              <span className="rewriter-placeholder">Result will appear here (plain text only).</span>
+              <StatusMessage kind="empty">Result will appear here (plain text only).</StatusMessage>
             )}
           </div>
         </div>
