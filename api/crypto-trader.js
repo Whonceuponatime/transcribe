@@ -1004,6 +1004,41 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ snapshots: snaps || [] });
     }
 
+    // ── GET TWR summary (Phase B) ────────────────────────────────────────────
+    // Bot NAV vs synthetic 33/33/33 BTC/ETH/XRP basket bought at inception,
+    // never rebalanced. Modified Dietz adjusts both sides for cash_movements.
+    if (action === 'twr-summary' && req.method === 'GET') {
+      const { computeTWRSummary } = require('../lib/twrCalc');
+      const result = await computeTWRSummary(supabase);
+
+      // Downsample series for transport. Raw cadence is ~1 row/min, so the
+      // payload would cross Vercel's 4.5 MB limit within ~3 weeks. Cap at
+      // MAX_POINTS evenly-spaced points; always preserve the most recent
+      // point because alpha derives from it.
+      if (result.enabled && Array.isArray(result.series)) {
+        const MAX_POINTS = 500;
+        const raw = result.series;
+        if (raw.length > MAX_POINTS) {
+          const step = Math.ceil(raw.length / MAX_POINTS);
+          const downsampled = [];
+          for (let i = 0; i < raw.length; i += step) {
+            downsampled.push(raw[i]);
+          }
+          if (downsampled[downsampled.length - 1] !== raw[raw.length - 1]) {
+            downsampled.push(raw[raw.length - 1]);
+          }
+          result.series = downsampled;
+          result.seriesDownsampled = true;
+          result.seriesOriginalCount = raw.length;
+        } else {
+          result.seriesDownsampled = false;
+          result.seriesOriginalCount = raw.length;
+        }
+      }
+
+      return res.status(200).json(result);
+    }
+
     // ── GET v2 circuit breaker status ────────────────────────────────────────
     if (action === 'circuit-breakers' && req.method === 'GET') {
       let cbData = null;
@@ -2307,6 +2342,10 @@ module.exports = async function handler(req, res) {
         // Cash poller (Phase A)
         'cash_poller_enabled', 'cash_poll_interval_ms', 'cash_backfill_window_days',
         'cash_settled_states_deposit', 'cash_settled_states_withdraw',
+        // Benchmark / TWR (Phase B)
+        'benchmark_enabled',
+        'benchmark_inception_snapshot_id',
+        'benchmark_basket_weights',
       ];
       if (!ALLOWLIST.includes(key)) {
         return res.status(400).json({ error: `Key "${key}" is not in the allowlist`, allowed: ALLOWLIST });
