@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import './CryptoTraderDashboard.css';
 
 const API = '';
@@ -36,6 +39,23 @@ const FNG_COLOR = (v) => v > 75 ? '#ef4444' : v > 55 ? '#f59e0b' : v > 45 ? '#88
 const FNG_LABEL = (v) => v > 75 ? 'Extreme Greed' : v > 55 ? 'Greed' : v > 45 ? 'Neutral' : v > 25 ? 'Fear' : 'Extreme Fear';
 
 // Toggle component removed — was used only by the retired V1 Bot Settings panel.
+
+// Performance / TWR alpha card — green/red coloring is intentional for the alpha
+// metric (vs the dashboard's elsewhere-used Korean +red/-blue P&L convention).
+// Alpha is "did we beat hodl?", not absolute P&L; green means yes.
+function TwrStatCard({ label, alpha, botTWR, benchmarkTWR }) {
+  const fmtPct = (v) => v == null ? '—' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
+  const color  = alpha == null ? '#94a3b8' : alpha >= 0 ? '#22c55e' : '#ef4444';
+  return (
+    <div className="ct__twr-card">
+      <div className="ct__twr-card-label">{label} alpha</div>
+      <div className="ct__twr-card-value" style={{ color }}>{fmtPct(alpha)}</div>
+      <div className="ct__twr-card-sub">
+        Bot {fmtPct(botTWR)} · Hodl {fmtPct(benchmarkTWR)}
+      </div>
+    </div>
+  );
+}
 
 export default function CryptoTraderDashboard() {
   const [status, setStatus] = useState(null);
@@ -93,6 +113,10 @@ export default function CryptoTraderDashboard() {
   const [weeklyData, setWeeklyData] = useState(null);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
 
+  // Performance Benchmark (TWR vs passive 33/33/33 basket)
+  const [twrData, setTwrData] = useState(null);
+  const [twrPanelOpen, setTwrPanelOpen] = useState(true);
+
   // Manual sell / withdraw
   const [withdrawCoin, setWithdrawCoin] = useState(null);   // coin with form open
   const [withdrawPct, setWithdrawPct]   = useState('');
@@ -123,14 +147,15 @@ export default function CryptoTraderDashboard() {
     if (!silent) setLoading(false);
   }, []);
 
-  // Fetch v2 data (regime, positions, circuit breakers, mode, adoption)
+  // Fetch v2 data (regime, positions, circuit breakers, mode, adoption, twr-summary)
   const fetchV2Data = useCallback(async () => {
     try {
-      const [regimeRes, posRes, cbRes, adoptionRes] = await Promise.all([
+      const [regimeRes, posRes, cbRes, adoptionRes, twrRes] = await Promise.all([
         fetch(`${API}/api/crypto-trader?action=regime`),
         fetch(`${API}/api/crypto-trader?action=positions`),
         fetch(`${API}/api/crypto-trader?action=circuit-breakers`),
         fetch(`${API}/api/crypto-trader?action=adoption`),
+        fetch(`${API}/api/crypto-trader?action=twr-summary`),
       ]);
       if (regimeRes.ok)   { const d = await regimeRes.json();   setV2Regime(d.regime); }
       if (posRes.ok)      { const d = await posRes.json();      setV2Positions(d.positions || []); }
@@ -142,6 +167,7 @@ export default function CryptoTraderDashboard() {
         setReconStatus(d.reconciliation);
         setTradingEnabled(d.tradingEnabled ?? false);
       }
+      if (twrRes.ok)      { setTwrData(await twrRes.json()); }
       // Trading controls (trading_enabled, buys_enabled, sells_enabled) are read
       // from the adoption endpoint's systemState — no separate fetch needed here.
     } catch (_) {}
@@ -225,6 +251,14 @@ export default function CryptoTraderDashboard() {
       let value;
       if (type === 'text[]') {
         value = String(rawValue ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+      } else if (type === 'jsonb') {
+        try {
+          value = JSON.parse(String(rawValue ?? ''));
+        } catch (parseErr) {
+          setCfgResult((r) => ({ ...r, [key]: `err:invalid JSON: ${parseErr.message}` }));
+          setCfgSaving((s) => { const n = { ...s }; delete n[key]; return n; });
+          return;
+        }
       } else {
         value = rawValue === '' ? null
               : (rawValue === 'true' || rawValue === true)   ? true
@@ -1784,6 +1818,11 @@ export default function CryptoTraderDashboard() {
               { key: 'cash_settled_states_deposit',  label: 'Settled deposit states',  type: 'text[]', helper: () => 'comma-separated' },
               { key: 'cash_settled_states_withdraw', label: 'Settled withdraw states', type: 'text[]', helper: () => 'comma-separated' },
             ]},
+            { label: 'Performance Benchmark', fields: [
+              { key: 'benchmark_enabled',                label: 'Benchmark enabled' },
+              { key: 'benchmark_inception_snapshot_id',  label: 'Inception snapshot ID', helper: () => 'change only if you understand benchmark anchoring' },
+              { key: 'benchmark_basket_weights',         label: 'Basket weights',        type: 'jsonb', helper: () => 'JSON object, sum of values must equal 1.0' },
+            ]},
           ];
 
           return (
@@ -1793,7 +1832,11 @@ export default function CryptoTraderDashboard() {
                   <h5 className="ct__cfg-group-title">{grp.label}</h5>
                   {grp.fields.map((f) => {
                     const liveVal    = bc[f.key];
-                    const displayVal = Array.isArray(liveVal) ? liveVal.join(', ') : (liveVal ?? '');
+                    const displayVal = Array.isArray(liveVal)
+                      ? liveVal.join(', ')
+                      : (liveVal !== null && typeof liveVal === 'object')
+                        ? JSON.stringify(liveVal)
+                        : (liveVal ?? '');
                     const editVal    = cfgEdits[f.key];
                     const saving     = cfgSaving[f.key];
                     const result     = cfgResult[f.key];
@@ -1833,6 +1876,113 @@ export default function CryptoTraderDashboard() {
             </div>
           );
         })()}
+      </div>
+
+      {/* ═══ PERFORMANCE — BOT vs HODL BASKET ═══ */}
+      <div className="ct__section">
+        <h4
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setTwrPanelOpen((o) => !o)}
+        >
+          {twrPanelOpen ? '▾' : '▸'} Performance — Bot vs Hodl Basket
+        </h4>
+
+        {twrPanelOpen && (
+          !twrData ? (
+            <p className="ct__muted">Loading…</p>
+          ) : twrData.enabled === false ? (
+            <p className="ct__muted">
+              Benchmark disabled. Enable in Bot Config → Performance Benchmark.
+              {twrData.reason && twrData.reason !== 'disabled' && (
+                <span> (reason: {twrData.reason})</span>
+              )}
+            </p>
+          ) : (
+            <>
+              <div className="ct__twr-cards">
+                <TwrStatCard
+                  label="7-day"
+                  alpha={twrData.alpha?.since7d}
+                  botTWR={twrData.botTWR?.since7d}
+                  benchmarkTWR={twrData.benchmarkTWR?.since7d}
+                />
+                <TwrStatCard
+                  label="30-day"
+                  alpha={twrData.alpha?.since30d}
+                  botTWR={twrData.botTWR?.since30d}
+                  benchmarkTWR={twrData.benchmarkTWR?.since30d}
+                />
+                <TwrStatCard
+                  label="Inception"
+                  alpha={twrData.alpha?.sinceInception}
+                  botTWR={twrData.botTWR?.sinceInception}
+                  benchmarkTWR={twrData.benchmarkTWR?.sinceInception}
+                />
+              </div>
+
+              <div className="ct__twr-chart">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={twrData.series} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                    <XAxis
+                      dataKey="ts"
+                      tickFormatter={(ts) => {
+                        const d = new Date(ts);
+                        return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                      }}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      stroke="#2a2a3a"
+                      minTickGap={48}
+                    />
+                    <YAxis
+                      tickFormatter={(v) => `₩${(v / 1e6).toFixed(2)}M`}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      stroke="#2a2a3a"
+                      domain={['auto', 'auto']}
+                      width={64}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#0d0d0d', border: '1px solid #2a2a3a', fontSize: '0.75rem' }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      labelFormatter={(ts) => new Date(ts).toLocaleString('ko-KR')}
+                      formatter={(v, name) => [`₩${Math.round(Number(v)).toLocaleString('ko-KR')}`, name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '0.75rem', color: '#94a3b8' }} />
+                    <Line
+                      type="monotone"
+                      dataKey="botNav"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      name="Bot NAV"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="benchmarkNav"
+                      stroke="#94a3b8"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={false}
+                      isAnimationActive={false}
+                      name="Hodl Basket"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="ct__twr-footer ct__muted">
+                Inception: {new Date(twrData.inception.ts).toLocaleString('ko-KR')}
+                {' · NAV ₩'}{fmt(twrData.inception.nav)}
+                {' · weights '}
+                {Object.entries(twrData.inception.weights || {})
+                  .map(([k, v]) => `${k} ${(Number(v) * 100).toFixed(1)}%`).join(' / ')}
+                {twrData.seriesDownsampled && (
+                  <> · showing {twrData.series.length} of {twrData.seriesOriginalCount} points</>
+                )}
+              </div>
+            </>
+          )
+        )}
       </div>
 
       {/* ═══ WEEKLY SUMMARY ═══ */}
