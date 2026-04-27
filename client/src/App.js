@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
 import AuthStatus from './components/AuthStatus';
@@ -58,10 +58,12 @@ function App() {
       <header className="App-header">
         <div className="App-header__inner">
           <div className="App-header__brand">
-            <h1 className="App-header__title">
-              <img src="/logo.png" alt="" className="App-header__logo" />
-              <span>Sad Dagger</span>
-            </h1>
+            <Link to="/" className="App-header__title-link" aria-label="Sad Dagger home">
+              <h1 className="App-header__title">
+                <img src="/logo.png" alt="" className="App-header__logo" />
+                <span>Sad Dagger</span>
+              </h1>
+            </Link>
           </div>
 
           {/* Category segmented control — center column on desktop */}

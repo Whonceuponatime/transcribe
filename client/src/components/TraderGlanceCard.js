@@ -90,11 +90,6 @@ export default function TraderGlanceCard() {
   const recentTrades  = status?.recentTrades  ?? [];
   const lastTrade     = recentTrades[0] || null;
 
-  const positionsLine =
-    status == null
-      ? '— open positions'
-      : `${positions.length} open ${positions.length === 1 ? 'position' : 'positions'}`;
-
   const updatedLine = snapshotAt
     ? `${snapshotAge != null && snapshotAge > STALE_SNAPSHOT_S ? '⚠ ' : ''}Updated ${fmtTime(snapshotAt)}`
     : '—';
@@ -132,18 +127,25 @@ export default function TraderGlanceCard() {
       <div className="home-glance__hero">{fmtKrw(totalValueKrw)}</div>
 
       <div className="home-glance__sub">
-        Cash {fmtKrw(krwBalance)} · {positionsLine}
+        Cash <span className="home-glance__data">{fmtKrw(krwBalance)}</span>
+        {' '}·{' '}
+        <span className="home-glance__data">{status == null ? '—' : positions.length}</span>
+        {' '}{positions.length === 1 ? 'open position' : 'open positions'}
       </div>
 
       {lastTrade && (
         <div className="home-glance__recent">
-          Last: {String(lastTrade.side || '').toUpperCase()} {lastTrade.coin} · {timeAgo(lastTrade.executed_at)}
+          Last: <span className="home-glance__data">{String(lastTrade.side || '').toUpperCase()} {lastTrade.coin}</span>
+          {' '}·{' '}
+          <span className="home-glance__data">{timeAgo(lastTrade.executed_at)}</span>
         </div>
       )}
 
       <div className="home-glance__footer">
         <span className="home-glance__updated">{updatedLine}</span>
-        <Link to="/trader" className="home-glance__link">Open trader →</Link>
+        <Link to="/trader" className="home-glance__link">
+          Open trader <span className="home-glance__link-arrow" aria-hidden>→</span>
+        </Link>
       </div>
     </article>
   );

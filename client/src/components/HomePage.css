@@ -102,9 +102,15 @@
   display: inline-block;
 }
 
+@keyframes glance-dot-pulse {
+  0%, 100% { box-shadow: 0 0 5px var(--accent); }
+  50%      { box-shadow: 0 0 10px var(--accent); }
+}
+
 .home-glance__pill--status.is-online .home-glance__dot {
   background: var(--accent);
   box-shadow: 0 0 5px var(--accent);
+  animation: glance-dot-pulse 2s ease-in-out infinite;
 }
 
 .home-glance__pill--status.is-offline .home-glance__dot {
@@ -136,6 +142,11 @@
   font-family: var(--font-ui);
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.home-glance__data {
+  font-family: var(--font-brand);
+  color: var(--text);
 }
 
 .home-glance__footer {
@@ -171,6 +182,16 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+.home-glance__link-arrow {
+  display: inline-block;
+  margin-left: 0.15rem;
+  transition: transform 0.15s ease;
+}
+
+.home-glance__link:hover .home-glance__link-arrow {
+  transform: translateX(2px);
 }
 
 /* ───────── Tool grid ───────── */
@@ -243,12 +264,14 @@
   border-radius: var(--radius);
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .home-card:hover {
   border-color: var(--accent);
   background: var(--bg-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .home-card:focus-visible {
