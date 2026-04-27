@@ -169,7 +169,7 @@ export default function ImageToText() {
       </div>
 
       <div className="image-to-text-panes">
-        <div className="image-to-text-pane image-to-text-pane--input">
+        <div className="image-to-text-pane image-to-text-pane--input card">
           <label className="image-to-text-pane-label">Images (order preserved)</label>
           <div
             className={`image-to-text-dropzone ${hasImages ? 'has-images' : ''}`}
@@ -263,7 +263,7 @@ export default function ImageToText() {
           </div>
         </div>
 
-        <div className="image-to-text-pane image-to-text-pane--output">
+        <div className="image-to-text-pane image-to-text-pane--output card">
           <label className="image-to-text-pane-label">Transcribed text</label>
           <div className="image-to-text-output">
             {loading && (

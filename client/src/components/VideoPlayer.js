@@ -239,7 +239,7 @@ const VideoPlayer = ({ video, onTimeUpdate, isTranscribing }) => {
   };
 
   return (
-    <div className="video-player">
+    <div className="video-player card">
       <div className="video-container">
         <video
           ref={videoRef}

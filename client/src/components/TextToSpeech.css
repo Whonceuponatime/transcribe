@@ -45,11 +45,8 @@
 
 .tts-input-section,
 .tts-output-section {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  /* deliberate: preserves pre-existing 1.25rem panel padding at all breakpoints */
   padding: 1.25rem;
-  box-shadow: var(--shadow);
 }
 
 .file-upload-section,

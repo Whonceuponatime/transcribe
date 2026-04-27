@@ -162,7 +162,7 @@ Bob,35,Chicago`);
       </div>
 
       <div className="converter-container">
-        <div className="left-section">
+        <div className="left-section card">
           <div className="input-section">
             <div className="input-header">
               <h3>📝 Input</h3>
@@ -238,7 +238,7 @@ Bob,35,Chicago`);
           </div>
         </div>
 
-        <div className="right-section">
+        <div className="right-section card">
           <div className="output-section">
             <div className="output-header">
               <h3>📋 Excel-Ready Output (TSV)</h3>

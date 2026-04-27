@@ -449,7 +449,7 @@ const ImageConverter = () => {
       </div>
 
       <div className="converter-container">
-        <div className="left-section">
+        <div className="left-section card">
           <div className="upload-section">
             <h3>📁 Upload Images</h3>
             <div 
@@ -522,7 +522,7 @@ const ImageConverter = () => {
           )}
         </div>
 
-        <div className="right-section">
+        <div className="right-section card">
           <div className="settings-section">
             <h3>⚙️ Conversion Settings</h3>
             

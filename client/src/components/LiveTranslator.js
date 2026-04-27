@@ -330,10 +330,10 @@ const LiveTranslator = () => {
 
       {/* Transcription and Translation Display */}
       <div className="translation-display">
-        <div className="text-panel">
+        <div className="text-panel card">
           <div className="panel-header">
             <h4>
-              {sourceLanguage === 'en' ? 'English' : 'Tiếng Việt'} 
+              {sourceLanguage === 'en' ? 'English' : 'Tiếng Việt'}
               <span className="lang-badge">Original</span>
             </h4>
             {transcription && (
@@ -357,7 +357,7 @@ const LiveTranslator = () => {
           />
         </div>
 
-        <div className="text-panel">
+        <div className="text-panel card">
           <div className="panel-header">
             <h4>
               {targetLanguage === 'en' ? 'English' : 'Tiếng Việt'}

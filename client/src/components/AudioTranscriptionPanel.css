@@ -1,9 +1,6 @@
 .audio-transcription-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  /* deliberate: panel uses extra padding for breathing room */
   padding: 1.5rem;
-  box-shadow: var(--shadow);
   max-width: 800px;
   margin: 0 auto;
 }
@@ -259,10 +256,11 @@
 /* Responsive design */
 @media (max-width: 768px) {
   .audio-transcription-panel {
+    /* deliberate: tighter padding on small screens */
     padding: 1rem;
     margin: 1rem;
   }
-  
+
   .controls {
     flex-direction: column;
   }

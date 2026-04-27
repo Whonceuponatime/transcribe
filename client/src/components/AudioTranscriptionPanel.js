@@ -203,7 +203,7 @@ const AudioTranscriptionPanel = () => {
   };
 
   return (
-    <div className="audio-transcription-panel">
+    <div className="audio-transcription-panel card">
       <div className="panel-header">
         <h3>🎵 Audio Transcription</h3>
         <p className="subtitle">Direct audio-to-text transcription (no video processing)</p>

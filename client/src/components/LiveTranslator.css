@@ -267,9 +267,7 @@
 }
 
 .text-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  /* deliberate: preserves pre-existing 1rem panel padding at all breakpoints */
   padding: 1rem;
   display: flex;
   flex-direction: column;

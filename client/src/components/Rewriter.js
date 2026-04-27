@@ -138,7 +138,7 @@ export default function Rewriter() {
       </div>
 
       <div className="rewriter-panes">
-        <div className="rewriter-pane rewriter-pane--draft">
+        <div className="rewriter-pane rewriter-pane--draft card">
           <label className="rewriter-pane-label">Draft</label>
           <span className="rewriter-hint">Use <code>&lt;??word or hint??&gt;</code> for the AI to suggest the right vocabulary.</span>
           <textarea
@@ -149,7 +149,7 @@ export default function Rewriter() {
             rows={12}
           />
         </div>
-        <div className="rewriter-pane rewriter-pane--output">
+        <div className="rewriter-pane rewriter-pane--output card">
           <label className="rewriter-pane-label">Rewritten</label>
           <div className="rewriter-output">
             {loading ? (

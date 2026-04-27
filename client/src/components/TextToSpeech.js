@@ -159,7 +159,7 @@ const TextToSpeech = () => {
       </div>
 
       <div className="tts-container">
-        <div className="tts-input-section">
+        <div className="tts-input-section card">
           <div className="file-upload-section">
             <h3>Upload Text File</h3>
             <input
@@ -266,7 +266,7 @@ const TextToSpeech = () => {
           </div>
         </div>
 
-        <div className="tts-output-section">
+        <div className="tts-output-section card">
           <h3>Audio Player</h3>
           {audioUrl && (
             <div className="audio-player">

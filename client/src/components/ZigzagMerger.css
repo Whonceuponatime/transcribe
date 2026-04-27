@@ -33,8 +33,7 @@
 }
 
 .left-section, .right-section {
-  background: var(--bg-surface);
-  border: 1px solid white;
+  /* deliberate: 25px panel padding intentionally larger than .card's 1.25rem desktop default */
   padding: 25px;
   font-family: var(--font-brand);
 }

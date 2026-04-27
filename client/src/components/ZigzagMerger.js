@@ -197,7 +197,7 @@ const ZigzagMerger = () => {
       </div>
 
       <div className="merger-container">
-        <div className="left-section">
+        <div className="left-section card">
           <div className="merge-section">
             <h3>📎 Zigzag Merge</h3>
             
@@ -300,7 +300,7 @@ const ZigzagMerger = () => {
           </div>
         </div>
 
-        <div className="right-section">
+        <div className="right-section card">
           <div className="unzigzag-section">
             <h3>✂️ Unzigzag</h3>
             

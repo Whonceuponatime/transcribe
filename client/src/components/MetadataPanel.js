@@ -163,7 +163,7 @@ const MetadataPanel = () => {
       </div>
 
       <div className="metadata-container">
-        <div className="left-section">
+        <div className="left-section card">
           <div className="upload-section">
             <h3>📁 Upload Files</h3>
             <div className="upload-area">
@@ -206,7 +206,7 @@ const MetadataPanel = () => {
           )}
         </div>
 
-        <div className="right-section">
+        <div className="right-section card">
           <div className="options-section">
             <h3>⚙️ Metadata Options</h3>
             
