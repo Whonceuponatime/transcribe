@@ -939,6 +939,113 @@ export default function CryptoTraderDashboard() {
         })}
       </div>
 
+      {/* ═══ PERFORMANCE — BOT vs HODL BASKET ═══ */}
+      <div className="ct__section">
+        <h4
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setTwrPanelOpen((o) => !o)}
+        >
+          {twrPanelOpen ? '▾' : '▸'} Performance — Bot vs Hodl Basket
+        </h4>
+
+        {twrPanelOpen && (
+          !twrData ? (
+            <p className="ct__muted">Loading…</p>
+          ) : twrData.enabled === false ? (
+            <p className="ct__muted">
+              Benchmark disabled. Enable in Bot Config → Performance Benchmark.
+              {twrData.reason && twrData.reason !== 'disabled' && (
+                <span> (reason: {twrData.reason})</span>
+              )}
+            </p>
+          ) : (
+            <>
+              <div className="ct__twr-cards">
+                <TwrStatCard
+                  label="7-day"
+                  alpha={twrData.alpha?.since7d}
+                  botTWR={twrData.botTWR?.since7d}
+                  benchmarkTWR={twrData.benchmarkTWR?.since7d}
+                />
+                <TwrStatCard
+                  label="30-day"
+                  alpha={twrData.alpha?.since30d}
+                  botTWR={twrData.botTWR?.since30d}
+                  benchmarkTWR={twrData.benchmarkTWR?.since30d}
+                />
+                <TwrStatCard
+                  label="Inception"
+                  alpha={twrData.alpha?.sinceInception}
+                  botTWR={twrData.botTWR?.sinceInception}
+                  benchmarkTWR={twrData.benchmarkTWR?.sinceInception}
+                />
+              </div>
+
+              <div className="ct__twr-chart">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={twrData.series} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                    <XAxis
+                      dataKey="ts"
+                      tickFormatter={(ts) => {
+                        const d = new Date(ts);
+                        return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                      }}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      stroke="#2a2a3a"
+                      minTickGap={48}
+                    />
+                    <YAxis
+                      tickFormatter={(v) => `₩${(v / 1e6).toFixed(2)}M`}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      stroke="#2a2a3a"
+                      domain={['auto', 'auto']}
+                      width={64}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#0d0d0d', border: '1px solid #2a2a3a', fontSize: '0.75rem' }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      labelFormatter={(ts) => new Date(ts).toLocaleString('ko-KR')}
+                      formatter={(v, name) => [`₩${Math.round(Number(v)).toLocaleString('ko-KR')}`, name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '0.75rem', color: '#94a3b8' }} />
+                    <Line
+                      type="monotone"
+                      dataKey="botNav"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                      name="Bot NAV"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="benchmarkNav"
+                      stroke="#94a3b8"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={false}
+                      isAnimationActive={false}
+                      name="Hodl Basket"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="ct__twr-footer ct__muted">
+                Inception: {new Date(twrData.inception.ts).toLocaleString('ko-KR')}
+                {' · NAV ₩'}{fmt(twrData.inception.nav)}
+                {' · weights '}
+                {Object.entries(twrData.inception.weights || {})
+                  .map(([k, v]) => `${k} ${(Number(v) * 100).toFixed(1)}%`).join(' / ')}
+                {twrData.seriesDownsampled && (
+                  <> · showing {twrData.series.length} of {twrData.seriesOriginalCount} points</>
+                )}
+              </div>
+            </>
+          )
+        )}
+      </div>
+
       {/* ═══ PI + LAST CYCLE ═══ */}
       <div className="ct__section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
@@ -1876,113 +1983,6 @@ export default function CryptoTraderDashboard() {
             </div>
           );
         })()}
-      </div>
-
-      {/* ═══ PERFORMANCE — BOT vs HODL BASKET ═══ */}
-      <div className="ct__section">
-        <h4
-          style={{ cursor: 'pointer', userSelect: 'none' }}
-          onClick={() => setTwrPanelOpen((o) => !o)}
-        >
-          {twrPanelOpen ? '▾' : '▸'} Performance — Bot vs Hodl Basket
-        </h4>
-
-        {twrPanelOpen && (
-          !twrData ? (
-            <p className="ct__muted">Loading…</p>
-          ) : twrData.enabled === false ? (
-            <p className="ct__muted">
-              Benchmark disabled. Enable in Bot Config → Performance Benchmark.
-              {twrData.reason && twrData.reason !== 'disabled' && (
-                <span> (reason: {twrData.reason})</span>
-              )}
-            </p>
-          ) : (
-            <>
-              <div className="ct__twr-cards">
-                <TwrStatCard
-                  label="7-day"
-                  alpha={twrData.alpha?.since7d}
-                  botTWR={twrData.botTWR?.since7d}
-                  benchmarkTWR={twrData.benchmarkTWR?.since7d}
-                />
-                <TwrStatCard
-                  label="30-day"
-                  alpha={twrData.alpha?.since30d}
-                  botTWR={twrData.botTWR?.since30d}
-                  benchmarkTWR={twrData.benchmarkTWR?.since30d}
-                />
-                <TwrStatCard
-                  label="Inception"
-                  alpha={twrData.alpha?.sinceInception}
-                  botTWR={twrData.botTWR?.sinceInception}
-                  benchmarkTWR={twrData.benchmarkTWR?.sinceInception}
-                />
-              </div>
-
-              <div className="ct__twr-chart">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={twrData.series} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
-                    <XAxis
-                      dataKey="ts"
-                      tickFormatter={(ts) => {
-                        const d = new Date(ts);
-                        return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                      }}
-                      tick={{ fill: '#94a3b8', fontSize: 11 }}
-                      stroke="#2a2a3a"
-                      minTickGap={48}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => `₩${(v / 1e6).toFixed(2)}M`}
-                      tick={{ fill: '#94a3b8', fontSize: 11 }}
-                      stroke="#2a2a3a"
-                      domain={['auto', 'auto']}
-                      width={64}
-                    />
-                    <Tooltip
-                      contentStyle={{ background: '#0d0d0d', border: '1px solid #2a2a3a', fontSize: '0.75rem' }}
-                      labelStyle={{ color: '#94a3b8' }}
-                      labelFormatter={(ts) => new Date(ts).toLocaleString('ko-KR')}
-                      formatter={(v, name) => [`₩${Math.round(Number(v)).toLocaleString('ko-KR')}`, name]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '0.75rem', color: '#94a3b8' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="botNav"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
-                      name="Bot NAV"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="benchmarkNav"
-                      stroke="#94a3b8"
-                      strokeWidth={2}
-                      strokeDasharray="4 4"
-                      dot={false}
-                      isAnimationActive={false}
-                      name="Hodl Basket"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="ct__twr-footer ct__muted">
-                Inception: {new Date(twrData.inception.ts).toLocaleString('ko-KR')}
-                {' · NAV ₩'}{fmt(twrData.inception.nav)}
-                {' · weights '}
-                {Object.entries(twrData.inception.weights || {})
-                  .map(([k, v]) => `${k} ${(Number(v) * 100).toFixed(1)}%`).join(' / ')}
-                {twrData.seriesDownsampled && (
-                  <> · showing {twrData.series.length} of {twrData.seriesOriginalCount} points</>
-                )}
-              </div>
-            </>
-          )
-        )}
       </div>
 
       {/* ═══ WEEKLY SUMMARY ═══ */}
