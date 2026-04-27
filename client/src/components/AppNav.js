@@ -1,37 +1,52 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Languages,
+  Folder,
+  Bot,
+  Video,
+  Music,
+  ScanText,
+  Pencil,
+  Volume2,
+  Image,
+  Table,
+  Files,
+  Shield,
+} from 'lucide-react';
 
 const CATEGORIES = {
   dashboard: {
     label: 'Dashboard',
-    icon: '📊',
+    Icon: LayoutDashboard,
     shortLabel: 'Home',
     tools: [
-      { id: 'crypto-trader', label: 'Upbit Bot', icon: '🤖', path: '/trader' },
+      { id: 'crypto-trader', label: 'Upbit Bot', Icon: Bot, path: '/trader' },
     ],
   },
   language: {
     label: 'Language',
-    icon: '🌐',
+    Icon: Languages,
     shortLabel: 'Language',
     tools: [
-      { id: 'transcription',  label: 'Video Transcribe', icon: '🎬', path: '/video-transcribe' },
-      { id: 'audio',          label: 'Audio Transcribe', icon: '🎵', path: '/audio-transcribe' },
-      { id: 'translator',     label: 'Live Translate',   icon: '🌐', path: '/translate' },
-      { id: 'image-to-text',  label: 'Image to Text',    icon: '📷', path: '/image-to-text' },
-      { id: 'rewriter',       label: 'Rewriter',         icon: '✉️', path: '/rewriter' },
-      { id: 'tts',            label: 'Text to Speech',   icon: '📖', path: '/tts' },
+      { id: 'transcription',  label: 'Video Transcribe', Icon: Video,    path: '/video-transcribe' },
+      { id: 'audio',          label: 'Audio Transcribe', Icon: Music,    path: '/audio-transcribe' },
+      { id: 'translator',     label: 'Live Translate',   Icon: Languages, path: '/translate' },
+      { id: 'image-to-text',  label: 'Image to Text',    Icon: ScanText, path: '/image-to-text' },
+      { id: 'rewriter',       label: 'Rewriter',         Icon: Pencil,   path: '/rewriter' },
+      { id: 'tts',            label: 'Text to Speech',   Icon: Volume2,  path: '/tts' },
     ],
   },
   files: {
     label: 'Files',
-    icon: '📁',
+    Icon: Folder,
     shortLabel: 'Files',
     tools: [
-      { id: 'converter',    label: 'Image Convert', icon: '🖼️', path: '/image-convert' },
-      { id: 'markdown-csv', label: 'Markdown/CSV',  icon: '📊', path: '/markdown-csv' },
-      { id: 'zigzag',       label: 'Zigzag PDF',    icon: '📄', path: '/zigzag' },
-      { id: 'metadata',     label: 'Metadata',      icon: '🛡️', path: '/metadata' },
+      { id: 'converter',    label: 'Image Convert', Icon: Image,  path: '/image-convert' },
+      { id: 'markdown-csv', label: 'Markdown/CSV',  Icon: Table,  path: '/markdown-csv' },
+      { id: 'zigzag',       label: 'Zigzag PDF',    Icon: Files,  path: '/zigzag' },
+      { id: 'metadata',     label: 'Metadata',      Icon: Shield, path: '/metadata' },
     ],
   },
 };
@@ -71,7 +86,7 @@ export default function AppNav({ activeCategory, setActiveCategory }) {
                     aria-selected={isActive}
                     className={`nav-tool-btn ${isActive ? 'active' : ''}`}
                   >
-                    <span aria-hidden>{tool.icon}</span>
+                    <tool.Icon size={16} aria-hidden />
                     <span className="nav-tool-btn__label">{tool.label}</span>
                   </NavLink>
                 );
@@ -89,6 +104,7 @@ export default function AppNav({ activeCategory, setActiveCategory }) {
                 className={`nav-category-btn ${activeCategory === key ? 'active' : ''}`}
                 onClick={() => setActiveCategory(key)}
               >
+                <cat.Icon size={14} aria-hidden />
                 {cat.label}
               </button>
             ))}
@@ -109,7 +125,9 @@ export default function AppNav({ activeCategory, setActiveCategory }) {
               aria-current={isActive ? 'page' : undefined}
               className={`nav-bottom-btn nav-bottom-btn--tool ${isActive ? 'active' : ''}`}
             >
-              <span className="nav-bottom-btn__icon" aria-hidden>{tool.icon}</span>
+              <span className="nav-bottom-btn__icon" aria-hidden>
+                <tool.Icon size={16} aria-hidden />
+              </span>
               <span className="nav-bottom-btn__label">{tool.label}</span>
             </NavLink>
           );

@@ -62,7 +62,6 @@ function App() {
               <img src="/logo.png" alt="" className="App-header__logo" />
               <span>Sad Dagger</span>
             </h1>
-            <p className="App-header__tagline">Transcription, conversion &amp; utilities</p>
           </div>
 
           {/* Category segmented control — center column on desktop */}

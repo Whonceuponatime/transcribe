@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Bot } from 'lucide-react';
 
 const POLL_MS = 30000;
 const STALE_SNAPSHOT_S = 600;
@@ -101,7 +102,10 @@ export default function TraderGlanceCard() {
   return (
     <article className="card home-glance" aria-label="Upbit bot at-a-glance">
       <div className="home-glance__header">
-        <h3 className="home-glance__title">Upbit Bot</h3>
+        <h3 className="home-glance__title">
+          <Bot size={20} className="home-glance__title-icon" />
+          <span>Upbit Bot</span>
+        </h3>
         <div className="home-glance__pills">
           {killSwitch && (
             <span className="home-glance__pill home-glance__pill--kill" title="Kill switch active">

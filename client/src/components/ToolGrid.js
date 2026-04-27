@@ -35,7 +35,9 @@ export default function ToolGrid() {
                   to={tool.path}
                   className={`home-card home-card--${key}`}
                 >
-                  <span className="home-card__icon" aria-hidden>{tool.icon}</span>
+                  <span className="home-card__icon" aria-hidden>
+                    <tool.Icon size={28} />
+                  </span>
                   <span className="home-card__title">{tool.label}</span>
                   <span className="home-card__desc">
                     {TOOL_DESCRIPTIONS[tool.path] || ''}

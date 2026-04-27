@@ -285,6 +285,9 @@ body {
   flex-shrink: 0;
   touch-action: manipulation;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .nav-category-btn:hover {
