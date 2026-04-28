@@ -354,8 +354,11 @@ const ImageConverter = () => {
       }
 
       const result = await response.json();
-      setConvertedFiles(result.convertedFiles || []);
-      setConversionStatus(`Conversion completed. ${result.convertedCount || result.convertedFiles.length} of ${result.totalFiles || uploadedFiles.length} files converted successfully.`);
+      const converted = (result.convertedFiles || []).map(f =>
+        typeof f === 'string' ? { filename: f, dataUrl: null } : f
+      );
+      setConvertedFiles(converted);
+      setConversionStatus(`Conversion completed. ${result.convertedCount || converted.length} of ${result.totalFiles || uploadedFiles.length} files converted successfully.`);
       setConversionProgress(100);
 
     } catch (error) {
@@ -378,41 +381,32 @@ const ImageConverter = () => {
     }
   };
 
-  const downloadFile = (filename) => {
+  const triggerDownload = (href, filename) => {
     const link = document.createElement('a');
-    link.href = `/api/download-converted-file/${encodeURIComponent(filename)}`;
+    link.href = href;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const downloadFile = (file) => {
+    if (file && file.dataUrl) {
+      triggerDownload(file.dataUrl, file.filename);
+      return;
+    }
+    const filename = typeof file === 'string' ? file : file?.filename;
+    if (!filename) return;
+    triggerDownload(`/api/download-converted-file/${encodeURIComponent(filename)}`, filename);
+  };
+
   const downloadAllFiles = async () => {
-    try {
-      const response = await fetch('/api/download-all-converted-files', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ files: convertedFiles })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to download files');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'converted-images.zip';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading files:', error);
-      alert('Failed to download files');
+    if (convertedFiles.length === 0) return;
+    for (let i = 0; i < convertedFiles.length; i++) {
+      downloadFile(convertedFiles[i]);
+      // Small delay between downloads so the browser doesn't drop them
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise(resolve => setTimeout(resolve, 150));
     }
   };
 
@@ -651,17 +645,20 @@ const ImageConverter = () => {
               <div className="results-section">
                 <h4>Converted Files ({convertedFiles.length})</h4>
                 <div className="converted-files">
-                  {convertedFiles.map((filename, index) => (
-                    <div key={index} className="converted-file-item">
-                      <span>{filename}</span>
-                      <button 
-                        className="download-btn"
-                        onClick={() => downloadFile(filename)}
-                      >
-                        Download
-                      </button>
-                    </div>
-                  ))}
+                  {convertedFiles.map((file, index) => {
+                    const filename = typeof file === 'string' ? file : file.filename;
+                    return (
+                      <div key={index} className="converted-file-item">
+                        <span>{filename}</span>
+                        <button
+                          className="download-btn"
+                          onClick={() => downloadFile(file)}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
                 <button 
                   className="download-all-btn"
