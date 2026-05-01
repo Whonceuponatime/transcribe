@@ -14,11 +14,13 @@ const TextToSpeech = () => {
   const [selectedVoice, setSelectedVoice] = useState('jOEnNSVLOHUgmrNwfqQE');
   const [selectedProvider, setSelectedProvider] = useState('elevenlabs');
   const [currentTextName, setCurrentTextName] = useState('');
+  const [customVoiceId, setCustomVoiceId] = useState('');
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const elevenlabsVoices = [
-    { value: 'jOEnNSVLOHUgmrNwfqQE', label: 'Custom Voice (ElevenLabs)' }
+    { value: 'jOEnNSVLOHUgmrNwfqQE', label: 'Custom Voice (ElevenLabs)' },
+    { value: '__custom__', label: 'Custom voice ID...' }
   ];
 
   const openaiVoices = [
@@ -48,6 +50,19 @@ const TextToSpeech = () => {
       return;
     }
 
+    const resolvedVoiceId = selectedProvider === 'elevenlabs' && selectedVoice === '__custom__'
+      ? customVoiceId.trim()
+      : selectedVoice;
+
+    if (selectedProvider === 'elevenlabs' && selectedVoice === '__custom__' && !resolvedVoiceId) {
+      alert('Please paste a voice ID, or pick a preset.');
+      return;
+    }
+
+    const requestBody = selectedProvider === 'elevenlabs'
+      ? { text, voiceId: resolvedVoiceId, modelId: 'eleven_multilingual_v2' }
+      : { text, voice: selectedVoice, provider: selectedProvider };
+
     setIsConverting(true);
     try {
       const response = await fetch('/api/text-to-speech', {
@@ -55,36 +70,39 @@ const TextToSpeech = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          text: text,
-          voice: selectedVoice,
-          provider: selectedProvider
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to convert text to speech');
+        let msg = 'Failed to convert text to speech';
+        try {
+          const errBody = await response.json();
+          if (errBody && errBody.error) {
+            msg = errBody.error + (errBody.detail ? `\n\nDetail: ${errBody.detail}` : '');
+          }
+        } catch (_) { /* fall back to generic message */ }
+        throw new Error(msg);
       }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
-      
+
       // Save to history
       const newText = {
         id: Date.now(),
         name: currentTextName || `Text ${savedTexts.length + 1}`,
         text: text,
-        voice: selectedVoice,
+        voice: resolvedVoiceId,
         provider: selectedProvider,
         timestamp: new Date().toLocaleString(),
         audioUrl: url
       };
       setSavedTexts(prev => [newText, ...prev]);
-      
+
     } catch (error) {
       console.error('Error converting text to speech:', error);
-      alert('Failed to convert text to speech. Please try again.');
+      alert(error.message || 'Failed to convert text to speech. Please try again.');
     } finally {
       setIsConverting(false);
     }
@@ -206,8 +224,8 @@ const TextToSpeech = () => {
                 OpenAI (Faster)
               </label>
             </div>
-            <select 
-              value={selectedVoice} 
+            <select
+              value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
               className="voice-select"
             >
@@ -225,6 +243,21 @@ const TextToSpeech = () => {
                 ))
               )}
             </select>
+            {selectedProvider === 'elevenlabs' && selectedVoice === '__custom__' && (
+              <>
+                <label htmlFor="tts-custom-voice-id" className="input-label" style={{ marginTop: '0.75rem' }}>
+                  Voice ID
+                </label>
+                <input
+                  id="tts-custom-voice-id"
+                  type="text"
+                  placeholder="Paste from ElevenLabs (e.g. 21m00Tcm4TlvDq8ikWAM)"
+                  value={customVoiceId}
+                  onChange={(e) => setCustomVoiceId(e.target.value)}
+                  className="text-name-input"
+                />
+              </>
+            )}
           </div>
 
           <div className="text-input-section">
@@ -243,12 +276,12 @@ const TextToSpeech = () => {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Paste or type your text here... (max 4000 characters)"
+              placeholder="Paste or type your text here... (max 50,000 characters)"
               className="text-input"
-              maxLength={4000}
+              maxLength={50000}
             />
             <div className="text-counter">
-              {text.length}/4000 characters
+              {text.length}/50000 characters
             </div>
           </div>
 
